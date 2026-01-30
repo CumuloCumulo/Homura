@@ -17,14 +17,30 @@ export interface ElementAnalysis {
   target?: HTMLElement;
   /** Nearest repeating container (not serializable through Chrome messaging) */
   container?: HTMLElement | null;
+  /** Semantic container found by findSemanticContainer (not serializable) */
+  semanticContainer?: HTMLElement | null;
   /** Container type */
   containerType: ContainerType;
   /** Anchor candidates for dynamic matching */
   anchorCandidates: AnchorCandidate[];
   /** Target selector relative to container */
   relativeSelector: string;
-  /** Minimal selector for target (fallback) */
+  /** 
+   * Minimal selector for target (now includes container prefix when available)
+   * @example ".search-bar button" instead of just "button"
+   */
   minimalSelector: string;
+  /** 
+   * Target-only selector (without container prefix)
+   * @example "button"
+   */
+  targetSelector?: string;
+  /**
+   * Full scoped selector: "container target"
+   * This is the recommended selector for execution
+   * @example ".search-bar button"
+   */
+  scopedSelector?: string;
   /** Container selector (serializable) */
   containerSelector?: string;
   /** Container tag name (serializable) */

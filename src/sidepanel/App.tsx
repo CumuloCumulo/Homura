@@ -11,7 +11,6 @@ import React from 'react';
 import { Header } from './components/Header';
 import { LogViewer } from './components/LogViewer';
 import { InspectMode } from './components/InspectMode';
-import { SelectorBuilder } from './components/SelectorBuilder';
 import { RecordingPanel } from './components/RecordingPanel';
 import { useRecordingStore } from './stores/recordingStore';
 
@@ -25,12 +24,6 @@ const InspectIcon = () => (
 const RecordIcon = () => (
   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-  </svg>
-);
-
-const BuildIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
   </svg>
 );
 
@@ -80,12 +73,6 @@ export default function App() {
           label="录制"
           indicator={isRecording ? 'recording' : undefined}
         />
-        <TabButton
-          active={mode === 'build'}
-          onClick={() => setMode('build')}
-          icon={<BuildIcon />}
-          label="构建"
-        />
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -133,7 +120,6 @@ export default function App() {
           <>
             {mode === 'inspect' && <InspectMode />}
             {mode === 'record' && <RecordingPanel />}
-            {mode === 'build' && <SelectorBuilder />}
           </>
         )}
       </div>

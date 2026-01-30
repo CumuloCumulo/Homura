@@ -14,7 +14,7 @@ import type {
 } from '@shared/selectorBuilder';
 import type { LogEntry } from '@shared/types';
 
-export type RecordingMode = 'inspect' | 'record' | 'build';
+export type RecordingMode = 'inspect' | 'record';
 
 interface RecordingStore {
   /** Current mode */
@@ -74,7 +74,7 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   setRecording: (active) => set({ isRecording: active }),
   setHoveredElement: (element) => set({ hoveredElement: element }),
   setSelectedElement: (element) => set({ selectedElement: element }),
-  setAnalysis: (analysis) => set({ analysis }),
+  setAnalysis: (analysis) => set({ analysis, selectorDraft: null }),  // Reset draft when analysis changes
   setSelectorDraft: (draft) => set({ selectorDraft: draft }),
   addRecordedAction: (action) => set((state) => ({
     recordedActions: [...state.recordedActions, action],

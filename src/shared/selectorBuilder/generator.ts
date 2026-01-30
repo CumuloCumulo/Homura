@@ -23,8 +23,11 @@ export function generateSelectorLogic(
 ): SelectorLogic {
   const { action, anchorValue, preferredAnchor } = options;
   
+  // Check for container using serializable fields (works across Chrome messaging)
+  const hasContainer = !!(analysis.container || analysis.containerSelector || analysis.containerTagName);
+  
   // If no container found, return simple target-only logic
-  if (!analysis.container) {
+  if (!hasContainer) {
     return {
       target: {
         selector: analysis.minimalSelector,
@@ -51,43 +54,61 @@ export function generateSelectorLogic(
 
 /**
  * Build scope from container analysis
+ * 
+ * Note: This function may be called with analysis from Chrome messaging,
+ * where container is not a real HTMLElement (DOM methods are lost).
+ * We use containerSelector and containerTagName for serialized data.
  */
 function buildScope(analysis: ElementAnalysis): SelectorScope {
-  const container = analysis.container!;
-  const parent = container.parentElement;
-  
   let selector = '';
   
-  // Build selector for the container pattern
-  if (analysis.containerType === 'table') {
-    // For table rows, find the table
-    const table = container.closest('table') as HTMLElement | null;
-    if (table) {
-      const tableSelector = buildMinimalSelector(table);
-      selector = `${tableSelector} tbody tr`;
-    } else {
-      selector = 'tr';
-    }
-  } else if (analysis.containerType === 'list') {
-    // For list items, find the list
-    const list = container.closest('ul, ol') as HTMLElement | null;
-    if (list) {
-      const listSelector = buildMinimalSelector(list);
-      selector = `${listSelector} li`;
-    } else {
-      selector = 'li';
-    }
-  } else {
-    // For other containers, use the container's selector
-    selector = buildMinimalSelector(container);
+  // Prefer using serialized container data (works across Chrome messaging)
+  if (analysis.containerSelector) {
+    selector = analysis.containerSelector;
+  } else if (analysis.container && typeof analysis.container.tagName === 'string') {
+    // Fallback: container is a real HTMLElement (same context)
+    const container = analysis.container;
+    const parent = container.parentElement;
     
-    // If parent has a recognizable pattern, use it
-    if (parent) {
-      const parentSelector = buildMinimalSelector(parent as HTMLElement);
-      if (parentSelector.includes('.') || parentSelector.includes('[')) {
-        selector = `${parentSelector} > ${container.tagName.toLowerCase()}`;
+    // Build selector for the container pattern
+    if (analysis.containerType === 'table') {
+      const table = container.closest('table') as HTMLElement | null;
+      if (table) {
+        const tableSelector = buildMinimalSelector(table);
+        selector = `${tableSelector} tbody tr`;
+      } else {
+        selector = 'tr';
+      }
+    } else if (analysis.containerType === 'list') {
+      const list = container.closest('ul, ol') as HTMLElement | null;
+      if (list) {
+        const listSelector = buildMinimalSelector(list);
+        selector = `${listSelector} li`;
+      } else {
+        selector = 'li';
+      }
+    } else {
+      selector = buildMinimalSelector(container);
+      
+      if (parent) {
+        const parentSelector = buildMinimalSelector(parent as HTMLElement);
+        if (parentSelector.includes('.') || parentSelector.includes('[')) {
+          selector = `${parentSelector} > ${container.tagName.toLowerCase()}`;
+        }
       }
     }
+  } else if (analysis.containerTagName) {
+    // Fallback: use serialized tag name
+    if (analysis.containerType === 'table') {
+      selector = 'tr';
+    } else if (analysis.containerType === 'list') {
+      selector = 'li';
+    } else {
+      selector = analysis.containerTagName;
+    }
+  } else {
+    // Ultimate fallback
+    selector = '*';
   }
   
   return {
@@ -139,17 +160,24 @@ function buildTarget(analysis: ElementAnalysis, action: PrimitiveAction): Select
 
 /**
  * Create a selector draft for preview/editing
+ * 
+ * Note: analysis may come from Chrome messaging where HTMLElement objects are lost.
+ * We check for containerSelector/containerTagName as indicators of container presence.
  */
 export function createSelectorDraft(
   analysis: ElementAnalysis,
   action: PrimitiveAction = 'CLICK'
 ): SelectorDraft {
-  const hasContainer = !!analysis.container;
-  const topAnchor = analysis.anchorCandidates[0];
+  // Check for container using serializable fields (works across Chrome messaging)
+  const hasContainer = !!(analysis.container || analysis.containerSelector || analysis.containerTagName);
+  const topAnchor = analysis.anchorCandidates?.[0];
+  
+  // Use targetSelector if available, otherwise fall back to relativeSelector or minimalSelector
+  const targetSelector = analysis.targetSelector || analysis.relativeSelector || analysis.minimalSelector;
   
   const draft: SelectorDraft = {
     target: {
-      selector: analysis.relativeSelector || analysis.minimalSelector,
+      selector: targetSelector,
       action,
     },
     confidence: hasContainer ? 0.8 : 0.5,
@@ -215,6 +243,9 @@ export function generateSelectorStrategies(
 ): SelectorLogic[] {
   const strategies: SelectorLogic[] = [];
   
+  // Check for container using serializable fields (works across Chrome messaging)
+  const hasContainer = !!(analysis.container || analysis.containerSelector || analysis.containerTagName);
+  
   // Strategy 1: Simple target (no scope/anchor)
   strategies.push({
     target: {
@@ -224,19 +255,19 @@ export function generateSelectorStrategies(
   });
   
   // Strategy 2: With scope but no anchor
-  if (analysis.container) {
+  if (hasContainer) {
     const scope = buildScope(analysis);
     strategies.push({
       scope,
       target: {
-        selector: analysis.relativeSelector,
+        selector: analysis.relativeSelector || analysis.targetSelector || analysis.minimalSelector,
         action,
       },
     });
   }
   
   // Strategy 3+: With different anchor candidates
-  if (analysis.container && analysis.anchorCandidates.length > 0) {
+  if (hasContainer && analysis.anchorCandidates?.length > 0) {
     for (const anchor of analysis.anchorCandidates.slice(0, 3)) {
       const logic = generateSelectorLogic(analysis, {
         action,

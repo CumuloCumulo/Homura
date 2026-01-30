@@ -18,32 +18,54 @@ const UNIQUE_ATTRIBUTES = ['id', 'data-id', 'data-testid', 'data-key', 'name'];
 // Semantic attributes for selectors
 const SEMANTIC_ATTRIBUTES = ['role', 'aria-label', 'title', 'data-testid'];
 
+// Patterns for identifying semantic class names (stable container identifiers)
+const SEMANTIC_CLASS_PATTERNS = [
+  /^(search|header|footer|nav|sidebar|content|main|form|modal|dialog|toolbar|menu)/i,
+  /(-bar|-box|-panel|-container|-wrapper|-section|-area|-card|-item|-group|-block)$/i,
+  /^(btn-group|input-group|form-group|card-body|card-header|list-group)/i,
+];
+
 /**
  * Analyze an element and extract selector-relevant information
  */
 export function analyzeElement(element: HTMLElement): ElementAnalysis {
-  // 1. Find repeating container
-  const container = findRepeatingContainer(element);
+  // 1. Find repeating container (for lists/tables with siblings)
+  const repeatingContainer = findRepeatingContainer(element);
   
-  // 2. Determine container type
+  // 2. Find semantic container (for single elements like search button)
+  const semanticContainer = findSemanticContainer(element);
+  
+  // 3. Use the more specific one: repeating > semantic
+  const container = repeatingContainer || semanticContainer;
+  
+  // 4. Determine container type
   const containerType = container ? detectContainerType(container) : 'single';
   
-  // 3. Find anchor candidates within container
+  // 5. Find anchor candidates within container
   const anchorCandidates = container 
     ? findAnchorCandidates(container) 
     : [];
   
-  // 4. Build relative selector (from container to target)
+  // 6. Build relative selector (from container to target)
   const relativeSelector = container
     ? buildRelativeSelector(element, container)
     : '';
   
-  // 5. Build minimal selector (fallback)
-  const minimalSelector = buildMinimalSelector(element);
+  // 7. Build minimal selector for the element itself
+  const targetSelector = buildMinimalSelector(element, container || undefined);
 
-  // 6. Build serializable container info (for Chrome messaging)
+  // 8. Build serializable container info (for Chrome messaging)
   const containerSelector = container ? buildMinimalSelector(container) : undefined;
   const containerTagName = container ? container.tagName.toLowerCase() : undefined;
+
+  // 9. Build scoped selector: "container target" for precise element location
+  // This is the key improvement - always use container context when available
+  const scopedSelector = containerSelector 
+    ? `${containerSelector} ${targetSelector}`
+    : targetSelector;
+
+  // 10. For backward compatibility, minimalSelector now returns the scoped version
+  const minimalSelector = scopedSelector;
 
   return {
     target: element,
@@ -54,6 +76,10 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
     minimalSelector,
     containerSelector,
     containerTagName,
+    // New fields for explicit scope handling
+    targetSelector,
+    scopedSelector,
+    semanticContainer,
   };
 }
 
@@ -87,6 +113,53 @@ export function findRepeatingContainer(element: HTMLElement): HTMLElement | null
     }
     
     current = parent;
+  }
+  
+  return null;
+}
+
+/**
+ * Find the nearest ancestor with semantic class/id (not requiring siblings)
+ * 
+ * This is different from findRepeatingContainer:
+ * - findRepeatingContainer: finds containers with similar siblings (table rows, list items)
+ * - findSemanticContainer: finds containers with semantic identifiers (search-bar, form-group)
+ * 
+ * Use case: <div class="search-bar"><button>Search</button></div>
+ * - The button has no semantic attributes
+ * - But its parent .search-bar is a stable, semantic container
+ * - We use ".search-bar button" instead of just "button"
+ */
+export function findSemanticContainer(element: HTMLElement): HTMLElement | null {
+  let current = element.parentElement;
+  
+  while (current && current !== document.body) {
+    // Check for stable ID (not dynamic/random)
+    if (current.id && !current.id.match(/\d{5,}|uid|uuid|random|react|vue|ng-/i)) {
+      return current;
+    }
+    
+    // Check for data-testid (designed for automation)
+    if (current.getAttribute('data-testid')) {
+      return current;
+    }
+    
+    // Check for semantic class names
+    const hasSemanticClass = Array.from(current.classList).some(cls =>
+      SEMANTIC_CLASS_PATTERNS.some(pattern => pattern.test(cls))
+    );
+    
+    if (hasSemanticClass) {
+      return current;
+    }
+    
+    // Check for semantic tag + class combination (like form, nav, header, etc.)
+    const semanticTags = ['FORM', 'NAV', 'HEADER', 'FOOTER', 'ASIDE', 'MAIN', 'SECTION', 'ARTICLE'];
+    if (semanticTags.includes(current.tagName) && current.classList.length > 0) {
+      return current;
+    }
+    
+    current = current.parentElement;
   }
   
   return null;
@@ -248,52 +321,70 @@ function isLikelyUnique(text: string): boolean {
 
 /**
  * Build a minimal CSS selector for an element
+ * 
+ * Design philosophy:
+ * - Use structurally stable selectors (avoid dynamic IDs, text content)
+ * - Rely on container + structural position (nth-of-type) for disambiguation
+ * - Text matching should be handled by Anchor mechanism, not selectors
+ * - Only use standard CSS selectors (no jQuery extensions like :contains)
  */
 export function buildMinimalSelector(
   element: HTMLElement, 
-  _context?: HTMLElement
+  context?: HTMLElement
 ): string {
-  // Priority 1: ID (only if not dynamic)
-  if (element.id && !element.id.match(/\d{5,}|uid|uuid|random/i)) {
+  const tag = element.tagName.toLowerCase();
+  
+  // Priority 1: Stable ID (only if not dynamic/random)
+  if (element.id && !element.id.match(/\d{5,}|uid|uuid|random|react|vue/i)) {
     return `#${CSS.escape(element.id)}`;
   }
   
-  // Priority 2: data-testid
+  // Priority 2: data-testid (designed for automation)
   const testId = element.getAttribute('data-testid');
   if (testId) {
     return `[data-testid="${testId}"]`;
   }
   
-  // Priority 3: Tag + semantic class
-  const tag = element.tagName.toLowerCase();
-  const classes = Array.from(element.classList)
-    .filter(c => !c.match(/\d{5,}|active|hover|focus|selected|disabled/i))
-    .slice(0, 2);
-  
-  if (classes.length > 0) {
-    return `${tag}.${classes.join('.')}`;
+  // Priority 3: Stable semantic attributes
+  const name = element.getAttribute('name');
+  if (name && !name.match(/\d{5,}/)) {
+    return `${tag}[name="${name}"]`;
   }
   
-  // Priority 4: Tag + role or type
+  // Priority 4: Tag + semantic/stable classes
+  const stableClasses = Array.from(element.classList)
+    .filter(c => !c.match(/\d{5,}|active|hover|focus|selected|disabled|ng-|vue-|react-/i))
+    .slice(0, 2);
+  
+  if (stableClasses.length > 0) {
+    return `${tag}.${stableClasses.join('.')}`;
+  }
+  
+  // Priority 5: Tag + role or type attributes
   const role = element.getAttribute('role');
   if (role) {
     return `${tag}[role="${role}"]`;
   }
   
   const type = element.getAttribute('type');
-  if (type && ['button', 'submit', 'text', 'checkbox'].includes(type)) {
+  if (type && ['button', 'submit', 'text', 'checkbox', 'radio', 'email', 'password'].includes(type)) {
     return `${tag}[type="${type}"]`;
   }
   
-  // Priority 5: Just the tag (for common containers)
-  if (['BUTTON', 'INPUT', 'A', 'SELECT'].includes(element.tagName)) {
-    // Add distinguishing text content
-    const text = element.textContent?.trim().slice(0, 20);
-    if (text) {
-      return `${tag}:contains("${text}")`;
+  // Priority 6: Structural position within context/parent
+  // Use nth-of-type for disambiguation when no semantic attributes exist
+  const parent = context || element.parentElement;
+  if (parent) {
+    const siblings = Array.from(parent.querySelectorAll(`:scope > ${tag}`));
+    if (siblings.length > 1) {
+      const index = siblings.indexOf(element) + 1;
+      if (index > 0) {
+        return `${tag}:nth-of-type(${index})`;
+      }
     }
   }
   
+  // Fallback: just the tag (rely on container context for uniqueness)
   return tag;
 }
 
