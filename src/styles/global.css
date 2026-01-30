@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   Homura - Deep Space / Cyberpunk Zen Theme
+   ============================================ */
+
+/* Custom scrollbar - ultra minimal */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.3);
+}
+
+/* Base styles */
+body {
+  @apply bg-zinc-950 text-zinc-300 antialiased;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Text selection */
+::selection {
+  @apply bg-violet-500/30;
+}
+
+/* Code blocks - monospace */
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', 'Geist Mono', 'Fira Code', monospace;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+/* Focus rings - subtle violet */
+*:focus-visible {
+  @apply outline-none ring-1 ring-violet-500/50 ring-offset-0;
+}
+
+/* Smooth transitions for interactive elements */
+button, a, input, [role="button"] {
+  @apply transition-all duration-200 ease-out;
+}
+
+/* Utility: Glass effect */
+.glass {
+  @apply bg-zinc-900/50 backdrop-blur-md border border-white/5;
+}
+
+/* Utility: Inner shadow (凹陷效果) */
+.inner-shadow {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Utility: Neon glow on hover */
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+}
+
+/* Utility: Gradient text */
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-400;
+}
+
+/* Animation: Breathing dot */
+@keyframes breathing {
+  0%, 100% { opacity: 0.4; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.animate-breathing {
+  animation: breathing 3s ease-in-out infinite;
+}
+
+/* Collapsed/Expanded transition helper */
+.collapse-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease-out;
+}
+
+.collapse-content.expanded {
+  grid-template-rows: 1fr;
+}
+
+.collapse-content > div {
+  overflow: hidden;
+}

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="flame" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ea580c"/>
+      <stop offset="100%" style="stop-color:#f97316"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="24" fill="#1f1f1f"/>
+  <text x="64" y="88" font-family="Arial Black, sans-serif" font-size="72" font-weight="900" fill="url(#flame)" text-anchor="middle">H</text>
+</svg>
