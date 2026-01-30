@@ -29,5 +29,7 @@
   },
   "action": {
     "default_title": "Open Homura"
-  }
+  },
+  "chrome_url_overrides": {},
+  "options_page": "src/dashboard/index.html"
 }

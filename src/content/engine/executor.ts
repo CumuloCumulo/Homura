@@ -28,9 +28,7 @@ import type {
   NavigateParams,
   ClickParams,
 } from '@shared/types';
-import { substituteVariables, matchText, getDOMSnapshot, safeQuerySelectorAll, safeQuerySelector } from '@shared/utils';
-import { sleep } from '@shared/utils';
-import { TIMEOUTS } from '@shared/constants';
+import { substituteVariables, matchText, getDOMSnapshot, safeQuerySelectorAll, safeQuerySelector, sleep } from '@shared/utils';
 
 // Import primitive executors
 import { 

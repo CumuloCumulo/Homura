@@ -27,7 +27,9 @@
       "@shared/*": ["src/shared/*"],
       "@content/*": ["src/content/*"],
       "@background/*": ["src/background/*"],
-      "@sidepanel/*": ["src/sidepanel/*"]
+      "@sidepanel/*": ["src/sidepanel/*"],
+      "@dashboard/*": ["src/dashboard/*"],
+      "@services/*": ["src/services/*"]
     }
   },
   "include": ["src"],

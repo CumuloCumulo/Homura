@@ -17,12 +17,15 @@ export default defineConfig({
       '@content': resolve(__dirname, 'src/content'),
       '@background': resolve(__dirname, 'src/background'),
       '@sidepanel': resolve(__dirname, 'src/sidepanel'),
+      '@dashboard': resolve(__dirname, 'src/dashboard'),
+      '@services': resolve(__dirname, 'src/services'),
     },
   },
   build: {
     rollupOptions: {
       input: {
         sidepanel: resolve(__dirname, 'src/sidepanel/index.html'),
+        dashboard: resolve(__dirname, 'src/dashboard/index.html'),
       },
     },
   },
