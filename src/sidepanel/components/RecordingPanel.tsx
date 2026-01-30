@@ -1,14 +1,61 @@
 /**
  * =============================================================================
- * Homura SidePanel - Recording Panel
+ * Homura SidePanel - Recording Panel (Enhanced)
  * =============================================================================
  * 
- * Record user actions for tool generation
+ * Features:
+ * - Delete recorded actions
+ * - Editable name/description for each action
+ * - Reorder actions (up/down)
+ * - Expandable selector configuration (Scope + Anchor + Target)
+ * - Inline selector editing
+ * 
+ * Design: Following UI-DESIGN.md principles
+ * - Progressive disclosure (collapsed by default)
+ * - Space efficient (compact padding, small text)
+ * - Calm interface (gentle animations)
  */
 
+import React from 'react';
+import { Reorder, useDragControls } from 'framer-motion';
 import { useRecordingStore } from '../stores/recordingStore';
 import { sendToContentScript } from '../utils/ensureContentScript';
-import type { RecordedAction } from '@shared/selectorBuilder';
+import type { RecordedAction, SelectorDraft, ElementAnalysis, AnchorCandidate } from '@shared/selectorBuilder';
+
+// =============================================================================
+// ICONS
+// =============================================================================
+
+const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
+  <svg 
+    className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} 
+    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+  </svg>
+);
+
+const DeleteIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+  </svg>
+);
+
+const DragHandleIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
+  </svg>
+);
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 
 export function RecordingPanel() {
   const { 
@@ -16,6 +63,9 @@ export function RecordingPanel() {
     setRecording, 
     recordedActions, 
     clearRecordedActions,
+    setRecordedActions,
+    deleteRecordedAction,
+    updateRecordedAction,
     addLog,
     isProcessing,
     setProcessing
@@ -84,7 +134,6 @@ export function RecordingPanel() {
           level: 'info',
           message: `工具生成成功: ${result.tool.name}`,
         });
-        // TODO: Open dialog to confirm and save tool
       } else {
         addLog({
           timestamp: Date.now(),
@@ -138,17 +187,13 @@ export function RecordingPanel() {
       </div>
 
       {/* Recorded Actions */}
-      <div className="flex-1 overflow-y-auto p-3">
-        {recordedActions.length === 0 ? (
-          <EmptyState isRecording={isRecording} />
-        ) : (
-          <div className="space-y-2">
-            {recordedActions.map((action, index) => (
-              <ActionItem key={index} action={action} index={index} />
-            ))}
-          </div>
-        )}
-      </div>
+      <ActionList 
+        actions={recordedActions}
+        isRecording={isRecording}
+        onDelete={deleteRecordedAction}
+        onUpdate={updateRecordedAction}
+        onReorder={setRecordedActions}
+      />
 
       {/* Generate Button */}
       {recordedActions.length > 0 && !isRecording && (
@@ -185,56 +230,540 @@ export function RecordingPanel() {
   );
 }
 
-function ActionItem({ action, index }: { action: RecordedAction; index: number }) {
-  const actionIcons = {
-    click: '👆',
-    input: '⌨️',
-    select: '📋',
-    scroll: '📜',
-  };
+// =============================================================================
+// ACTION LIST - Container with Framer Motion Reorder
+// =============================================================================
 
-  const time = new Date(action.timestamp).toLocaleTimeString('en-US', {
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+interface ActionListProps {
+  actions: RecordedAction[];
+  isRecording: boolean;
+  onDelete: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<RecordedAction>) => void;
+  onReorder: (actions: RecordedAction[]) => void;
+}
+
+function ActionList({ actions, isRecording, onDelete, onUpdate, onReorder }: ActionListProps) {
+  if (actions.length === 0) {
+    return (
+      <div className="flex-1 overflow-y-auto p-3">
+        <EmptyState isRecording={isRecording} />
+      </div>
+    );
+  }
 
   return (
-    <div className="p-2.5 rounded-lg bg-zinc-900/50 border border-white/5">
-      <div className="flex items-start gap-2">
-        <span className="shrink-0 w-6 h-6 flex items-center justify-center rounded bg-zinc-800 text-xs">
+    <div className="flex-1 overflow-y-auto p-3">
+      <Reorder.Group
+        axis="y"
+        values={actions}
+        onReorder={onReorder}
+        className="space-y-2"
+      >
+        {actions.map((action, index) => (
+          <ReorderableActionCard
+            key={action.id}
+            action={action}
+            index={index}
+            onDelete={() => onDelete(action.id)}
+            onUpdate={(updates) => onUpdate(action.id, updates)}
+          />
+        ))}
+      </Reorder.Group>
+    </div>
+  );
+}
+
+// =============================================================================
+// REORDERABLE ACTION CARD - Wrapper with Framer Motion Reorder.Item
+// =============================================================================
+
+interface ReorderableActionCardProps {
+  action: RecordedAction;
+  index: number;
+  onDelete: () => void;
+  onUpdate: (updates: Partial<RecordedAction>) => void;
+}
+
+function ReorderableActionCard({ action, index, onDelete, onUpdate }: ReorderableActionCardProps) {
+  const dragControls = useDragControls();
+
+  return (
+    <Reorder.Item
+      value={action}
+      dragListener={false}
+      dragControls={dragControls}
+      layout
+      layoutId={action.id}
+      className="list-none"
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ 
+        layout: { duration: 0.2, ease: 'easeOut' },
+        opacity: { duration: 0.15 },
+        scale: { duration: 0.15 },
+      }}
+      whileDrag={{ 
+        scale: 1.02, 
+        boxShadow: '0 10px 30px -10px rgba(139, 92, 246, 0.3)',
+        zIndex: 50,
+        cursor: 'grabbing',
+      }}
+      dragElastic={0}
+    >
+      <ActionCard
+        action={action}
+        index={index}
+        onDelete={onDelete}
+        onUpdate={onUpdate}
+        dragControls={dragControls}
+      />
+    </Reorder.Item>
+  );
+}
+
+// =============================================================================
+// ACTION CARD - Expandable card with full selector editing
+// =============================================================================
+
+interface ActionCardProps {
+  action: RecordedAction;
+  index: number;
+  onDelete: () => void;
+  onUpdate: (updates: Partial<RecordedAction>) => void;
+  dragControls: ReturnType<typeof useDragControls>;
+}
+
+const actionIcons: Record<string, string> = {
+  click: '👆',
+  input: '⌨️',
+  select: '📋',
+  scroll: '📜',
+};
+
+/** Get default action name based on type (stable, doesn't change on reorder) */
+function getDefaultActionName(type: string): string {
+  const names: Record<string, string> = {
+    click: '点击',
+    input: '输入',
+    select: '选择',
+    scroll: '滚动',
+  };
+  return names[type] || '操作';
+}
+
+function ActionCard({ 
+  action, 
+  index, 
+  onDelete, 
+  onUpdate,
+  dragControls,
+}: ActionCardProps) {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isEditingName, setIsEditingName] = React.useState(false);
+  
+  // Default name based on action type (not index, so it doesn't change on reorder)
+  const defaultName = getDefaultActionName(action.type);
+  const [localName, setLocalName] = React.useState(action.name || defaultName);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Sync local name when action.name changes
+  React.useEffect(() => {
+    setLocalName(action.name || defaultName);
+  }, [action.name, defaultName]);
+
+  // Focus input when editing starts
+  React.useEffect(() => {
+    if (isEditingName && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditingName]);
+
+  const handleNameSubmit = () => {
+    const trimmedName = localName.trim();
+    if (trimmedName && trimmedName !== action.name) {
+      onUpdate({ name: trimmedName });
+    }
+    setIsEditingName(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameSubmit();
+    } else if (e.key === 'Escape') {
+      setLocalName(action.name || defaultName);
+      setIsEditingName(false);
+    }
+  };
+
+  return (
+    <div 
+      className={`
+        group rounded-lg overflow-hidden
+        ${isExpanded 
+          ? 'bg-zinc-800/60 border border-violet-500/20 shadow-[0_0_15px_-3px_rgba(139,92,246,0.15)]' 
+          : 'bg-zinc-900/50 border border-white/5 hover:border-white/10'
+        }
+      `}
+    >
+      {/* Header - Always visible */}
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        {/* Drag Handle - triggers Framer Motion drag */}
+        <div 
+          className="shrink-0 cursor-grab active:cursor-grabbing p-1 -ml-1 text-zinc-600 hover:text-zinc-400 transition-colors touch-none select-none"
+          title="拖拽排序"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            dragControls.start(e);
+          }}
+        >
+          <DragHandleIcon />
+        </div>
+
+        {/* Icon */}
+        <span className={`
+          shrink-0 w-6 h-6 flex items-center justify-center rounded text-xs
+          transition-colors duration-200
+          ${isExpanded ? 'bg-violet-500/20' : 'bg-zinc-800'}
+        `}>
           {actionIcons[action.type] || '•'}
         </span>
+
+        {/* Name - Editable */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-zinc-300 uppercase">
-              {action.type}
-            </span>
-            <span className="text-[9px] text-zinc-600">{time}</span>
-          </div>
-          <code className="block text-[10px] font-mono text-zinc-500 truncate mt-1">
+          {isEditingName ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={localName}
+              onChange={(e) => setLocalName(e.target.value)}
+              onBlur={handleNameSubmit}
+              onKeyDown={handleKeyDown}
+              className="
+                w-full h-6 px-1.5 text-xs font-medium
+                bg-black/30 border border-violet-500/30 rounded
+                text-zinc-200 focus:outline-none focus:border-violet-500/50
+              "
+            />
+          ) : (
+            <div 
+              className="flex items-center gap-1.5 cursor-pointer group/name"
+              onClick={() => setIsEditingName(true)}
+            >
+              <span className="text-xs font-medium text-zinc-300 truncate">
+                {localName}
+              </span>
+              <span className="text-zinc-600 opacity-0 group-hover/name:opacity-100 transition-opacity">
+                <EditIcon />
+              </span>
+            </div>
+          )}
+          <code className="block text-[9px] font-mono text-zinc-600 truncate mt-0.5">
             {action.elementAnalysis.minimalSelector}
           </code>
-          {action.value && (
-            <p className="text-[10px] text-violet-400 mt-1">
-              输入: "{action.value}"
-            </p>
-          )}
         </div>
+
+        {/* Action Badge */}
+        <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-mono bg-white/5 text-amber-400/80 uppercase">
+          {action.type}
+        </span>
+
+        {/* Expand Toggle */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="shrink-0 p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
+          title={isExpanded ? '收起' : '展开选择器配置'}
+        >
+          <ChevronIcon expanded={isExpanded} />
+        </button>
+
+        {/* Delete Button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="shrink-0 p-1 text-zinc-600 hover:text-rose-400 transition-colors"
+          title="删除"
+        >
+          <DeleteIcon />
+        </button>
+
+        {/* Index Badge */}
         <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-zinc-800 text-[9px] text-zinc-500">
           {index + 1}
         </span>
       </div>
+
+      {/* Expanded Content - Selector Configuration */}
+      {isExpanded && (
+        <div className="px-3 pb-3 pt-1 space-y-2.5 animate-fade-in border-t border-white/5">
+          {/* Input Value (if applicable) */}
+          {action.value && (
+            <div className="flex items-center gap-2 text-[10px] p-2 rounded bg-violet-500/5 border border-violet-500/10">
+              <span className="text-zinc-500">输入值:</span>
+              <code className="text-violet-400 font-mono">"{action.value}"</code>
+            </div>
+          )}
+
+          {/* Selector Logic Editor */}
+          <SelectorEditor 
+            analysis={action.elementAnalysis}
+            draft={action.selectorDraft}
+            onChange={(draft) => onUpdate({ selectorDraft: draft })}
+          />
+        </div>
+      )}
     </div>
   );
 }
+
+// =============================================================================
+// SELECTOR EDITOR - Inline Scope + Anchor + Target editor
+// =============================================================================
+
+interface SelectorEditorProps {
+  analysis: ElementAnalysis;
+  draft?: SelectorDraft;
+  onChange: (draft: SelectorDraft) => void;
+}
+
+function SelectorEditor({ analysis, draft, onChange }: SelectorEditorProps) {
+  // Initialize draft from analysis if not provided
+  const [localDraft, setLocalDraft] = React.useState<SelectorDraft>(() => {
+    if (draft) return draft;
+    
+    // Build initial draft from element analysis
+    // Note: Use serializable fields (containerSelector, containerTagName) 
+    // because HTMLElement objects cannot be serialized through Chrome messaging
+    const firstAnchor = analysis.anchorCandidates?.[0];
+    const hasContainer = analysis.containerSelector || analysis.containerTagName;
+    
+    return {
+      scope: hasContainer ? {
+        selector: analysis.containerSelector || analysis.containerTagName || '',
+        type: 'container_list',
+        matchCount: 0,
+      } : undefined,
+      anchor: firstAnchor ? {
+        selector: firstAnchor.selector,
+        type: firstAnchor.type,
+        value: firstAnchor.text || firstAnchor.attribute?.value || '',
+        matchMode: 'contains' as const,
+      } : undefined,
+      target: {
+        selector: analysis.relativeSelector || analysis.minimalSelector,
+        action: 'CLICK',
+      },
+      confidence: 0.8,
+      validated: false,
+    };
+  });
+
+  // Notify parent of changes
+  const handleDraftChange = React.useCallback((newDraft: SelectorDraft) => {
+    setLocalDraft(newDraft);
+    onChange(newDraft);
+  }, [onChange]);
+
+  const handleApplyAnchor = (candidate: AnchorCandidate) => {
+    handleDraftChange({
+      ...localDraft,
+      anchor: {
+        selector: candidate.selector,
+        type: candidate.type,
+        value: candidate.text || candidate.attribute?.value || '',
+        matchMode: 'contains' as const,
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* Scope */}
+      {localDraft.scope && (
+        <SelectorSection
+          label="SCOPE"
+          sublabel="容器作用域"
+          color="blue"
+          value={localDraft.scope.selector}
+          onChange={(value) => handleDraftChange({
+            ...localDraft,
+            scope: { ...localDraft.scope!, selector: value },
+          })}
+        />
+      )}
+
+      {/* Anchor */}
+      {localDraft.anchor && (
+        <div className="p-2 rounded bg-zinc-900/80 border border-emerald-500/20">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[9px] font-medium text-emerald-400">ANCHOR</span>
+            <span className="text-[8px] text-zinc-600">定位锚点</span>
+          </div>
+          <div className="space-y-1.5">
+            {/* Selector */}
+            <input
+              type="text"
+              value={localDraft.anchor.selector}
+              onChange={(e) => handleDraftChange({
+                ...localDraft,
+                anchor: { ...localDraft.anchor!, selector: e.target.value },
+              })}
+              placeholder="选择器"
+              className="
+                w-full h-6 px-1.5 text-[10px] font-mono
+                bg-black/40 border border-zinc-800 rounded
+                text-emerald-400 placeholder:text-zinc-700
+                focus:border-emerald-500/50 focus:outline-none
+                transition-colors
+              "
+            />
+            {/* Value + Match Mode */}
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                value={localDraft.anchor.value}
+                onChange={(e) => handleDraftChange({
+                  ...localDraft,
+                  anchor: { ...localDraft.anchor!, value: e.target.value },
+                })}
+                placeholder="匹配值 (支持 {{变量}})"
+                className="
+                  flex-1 h-6 px-1.5 text-[10px] font-mono
+                  bg-black/40 border border-zinc-800 rounded
+                  text-emerald-300 placeholder:text-zinc-700
+                  focus:border-emerald-500/50 focus:outline-none
+                  transition-colors
+                "
+              />
+              <select
+                value={localDraft.anchor.matchMode}
+                onChange={(e) => handleDraftChange({
+                  ...localDraft,
+                  anchor: { ...localDraft.anchor!, matchMode: e.target.value as 'contains' | 'exact' | 'startsWith' | 'endsWith' },
+                })}
+                className="
+                  w-16 h-6 px-1 text-[9px]
+                  bg-black/40 border border-zinc-800 rounded
+                  text-zinc-400
+                  focus:outline-none focus:border-zinc-600
+                  transition-colors
+                "
+              >
+                <option value="contains">包含</option>
+                <option value="exact">精确</option>
+                <option value="startsWith">开头</option>
+                <option value="endsWith">结尾</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Target */}
+      <SelectorSection
+        label="TARGET"
+        sublabel="操作目标"
+        color="violet"
+        value={localDraft.target.selector}
+        onChange={(value) => handleDraftChange({
+          ...localDraft,
+          target: { ...localDraft.target, selector: value },
+        })}
+      />
+
+      {/* Anchor Candidates */}
+      {analysis.anchorCandidates.length > 0 && (
+        <div className="pt-1">
+          <p className="text-[9px] text-zinc-600 mb-1.5">可用锚点候选:</p>
+          <div className="flex flex-wrap gap-1">
+            {analysis.anchorCandidates.slice(0, 4).map((candidate, i) => {
+              const displayText = candidate.text || candidate.attribute?.value || '';
+              const truncated = displayText.length > 15 ? displayText.slice(0, 15) + '...' : displayText;
+              
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleApplyAnchor(candidate)}
+                  className="
+                    px-2 py-1 text-[9px]
+                    bg-emerald-500/10 text-emerald-400/80 rounded
+                    hover:bg-emerald-500/20 hover:text-emerald-400
+                    transition-colors
+                  "
+                  title={displayText}
+                >
+                  {truncated || candidate.selector}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// SELECTOR SECTION - Reusable input section
+// =============================================================================
+
+interface SelectorSectionProps {
+  label: string;
+  sublabel: string;
+  color: 'blue' | 'violet';
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function SelectorSection({ label, sublabel, color, value, onChange }: SelectorSectionProps) {
+  const colorStyles = {
+    blue: {
+      border: 'border-blue-500/20',
+      text: 'text-blue-400',
+      focus: 'focus:border-blue-500/50',
+    },
+    violet: {
+      border: 'border-violet-500/20',
+      text: 'text-violet-400',
+      focus: 'focus:border-violet-500/50',
+    },
+  };
+
+  const styles = colorStyles[color];
+
+  return (
+    <div className={`p-2 rounded bg-zinc-900/80 border ${styles.border}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className={`text-[9px] font-medium ${styles.text}`}>{label}</span>
+        <span className="text-[8px] text-zinc-600">{sublabel}</span>
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`
+          w-full h-6 px-1.5 text-[10px] font-mono
+          bg-black/40 border border-zinc-800 rounded
+          ${styles.text} placeholder:text-zinc-700
+          ${styles.focus} focus:outline-none
+          transition-colors
+        `}
+      />
+    </div>
+  );
+}
+
+
+// =============================================================================
+// EMPTY STATE
+// =============================================================================
 
 function EmptyState({ isRecording }: { isRecording: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center py-8">
       <div className={`
         w-12 h-12 rounded-full border flex items-center justify-center mb-3
+        transition-colors duration-300
         ${isRecording 
           ? 'bg-rose-500/10 border-rose-500/30' 
           : 'bg-zinc-900 border-white/5'

@@ -49,7 +49,7 @@ export function InspectMode() {
   };
 
   const handleBuildSelector = () => {
-    if (analysis) {
+    if (analysis && analysis.target) {
       setSelectedElement(analysis.target);
       setMode('build');
     }

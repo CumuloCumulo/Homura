@@ -13,10 +13,10 @@ import type { SelectorScope, SelectorAnchor } from '@shared/types';
 // =============================================================================
 
 export interface ElementAnalysis {
-  /** Target element */
-  target: HTMLElement;
-  /** Nearest repeating container */
-  container: HTMLElement | null;
+  /** Target element (not serializable through Chrome messaging) */
+  target?: HTMLElement;
+  /** Nearest repeating container (not serializable through Chrome messaging) */
+  container?: HTMLElement | null;
   /** Container type */
   containerType: ContainerType;
   /** Anchor candidates for dynamic matching */
@@ -25,6 +25,10 @@ export interface ElementAnalysis {
   relativeSelector: string;
   /** Minimal selector for target (fallback) */
   minimalSelector: string;
+  /** Container selector (serializable) */
+  containerSelector?: string;
+  /** Container tag name (serializable) */
+  containerTagName?: string;
 }
 
 export type ContainerType = 
@@ -120,6 +124,10 @@ export interface RecordingState {
 }
 
 export interface RecordedAction {
+  /** Unique identifier */
+  id: string;
+  /** User-defined name for this action */
+  name?: string;
   /** Action type */
   type: 'click' | 'input' | 'select' | 'scroll';
   /** Timestamp */
@@ -130,4 +138,6 @@ export interface RecordedAction {
   value?: string;
   /** Screenshot data URL (optional) */
   screenshot?: string;
+  /** User-edited selector draft */
+  selectorDraft?: SelectorDraft;
 }

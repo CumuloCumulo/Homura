@@ -47,6 +47,9 @@ interface RecordingStore {
   setAnalysis: (analysis: ElementAnalysis | null) => void;
   setSelectorDraft: (draft: SelectorDraft | null) => void;
   addRecordedAction: (action: RecordedAction) => void;
+  setRecordedActions: (actions: RecordedAction[]) => void;
+  deleteRecordedAction: (id: string) => void;
+  updateRecordedAction: (id: string, updates: Partial<RecordedAction>) => void;
   clearRecordedActions: () => void;
   addLog: (log: LogEntry) => void;
   clearLogs: () => void;
@@ -75,6 +78,15 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   setSelectorDraft: (draft) => set({ selectorDraft: draft }),
   addRecordedAction: (action) => set((state) => ({
     recordedActions: [...state.recordedActions, action],
+  })),
+  setRecordedActions: (actions) => set({ recordedActions: actions }),
+  deleteRecordedAction: (id) => set((state) => ({
+    recordedActions: state.recordedActions.filter((action) => action.id !== id),
+  })),
+  updateRecordedAction: (id, updates) => set((state) => ({
+    recordedActions: state.recordedActions.map((action) =>
+      action.id === id ? { ...action, ...updates } : action
+    ),
   })),
   clearRecordedActions: () => set({ recordedActions: [] }),
   addLog: (log) => set((state) => ({

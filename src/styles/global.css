@@ -88,6 +88,40 @@ button, a, input, [role="button"] {
   animation: breathing 3s ease-in-out infinite;
 }
 
+/* Animation: Fade in */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Utility: Neon shadow */
+.shadow-neon {
+  box-shadow: 0 0 15px -3px rgba(139, 92, 246, 0.25);
+}
+
+.hover\:shadow-neon:hover {
+  box-shadow: 0 0 20px -3px rgba(139, 92, 246, 0.35);
+}
+
+/* Drag and drop styles */
+[draggable="true"] {
+  cursor: grab;
+  user-select: none;
+}
+
+[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Smooth reorder animation */
+.space-y-2 > * {
+  transition: transform 0.15s ease-out;
+}
+
 /* Collapsed/Expanded transition helper */
 .collapse-content {
   display: grid;

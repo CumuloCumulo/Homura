@@ -41,6 +41,10 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
   // 5. Build minimal selector (fallback)
   const minimalSelector = buildMinimalSelector(element);
 
+  // 6. Build serializable container info (for Chrome messaging)
+  const containerSelector = container ? buildMinimalSelector(container) : undefined;
+  const containerTagName = container ? container.tagName.toLowerCase() : undefined;
+
   return {
     target: element,
     container,
@@ -48,6 +52,8 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
     anchorCandidates,
     relativeSelector,
     minimalSelector,
+    containerSelector,
+    containerTagName,
   };
 }
 

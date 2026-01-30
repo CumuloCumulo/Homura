@@ -291,6 +291,11 @@ function handleStopRecording(): { success: boolean } {
   return { success: true };
 }
 
+/** Generate a unique ID for recorded actions */
+function generateActionId(): string {
+  return `action_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function onRecordClick(e: MouseEvent): void {
   if (!isRecordMode) return;
   
@@ -302,6 +307,8 @@ function onRecordClick(e: MouseEvent): void {
   chrome.runtime.sendMessage({
     type: 'ACTION_RECORDED',
     payload: {
+      id: generateActionId(),
+      name: '点击',
       type: 'click',
       timestamp: Date.now(),
       elementAnalysis: analysis,
@@ -320,6 +327,8 @@ function onRecordInput(e: Event): void {
   chrome.runtime.sendMessage({
     type: 'ACTION_RECORDED',
     payload: {
+      id: generateActionId(),
+      name: '输入',
       type: 'input',
       timestamp: Date.now(),
       elementAnalysis: analysis,
