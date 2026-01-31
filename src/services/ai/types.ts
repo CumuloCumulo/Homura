@@ -70,6 +70,56 @@ export interface SelectorSuggestion {
 }
 
 // =============================================================================
+// PATH-BASED SELECTOR TYPES (New)
+// =============================================================================
+
+/**
+ * Ancestor info for path-based selector generation
+ */
+export interface AncestorInfoForAI {
+  tagName: string;
+  id?: string;
+  classes: string[];
+  semanticScore: number;
+  selector: string;
+  outerHTML: string;
+  depth: number;
+  isSemanticRoot: boolean;
+}
+
+/**
+ * Context for path-based selector generation
+ */
+export interface PathSelectorContext {
+  /** Target element selector */
+  targetSelector: string;
+  /** Target element HTML */
+  targetHtml: string;
+  /** Ancestor path from target upward */
+  ancestorPath: AncestorInfoForAI[];
+  /** User's intent description */
+  intent?: string;
+}
+
+/**
+ * Result from AI path selector generation
+ */
+export interface PathSelectorResult {
+  /** Semantic root selector */
+  root: string;
+  /** Intermediate path selectors */
+  path: string[];
+  /** Target element selector */
+  target: string;
+  /** Full combined selector */
+  fullSelector: string;
+  /** Confidence score (0-1) */
+  confidence: number;
+  /** Reasoning for the selection */
+  reasoning?: string;
+}
+
+// =============================================================================
 // TOOL GENERATION TYPES
 // =============================================================================
 

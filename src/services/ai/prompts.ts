@@ -6,7 +6,7 @@
  * System prompts and prompt builders for AI interactions
  */
 
-import type { SelectorGenerationContext, RecordingTrace, SelfHealingContext } from './types';
+import type { SelectorGenerationContext, RecordingTrace, SelfHealingContext, PathSelectorContext } from './types';
 
 // =============================================================================
 // SYSTEM PROMPTS
@@ -112,6 +112,78 @@ export const SELF_HEALING_SYSTEM_PROMPT = `你是一个浏览器自动化修复�
 4. 解释你的推理过程`;
 
 // =============================================================================
+// PATH-BASED SELECTOR PROMPT (New)
+// =============================================================================
+
+export const PATH_SELECTOR_SYSTEM_PROMPT = `你是一个 CSS 选择器生成专家。你的任务是基于元素的祖先路径信息，生成稳定、精确的 CSS 选择器。
+
+## 核心原则
+
+**路径式选择器**：从目标元素向上递归分析祖先，找到最佳的语义根节点，然后构建从根到目标的选择器路径。
+
+## 输入格式
+
+你会收到：
+1. **目标元素选择器** (targetSelector)
+2. **祖先路径** (ancestorPath) - 从直接父元素到更远的祖先
+
+每个祖先包含：
+- tagName: 标签名
+- id: 元素 ID（如果存在且稳定）
+- classes: 类名数组
+- semanticScore: 类名的语义强度 (0-1)
+- selector: 程序生成的该层选择器
+- outerHTML: 元素 HTML 概要
+- isSemanticRoot: 是否适合作为语义根
+
+## 输出格式
+
+使用 generate_path_selector 工具返回结果。
+
+## 选择器生成规则
+
+### 1. 选择语义根 (root)
+- 优先选择 semanticScore >= 0.7 的祖先
+- 如果有稳定 ID (非 app/root/main)，使用 #id
+- 如果有 data-testid，使用 [data-testid="..."]
+- 如果有语义类名 (如 official-header, search-bar)，使用 .class
+
+### 2. 跳过的元素
+- 全局容器：#app, #root, #main, #__next
+- 泛化类名：.input, .box, .item, .btn, .icon
+- 框架类名：.el-*, .ant-*, .van-*, .v-*
+- 状态类名：.active, .hover, .selected
+
+### 3. 构建路径 (path)
+- 只包含增加选择精确性的中间层
+- 跳过没有语义价值的包装层
+- 保留能区分不同区域的容器
+
+### 4. 目标选择器 (target)
+- 使用最简洁且唯一的选择器
+- 优先：data-testid > id > 语义class > tag[type]
+
+## 示例
+
+输入：
+- targetSelector: "input.input-inner"
+- ancestorPath: [
+    { tagName: "div", classes: ["input"], semanticScore: 0.1 },
+    { tagName: "div", classes: ["section"], semanticScore: 0.6 },
+    { tagName: "div", classes: ["official-header"], semanticScore: 0.9, isSemanticRoot: true }
+  ]
+
+输出：
+{
+  "root": ".official-header",
+  "path": [".section"],
+  "target": "input.input-inner",
+  "fullSelector": ".official-header .section input.input-inner",
+  "confidence": 0.85,
+  "reasoning": "选择 .official-header 作为语义根（score=0.9），保留 .section 增加精确性，跳过泛化的 .input 层"
+}`;
+
+// =============================================================================
 // PROMPT BUILDERS
 // =============================================================================
 
@@ -212,4 +284,29 @@ ${context.currentDom}
 \`\`\`
 
 请分析 DOM 并生成新的选择器来定位相同功能的元素。`;
+}
+
+/**
+ * Build path-based selector generation prompt
+ */
+export function buildPathSelectorPrompt(context: PathSelectorContext): string {
+  const ancestorPathJson = JSON.stringify(context.ancestorPath, null, 2);
+  
+  return `## 任务
+基于元素的祖先路径，生成稳定的 CSS 选择器。
+
+## 目标元素
+选择器: ${context.targetSelector}
+\`\`\`html
+${context.targetHtml}
+\`\`\`
+
+## 祖先路径（从直接父元素到更远的祖先）
+\`\`\`json
+${ancestorPathJson}
+\`\`\`
+
+${context.intent ? `## 用户意图\n${context.intent}\n` : ''}
+
+请使用 generate_path_selector 工具返回最佳的路径式选择器。`;
 }

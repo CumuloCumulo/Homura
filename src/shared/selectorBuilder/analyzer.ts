@@ -9,7 +9,8 @@
 import type { 
   ElementAnalysis, 
   ContainerType, 
-  AnchorCandidate 
+  AnchorCandidate,
+  AncestorInfo,
 } from './types';
 
 // Attributes that typically contain unique identifiers
@@ -24,6 +25,96 @@ const SEMANTIC_CLASS_PATTERNS = [
   /(-bar|-box|-panel|-container|-wrapper|-section|-area|-card|-item|-group|-block)$/i,
   /^(btn-group|input-group|form-group|card-body|card-header|list-group)/i,
 ];
+
+// =============================================================================
+// PATH-BASED SELECTOR: Class Name Evaluation
+// =============================================================================
+
+/**
+ * Class names that are too generic and should be skipped
+ * These don't provide stable selectors
+ */
+const SKIP_CLASS_PATTERNS = [
+  /^(input|box|item|btn|icon|text|title|label|wrapper|container|content)$/i,  // Single generic words
+  /^[a-z]{1,2}$/i,           // Single or double letters
+  /^\d+$/,                   // Pure numbers
+  /^(el-|ant-|van-|v-|ng-|react-|vue-)/i,  // Framework prefixes
+  /^(is-|has-|active|hover|focus|selected|disabled|loading)/i,  // State classes
+  /^_/,                      // Private/internal classes (start with _)
+  /\d{5,}/,                  // Contains long numbers (likely generated)
+];
+
+/**
+ * Class name patterns with semantic meaning (higher = better)
+ */
+const SEMANTIC_SCORE_PATTERNS: Array<{ pattern: RegExp; score: number }> = [
+  // Layout structure (very semantic)
+  { pattern: /^(official|custom|primary|main|secondary)/i, score: 0.9 },
+  { pattern: /(-header|-footer|-sidebar|-content|-main)$/i, score: 0.9 },
+  { pattern: /^(header|footer|sidebar|navigation|breadcrumb)/i, score: 0.85 },
+  
+  // Functional areas
+  { pattern: /(-search|-login|-register|-checkout|-cart|-profile)/i, score: 0.85 },
+  { pattern: /(-form|-modal|-dialog|-popup|-dropdown)/i, score: 0.8 },
+  { pattern: /(-bar|-panel|-section|-area|-zone)/i, score: 0.75 },
+  
+  // Components
+  { pattern: /(-card|-list|-table|-grid)/i, score: 0.7 },
+  { pattern: /(-group|-block|-row|-col)/i, score: 0.6 },
+  
+  // Generic with some meaning
+  { pattern: /(-inner|-outer|-wrapper|-container)$/i, score: 0.4 },
+];
+
+/**
+ * Global container IDs that should be avoided as roots
+ */
+const GLOBAL_CONTAINER_IDS = ['app', 'root', 'main', 'content', '__next', '__nuxt'];
+
+/**
+ * Calculate semantic score for a class name (0-1)
+ */
+function calculateClassSemanticScore(className: string): number {
+  // Check if should be skipped
+  if (SKIP_CLASS_PATTERNS.some(pattern => pattern.test(className))) {
+    return 0;
+  }
+  
+  // Check for semantic patterns
+  for (const { pattern, score } of SEMANTIC_SCORE_PATTERNS) {
+    if (pattern.test(className)) {
+      return score;
+    }
+  }
+  
+  // Default: slightly positive if has hyphen (indicates deliberate naming)
+  if (className.includes('-') && className.length > 5) {
+    return 0.3;
+  }
+  
+  return 0.1;
+}
+
+/**
+ * Calculate overall semantic score for an element
+ */
+function calculateElementSemanticScore(element: HTMLElement): number {
+  const classes = Array.from(element.classList);
+  
+  if (classes.length === 0) {
+    // Check for ID
+    if (element.id && !GLOBAL_CONTAINER_IDS.includes(element.id.toLowerCase())) {
+      if (!element.id.match(/\d{5,}|uid|uuid|random/i)) {
+        return 0.85; // Stable ID
+      }
+    }
+    return 0;
+  }
+  
+  // Get highest score among all classes
+  const scores = classes.map(calculateClassSemanticScore);
+  return Math.max(...scores);
+}
 
 /**
  * Analyze an element and extract selector-relevant information
@@ -67,6 +158,10 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
   // 10. For backward compatibility, minimalSelector now returns the scoped version
   const minimalSelector = scopedSelector;
 
+  // 11. Collect ancestor path for AI-assisted selector generation
+  const ancestorPath = collectAncestorPath(element);
+  const pathSelector = buildPathSelector(ancestorPath, targetSelector);
+
   return {
     target: element,
     container,
@@ -80,14 +175,200 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
     targetSelector,
     scopedSelector,
     semanticContainer,
+    // Path-based selector fields
+    ancestorPath,
+    pathSelector,
   };
 }
 
+// =============================================================================
+// PATH-BASED SELECTOR: Ancestor Path Collection
+// =============================================================================
+
+/**
+ * Collect ancestor path from target element upward to semantic root
+ * 
+ * This provides rich context for AI-assisted selector generation.
+ * Each ancestor includes its tag, classes, semantic score, and a selector.
+ * 
+ * @param element - Target element
+ * @param maxDepth - Maximum number of ancestors to collect (default: 6)
+ * @returns Array of ancestor info, from nearest parent to root
+ */
+export function collectAncestorPath(element: HTMLElement, maxDepth = 6): AncestorInfo[] {
+  const path: AncestorInfo[] = [];
+  let current = element.parentElement;
+  let depth = 0;
+  
+  while (current && current !== document.body && depth < maxDepth) {
+    const semanticScore = calculateElementSemanticScore(current);
+    const classes = Array.from(current.classList);
+    const id = current.id && !GLOBAL_CONTAINER_IDS.includes(current.id.toLowerCase()) 
+      ? current.id 
+      : undefined;
+    
+    // Check if this is a good semantic root
+    const isSemanticRoot = semanticScore >= 0.7 || 
+      (id !== undefined && !id.match(/\d{5,}|uid|uuid|random/i));
+    
+    // Build best selector for this element
+    const selector = buildAncestorSelector(current);
+    
+    // Truncate outerHTML for serialization (first 300 chars, remove inner content)
+    const outerHTML = truncateOuterHTML(current, 300);
+    
+    path.push({
+      tagName: current.tagName.toLowerCase(),
+      id,
+      classes,
+      semanticScore,
+      selector,
+      outerHTML,
+      depth,
+      isSemanticRoot,
+    });
+    
+    // Stop if we found a good semantic root
+    if (isSemanticRoot) {
+      break;
+    }
+    
+    current = current.parentElement;
+    depth++;
+  }
+  
+  return path;
+}
+
+/**
+ * Build selector for an ancestor element
+ */
+function buildAncestorSelector(element: HTMLElement): string {
+  const tag = element.tagName.toLowerCase();
+  
+  // Priority 1: Stable ID
+  if (element.id && !element.id.match(/\d{5,}|uid|uuid|random/i)) {
+    if (!GLOBAL_CONTAINER_IDS.includes(element.id.toLowerCase())) {
+      return `#${CSS.escape(element.id)}`;
+    }
+  }
+  
+  // Priority 2: data-testid
+  const testId = element.getAttribute('data-testid');
+  if (testId) {
+    return `[data-testid="${testId}"]`;
+  }
+  
+  // Priority 3: Semantic class with high score
+  const classes = Array.from(element.classList);
+  const scoredClasses = classes
+    .map(c => ({ cls: c, score: calculateClassSemanticScore(c) }))
+    .filter(x => x.score >= 0.5)
+    .sort((a, b) => b.score - a.score);
+  
+  if (scoredClasses.length > 0) {
+    return `${tag}.${scoredClasses[0].cls}`;
+  }
+  
+  // Priority 4: Any non-skipped class
+  const validClasses = classes.filter(c => 
+    !SKIP_CLASS_PATTERNS.some(pattern => pattern.test(c))
+  );
+  if (validClasses.length > 0) {
+    return `${tag}.${validClasses[0]}`;
+  }
+  
+  // Fallback: just tag
+  return tag;
+}
+
+/**
+ * Truncate outerHTML for serialization
+ */
+function truncateOuterHTML(element: HTMLElement, maxLength: number): string {
+  const html = element.outerHTML;
+  if (html.length <= maxLength) {
+    return html;
+  }
+  
+  // Try to preserve the opening tag
+  const closeTagStart = html.indexOf('>');
+  if (closeTagStart > 0 && closeTagStart < maxLength - 10) {
+    return html.substring(0, closeTagStart + 1) + '...';
+  }
+  
+  return html.substring(0, maxLength) + '...';
+}
+
+/**
+ * Build path-based selector from ancestor path
+ * 
+ * Strategy:
+ * 1. Find the best semantic root (highest score or has stable ID)
+ * 2. Build path from root to target, skipping low-value intermediates
+ */
+export function buildPathSelector(ancestorPath: AncestorInfo[], targetSelector: string): string {
+  if (ancestorPath.length === 0) {
+    return targetSelector;
+  }
+  
+  // Find semantic root (last item with isSemanticRoot or highest score)
+  let rootIndex = ancestorPath.findIndex(a => a.isSemanticRoot);
+  if (rootIndex === -1) {
+    // Use ancestor with highest semantic score
+    let maxScore = 0;
+    ancestorPath.forEach((a, i) => {
+      if (a.semanticScore > maxScore) {
+        maxScore = a.semanticScore;
+        rootIndex = i;
+      }
+    });
+  }
+  
+  if (rootIndex === -1 || ancestorPath[rootIndex].semanticScore < 0.3) {
+    // No good root found, just use target selector
+    return targetSelector;
+  }
+  
+  // Build path from root to target
+  const parts: string[] = [];
+  
+  // Add root
+  parts.push(ancestorPath[rootIndex].selector);
+  
+  // Add intermediate nodes with decent semantic value
+  for (let i = rootIndex - 1; i >= 0; i--) {
+    const ancestor = ancestorPath[i];
+    // Only include if it adds semantic value
+    if (ancestor.semanticScore >= 0.5) {
+      parts.push(ancestor.selector);
+    }
+  }
+  
+  // Add target
+  parts.push(targetSelector);
+  
+  return parts.join(' ');
+}
+
+// Elements that should NOT be used as repeating containers
+// These are too granular - we should continue upward to find a more meaningful container
+const SKIP_AS_CONTAINER = ['TD', 'TH', 'SPAN', 'A', 'STRONG', 'EM', 'B', 'I'];
+
+// Elements that are ideal repeating containers
+const PREFERRED_CONTAINERS = ['TR', 'LI', 'ARTICLE', 'SECTION'];
+
 /**
  * Find the nearest repeating container (e.g., table row, list item)
+ * 
+ * Design principle:
+ * - Skip granular elements like TD/TH (they repeat within a row, but a row is the meaningful unit)
+ * - Prefer semantic containers like TR, LI, ARTICLE
+ * - For tables: always use TR as the container, not TD
  */
 export function findRepeatingContainer(element: HTMLElement): HTMLElement | null {
   let current = element.parentElement;
+  let foundCandidate: HTMLElement | null = null;
   
   while (current && current !== document.body) {
     const parent = current.parentElement;
@@ -109,13 +390,30 @@ export function findRepeatingContainer(element: HTMLElement): HTMLElement | null
     
     // Found repeating structure
     if (siblings.length >= 2) {
+      // If this is a granular element (TD/TH), skip it and continue looking for a better container
+      if (SKIP_AS_CONTAINER.includes(current.tagName)) {
+        // Remember this as a fallback, but keep looking
+        if (!foundCandidate) {
+          foundCandidate = current;
+        }
+        current = parent;
+        continue;
+      }
+      
+      // If this is a preferred container, return immediately
+      if (PREFERRED_CONTAINERS.includes(current.tagName)) {
+        return current;
+      }
+      
+      // For other elements, return this container
       return current;
     }
     
     current = parent;
   }
   
-  return null;
+  // Return the fallback candidate if we found one
+  return foundCandidate;
 }
 
 /**
@@ -192,25 +490,22 @@ function detectContainerType(container: HTMLElement): ContainerType {
 
 /**
  * Find anchor candidates within a container
+ * 
+ * IMPORTANT: Anchors must be able to DISTINGUISH different container instances.
+ * For example, in a table with multiple rows, the anchor should be something unique
+ * to each row (like student name "Alice Johnson"), not something shared by all rows
+ * (like data-testid="audit-row").
+ * 
+ * Priority:
+ * 1. text_match - Text content that varies between instances (best for automation)
+ * 2. attribute_match on CHILD elements - Attributes that might vary
+ * 
+ * Container's own attributes are NOT good anchors because they're the same for all instances.
  */
 export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] {
   const candidates: AnchorCandidate[] = [];
   
-  // 1. Check for unique attributes on container itself
-  for (const attr of UNIQUE_ATTRIBUTES) {
-    const value = container.getAttribute(attr);
-    if (value) {
-      candidates.push({
-        selector: `[${attr}]`,
-        type: 'attribute_match',
-        attribute: { name: attr, value },
-        confidence: 0.9,
-        isUnique: true,
-      });
-    }
-  }
-  
-  // 2. Find text elements that could be anchors
+  // 1. Find text elements that could be anchors (PRIORITY - these distinguish instances)
   const textElements = container.querySelectorAll('*');
   const textsFound = new Map<string, HTMLElement>();
   
@@ -226,7 +521,7 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
     }
   });
   
-  // Convert to candidates
+  // Convert to candidates - text matches get high priority
   textsFound.forEach((el, text) => {
     const selector = buildMinimalSelector(el, container);
     const confidence = calculateTextConfidence(el, text);
@@ -235,13 +530,17 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
       selector,
       type: 'text_match',
       text,
-      confidence,
+      confidence: confidence + 0.2, // Boost text matches - they distinguish instances
       isUnique: isLikelyUnique(text),
     });
   });
   
-  // 3. Check for semantic attributes on child elements
+  // 2. Check for semantic attributes on CHILD elements (not container itself)
+  // These might vary between instances (e.g., data-id="123" vs data-id="456")
   textElements.forEach(el => {
+    // Skip the container itself - its attributes are the same for all instances
+    if (el === container) return;
+    
     for (const attr of SEMANTIC_ATTRIBUTES) {
       const value = el.getAttribute(attr);
       if (value && value.length > 2) {
@@ -250,17 +549,41 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
           selector,
           type: 'attribute_match',
           attribute: { name: attr, value },
-          confidence: 0.7,
+          confidence: 0.6, // Lower than text matches
           isUnique: false,
         });
       }
     }
   });
   
-  // Sort by confidence and uniqueness
+  // 3. Container's own unique attributes - LOWEST priority
+  // These identify the container TYPE but not specific instances
+  // Only include as fallback for when no better anchors exist
+  for (const attr of UNIQUE_ATTRIBUTES) {
+    const value = container.getAttribute(attr);
+    if (value) {
+      candidates.push({
+        selector: `[${attr}]`,
+        type: 'attribute_match',
+        attribute: { name: attr, value },
+        confidence: 0.3, // Low - doesn't distinguish instances
+        isUnique: false, // NOT unique per instance!
+      });
+    }
+  }
+  
+  // Sort by: 1) type (text_match first), 2) uniqueness, 3) confidence
   return candidates
     .sort((a, b) => {
-      if (a.isUnique !== b.isUnique) return a.isUnique ? -1 : 1;
+      // Priority 1: text_match over attribute_match
+      if (a.type !== b.type) {
+        return a.type === 'text_match' ? -1 : 1;
+      }
+      // Priority 2: unique candidates first
+      if (a.isUnique !== b.isUnique) {
+        return a.isUnique ? -1 : 1;
+      }
+      // Priority 3: higher confidence first
       return b.confidence - a.confidence;
     })
     .slice(0, 5); // Top 5 candidates

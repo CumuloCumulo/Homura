@@ -100,6 +100,9 @@ async function handleMessage(message: { type: string; payload?: unknown }): Prom
     case 'AI_GENERATE_SELECTOR':
       return handleAIGenerateSelector(message.payload as { intent: string; analysis: ElementAnalysis });
 
+    case 'AI_GENERATE_PATH_SELECTOR':
+      return handleAIGeneratePathSelector(message.payload as AIGeneratePathSelectorPayload);
+
     case 'AI_GENERATE_TOOL':
       return handleAIGenerateTool(message.payload as { actions: unknown[] });
 
@@ -112,6 +115,10 @@ async function handleMessage(message: { type: string; payload?: unknown }): Prom
 
     case 'EXECUTE_EXTRACT':
       return handleExecuteExtract(message.payload as { selector: string });
+
+    // Execute with full Scope + Anchor + Target logic
+    case 'EXECUTE_WITH_LOGIC':
+      return handleExecuteWithLogic(message.payload as ExecuteWithLogicPayload);
 
     default:
       console.warn('[Homura] Unknown message type:', message.type);
@@ -418,6 +425,20 @@ interface DirectOperationResult {
   success: boolean;
   data?: string;
   error?: string;
+  usedSelector?: string;
+}
+
+/**
+ * Payload for EXECUTE_WITH_LOGIC - uses full Scope + Anchor + Target
+ */
+interface ExecuteWithLogicPayload {
+  scopeSelector?: string;
+  anchorSelector?: string;
+  anchorValue?: string;
+  anchorMatchMode?: 'exact' | 'contains' | 'startsWith';
+  targetSelector: string;
+  action: 'highlight' | 'click' | 'input' | 'extract';
+  inputValue?: string;
 }
 
 /**
@@ -477,6 +498,179 @@ function handleExecuteExtract(payload: { selector: string }): DirectOperationRes
     return { success: true, data: text as string };
   } catch (error) {
     return { success: false, error: `读取失败: ${error}` };
+  }
+}
+
+// =============================================================================
+// EXECUTE WITH FULL SELECTOR LOGIC - "所见即所得"
+// =============================================================================
+
+/**
+ * Execute action using full Scope + Anchor + Target logic
+ * 
+ * This is the "WYSIWYG" executor - what you test here is exactly what automation will do.
+ * 
+ * Logic:
+ * 1. If scopeSelector exists: find all scope containers
+ * 2. If anchorValue exists: filter scopes by matching anchor text/attribute
+ * 3. Find target within the matched scope
+ * 4. Execute action on target
+ */
+async function handleExecuteWithLogic(payload: ExecuteWithLogicPayload): Promise<DirectOperationResult> {
+  const { 
+    scopeSelector, 
+    anchorSelector, 
+    anchorValue, 
+    anchorMatchMode = 'contains',
+    targetSelector, 
+    action, 
+    inputValue 
+  } = payload;
+
+  console.log('[Homura] EXECUTE_WITH_LOGIC payload:', {
+    scopeSelector,
+    anchorSelector,
+    anchorValue,
+    anchorMatchMode,
+    targetSelector,
+    action,
+  });
+
+  try {
+    let targetElement: HTMLElement | null = null;
+    let usedSelector = targetSelector;
+
+    // Case 1: Has scope (repeating structure)
+    if (scopeSelector) {
+      console.log('[Homura] Has scope, querying:', scopeSelector);
+      const scopeElements = document.querySelectorAll(scopeSelector);
+      console.log('[Homura] Found', scopeElements.length, 'scope elements');
+      
+      if (scopeElements.length === 0) {
+        return { success: false, error: `未找到容器: ${scopeSelector}` };
+      }
+
+      // Find the right scope element
+      let matchedScope: Element | null = null;
+      
+      if (anchorValue && anchorSelector) {
+        // Filter by anchor
+        console.log('[Homura] Filtering by anchor:', anchorSelector, '=', anchorValue);
+        for (const scope of scopeElements) {
+          const anchor = scope.querySelector(anchorSelector);
+          if (!anchor) {
+            console.log('[Homura] No anchor found in scope');
+            continue;
+          }
+          
+          const anchorText = anchor.textContent?.trim() || 
+                           anchor.getAttribute('value') || 
+                           anchor.getAttribute('data-value') || '';
+          
+          console.log('[Homura] Anchor text:', anchorText);
+          const matches = matchText(anchorText, anchorValue, anchorMatchMode);
+          if (matches) {
+            console.log('[Homura] Anchor matched!');
+            matchedScope = scope;
+            break;
+          }
+        }
+        
+        if (!matchedScope) {
+          console.log('[Homura] No matching scope found');
+          return { 
+            success: false, 
+            error: `未找到匹配锚点 "${anchorValue}" 的容器` 
+          };
+        }
+      } else {
+        // No anchor - use first scope (or could be improved to use selected element's scope)
+        console.log('[Homura] No anchor filter, using first scope');
+        matchedScope = scopeElements[0];
+      }
+
+      // Find target within scope
+      console.log('[Homura] Finding target in scope:', targetSelector);
+      targetElement = matchedScope.querySelector(targetSelector) as HTMLElement;
+      usedSelector = `${scopeSelector} >> ${anchorSelector || '(无锚点)'} = "${anchorValue}" >> ${targetSelector}`;
+      console.log('[Homura] Target found:', !!targetElement);
+      
+    } else {
+      // Case 2: No scope - use target selector directly
+      console.log('[Homura] No scope, using target directly:', targetSelector);
+      targetElement = document.querySelector(targetSelector) as HTMLElement;
+      usedSelector = targetSelector;
+      console.log('[Homura] Target found:', !!targetElement);
+    }
+
+    if (!targetElement) {
+      console.log('[Homura] Target not found!');
+      return { success: false, error: `目标元素未找到: ${targetSelector}` };
+    }
+    
+    console.log('[Homura] Executing action:', action, 'on element:', targetElement.tagName);
+
+    // Execute the action
+    switch (action) {
+      case 'highlight':
+        showValidationHighlight(targetElement);
+        console.log('[Homura] Highlighted:', usedSelector);
+        return { success: true, usedSelector };
+
+      case 'click':
+        // Temporarily disable inspect mode listeners to prevent interference
+        // The onInspectClick handler calls preventDefault() which blocks native onclick
+        const wasInspectMode = isInspectMode;
+        if (wasInspectMode) {
+          document.removeEventListener('click', onInspectClick, true);
+        }
+        try {
+          await executeClick(targetElement);
+          console.log('[Homura] Clicked:', usedSelector);
+          return { success: true, usedSelector };
+        } finally {
+          // Restore inspect mode listeners
+          if (wasInspectMode) {
+            document.addEventListener('click', onInspectClick, true);
+          }
+        }
+
+      case 'input':
+        if (!inputValue) {
+          return { success: false, error: '输入值不能为空' };
+        }
+        await executeInput(targetElement, { value: inputValue, clearFirst: true, typeDelay: 0 });
+        console.log('[Homura] Input:', usedSelector, 'value:', inputValue);
+        return { success: true, usedSelector };
+
+      case 'extract':
+        const text = executeExtractText(targetElement);
+        console.log('[Homura] Extracted from:', usedSelector, 'text:', text);
+        return { success: true, data: text as string, usedSelector };
+
+      default:
+        return { success: false, error: `未知操作: ${action}` };
+    }
+  } catch (error) {
+    return { success: false, error: `操作失败: ${error}` };
+  }
+}
+
+/**
+ * Match text with different modes
+ */
+function matchText(text: string, pattern: string, mode: 'exact' | 'contains' | 'startsWith'): boolean {
+  const normalizedText = text.toLowerCase();
+  const normalizedPattern = pattern.toLowerCase();
+  
+  switch (mode) {
+    case 'exact':
+      return normalizedText === normalizedPattern;
+    case 'startsWith':
+      return normalizedText.startsWith(normalizedPattern);
+    case 'contains':
+    default:
+      return normalizedText.includes(normalizedPattern);
   }
 }
 
@@ -630,6 +824,155 @@ async function handleAIGenerateSelector(_payload: { intent: string; analysis: El
   return { 
     success: false, 
     error: 'AI generation not yet implemented. Please use manual selector building.' 
+  };
+}
+
+/**
+ * Payload for AI path selector generation
+ */
+interface AIGeneratePathSelectorPayload {
+  intent: string;
+  targetSelector: string;
+  targetHtml: string;
+  ancestorPath: Array<{
+    tagName: string;
+    id?: string;
+    classes: string[];
+    semanticScore: number;
+    selector: string;
+    outerHTML: string;
+    depth: number;
+    isSemanticRoot: boolean;
+  }>;
+}
+
+/**
+ * Handle AI path selector generation
+ * 
+ * This forwards the request to the background script which has access to the AI client.
+ * The background script will call the AI with the ancestor path and return a structured
+ * path-based selector.
+ */
+async function handleAIGeneratePathSelector(payload: AIGeneratePathSelectorPayload): Promise<{
+  success: boolean;
+  pathSelector?: {
+    root: string;
+    path: string[];
+    target: string;
+    fullSelector: string;
+    confidence: number;
+    reasoning?: string;
+  };
+  error?: string;
+}> {
+  try {
+    // Forward to background script for AI processing
+    const response = await chrome.runtime.sendMessage({
+      type: 'AI_GENERATE_PATH_SELECTOR',
+      payload,
+    });
+    
+    if (response && response.success) {
+      console.log('[Homura] AI path selector generated:', response.pathSelector);
+      return {
+        success: true,
+        pathSelector: response.pathSelector,
+      };
+    } else {
+      // If AI is not available, use the programmatic path selector
+      const pathSelector = payload.ancestorPath.length > 0
+        ? buildFallbackPathSelector(payload)
+        : null;
+      
+      if (pathSelector) {
+        console.log('[Homura] Using fallback path selector:', pathSelector);
+        return {
+          success: true,
+          pathSelector,
+        };
+      }
+      
+      return {
+        success: false,
+        error: response?.error || 'AI path selector generation failed',
+      };
+    }
+  } catch (error) {
+    console.error('[Homura] AI path selector error:', error);
+    
+    // Fallback to programmatic generation
+    const pathSelector = payload.ancestorPath.length > 0
+      ? buildFallbackPathSelector(payload)
+      : null;
+    
+    if (pathSelector) {
+      return {
+        success: true,
+        pathSelector,
+      };
+    }
+    
+    return {
+      success: false,
+      error: String(error),
+    };
+  }
+}
+
+/**
+ * Build a fallback path selector when AI is not available
+ */
+function buildFallbackPathSelector(payload: AIGeneratePathSelectorPayload): {
+  root: string;
+  path: string[];
+  target: string;
+  fullSelector: string;
+  confidence: number;
+  reasoning: string;
+} | null {
+  const { ancestorPath, targetSelector } = payload;
+  
+  if (ancestorPath.length === 0) {
+    return null;
+  }
+  
+  // Find semantic root (last item with isSemanticRoot or highest score)
+  let rootIndex = ancestorPath.findIndex(a => a.isSemanticRoot);
+  if (rootIndex === -1) {
+    // Use ancestor with highest semantic score
+    let maxScore = 0;
+    ancestorPath.forEach((a, i) => {
+      if (a.semanticScore > maxScore) {
+        maxScore = a.semanticScore;
+        rootIndex = i;
+      }
+    });
+  }
+  
+  if (rootIndex === -1 || ancestorPath[rootIndex].semanticScore < 0.3) {
+    return null;
+  }
+  
+  const root = ancestorPath[rootIndex].selector;
+  const path: string[] = [];
+  
+  // Add intermediate nodes with decent semantic value
+  for (let i = rootIndex - 1; i >= 0; i--) {
+    const ancestor = ancestorPath[i];
+    if (ancestor.semanticScore >= 0.5) {
+      path.push(ancestor.selector);
+    }
+  }
+  
+  const fullSelector = [root, ...path, targetSelector].join(' ');
+  
+  return {
+    root,
+    path,
+    target: targetSelector,
+    fullSelector,
+    confidence: ancestorPath[rootIndex].semanticScore * 0.9,
+    reasoning: `Fallback: 使用 ${root} 作为语义根 (score: ${Math.round(ancestorPath[rootIndex].semanticScore * 100)}%)`,
   };
 }
 

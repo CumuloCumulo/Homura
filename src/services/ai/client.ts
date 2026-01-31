@@ -18,15 +18,21 @@ import type {
   ToolGenerationResult,
   SelfHealingContext,
   SelfHealingResult,
+  PathSelectorContext,
+  PathSelectorResult,
 } from './types';
 import {
   SELECTOR_SYSTEM_PROMPT,
   TOOL_BUILDER_SYSTEM_PROMPT,
   SELF_HEALING_SYSTEM_PROMPT,
+  PATH_SELECTOR_SYSTEM_PROMPT,
   buildSelectorPrompt,
   buildToolPrompt,
   buildSelfHealingPrompt,
+  buildPathSelectorPrompt,
 } from './prompts';
+import { PATH_SELECTOR_TOOL } from './tools';
+import type { PathSelectorToolResult } from './tools';
 
 // Default configuration
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
@@ -70,6 +76,54 @@ export class TongyiClient {
 
     const data: ChatCompletionResponse = await response.json();
     return data.choices[0]?.message?.content || '';
+  }
+
+  /**
+   * Send chat completion request with tool calling
+   */
+  async chatWithTools<T>(
+    messages: ChatMessage[],
+    tools: Array<{ type: string; function: { name: string; description: string; parameters: unknown } }>,
+    toolChoice?: string | { type: string; function: { name: string } }
+  ): Promise<{ content?: string; toolCalls?: Array<{ name: string; arguments: T }> }> {
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages,
+        tools,
+        tool_choice: toolChoice || 'auto',
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`AI request failed: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    
+    if (!choice) {
+      throw new Error('No response from AI');
+    }
+
+    // Check for tool calls
+    if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
+      const toolCalls = choice.message.tool_calls.map((tc: { function: { name: string; arguments: string } }) => ({
+        name: tc.function.name,
+        arguments: JSON.parse(tc.function.arguments) as T,
+      }));
+      return { toolCalls };
+    }
+
+    // Regular text response
+    return { content: choice.message?.content || '' };
   }
 
   /**
@@ -159,6 +213,50 @@ export class TongyiClient {
     } catch (error) {
       throw new Error(`Failed to parse healing response: ${error}`);
     }
+  }
+
+  /**
+   * Generate path-based selector using tool calling
+   * 
+   * This method uses the generate_path_selector tool to get structured output
+   * from the AI, based on the ancestor path of the target element.
+   */
+  async generatePathSelector(context: PathSelectorContext): Promise<PathSelectorResult> {
+    const prompt = buildPathSelectorPrompt(context);
+    
+    const result = await this.chatWithTools<PathSelectorToolResult>(
+      [
+        { role: 'system', content: PATH_SELECTOR_SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+      [PATH_SELECTOR_TOOL],
+      { type: 'function', function: { name: 'generate_path_selector' } }
+    );
+
+    // If tool was called, use the structured result
+    if (result.toolCalls && result.toolCalls.length > 0) {
+      const toolResult = result.toolCalls[0].arguments;
+      return {
+        root: toolResult.root,
+        path: toolResult.path || [],
+        target: toolResult.target,
+        fullSelector: toolResult.fullSelector,
+        confidence: toolResult.confidence,
+        reasoning: toolResult.reasoning,
+      };
+    }
+
+    // Fallback: try to parse text response as JSON
+    if (result.content) {
+      try {
+        const jsonStr = this.extractJson(result.content);
+        return JSON.parse(jsonStr) as PathSelectorResult;
+      } catch (error) {
+        throw new Error(`Failed to parse path selector response: ${error}`);
+      }
+    }
+
+    throw new Error('No valid response from AI for path selector generation');
   }
 }
 

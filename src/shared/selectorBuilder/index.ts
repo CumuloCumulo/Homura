@@ -15,6 +15,9 @@ export type {
   ValidationResult,
   RecordingState,
   RecordedAction,
+  // Path-based selector types (new)
+  AncestorInfo,
+  PathSelector,
 } from './types';
 
 // Analyzer
@@ -26,6 +29,9 @@ export {
   buildRelativeSelector,
   getElementHtml,
   getContainerContext,
+  // Path-based selector functions (new)
+  collectAncestorPath,
+  buildPathSelector,
 } from './analyzer';
 
 // Generator

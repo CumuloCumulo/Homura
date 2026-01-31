@@ -81,12 +81,32 @@ interface AIGenerateToolMessage {
   };
 }
 
+interface AIGeneratePathSelectorMessage {
+  type: 'AI_GENERATE_PATH_SELECTOR';
+  payload: {
+    intent: string;
+    targetSelector: string;
+    targetHtml: string;
+    ancestorPath: Array<{
+      tagName: string;
+      id?: string;
+      classes: string[];
+      semanticScore: number;
+      selector: string;
+      outerHTML: string;
+      depth: number;
+      isSemanticRoot: boolean;
+    }>;
+  };
+}
+
 type BackgroundMessage = 
   | RunMissionMessage 
   | OpenSidePanelMessage 
   | SetAPIKeyMessage
   | AIGenerateSelectorMessage
-  | AIGenerateToolMessage;
+  | AIGenerateToolMessage
+  | AIGeneratePathSelectorMessage;
 
 chrome.runtime.onMessage.addListener((
   message: BackgroundMessage, 
@@ -124,6 +144,10 @@ async function handleMessage(
 
     case 'AI_GENERATE_TOOL':
       await handleAIGenerateTool(message, sendResponse);
+      break;
+
+    case 'AI_GENERATE_PATH_SELECTOR':
+      await handleAIGeneratePathSelector(message, sendResponse);
       break;
 
     default:
@@ -223,6 +247,39 @@ async function handleAIGenerateTool(
     sendResponse({ success: true, tool: result.tool });
   } catch (error) {
     console.error('[Homura] AI tool generation error:', error);
+    sendResponse({ success: false, error: String(error) });
+  }
+}
+
+async function handleAIGeneratePathSelector(
+  message: AIGeneratePathSelectorMessage,
+  sendResponse: (response: unknown) => void
+): Promise<void> {
+  if (!isAIClientInitialized()) {
+    sendResponse({ success: false, error: 'AI client not initialized' });
+    return;
+  }
+
+  try {
+    const { getAIClient } = await import('@services/ai');
+    const client = getAIClient();
+    
+    // Use the new path-based selector generation
+    const result = await client.generatePathSelector({
+      intent: message.payload.intent,
+      targetSelector: message.payload.targetSelector,
+      targetHtml: message.payload.targetHtml,
+      ancestorPath: message.payload.ancestorPath,
+    });
+
+    console.log('[Homura] AI path selector result:', result);
+
+    sendResponse({ 
+      success: true, 
+      pathSelector: result,
+    });
+  } catch (error) {
+    console.error('[Homura] AI path selector generation error:', error);
     sendResponse({ success: false, error: String(error) });
   }
 }
