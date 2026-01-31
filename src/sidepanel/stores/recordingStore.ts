@@ -10,11 +10,17 @@ import { create } from 'zustand';
 import type { 
   ElementAnalysis, 
   SelectorDraft, 
-  RecordedAction 
+  RecordedAction,
+  PathSelector,
 } from '@shared/selectorBuilder';
 import type { LogEntry } from '@shared/types';
 
 export type RecordingMode = 'inspect' | 'record';
+
+// AI Strategy Types
+export type AIStatus = 'idle' | 'analyzing' | 'decided';
+export type AIStrategy = 'path_selector' | 'scope_anchor_target' | null;
+export type ViewMode = 'path' | 'structure';
 
 interface RecordingStore {
   /** Current mode */
@@ -37,6 +43,23 @@ interface RecordingStore {
   logs: LogEntry[];
   /** AI is processing */
   isProcessing: boolean;
+  
+  // ==========================================================================
+  // AI Strategy State
+  // ==========================================================================
+  
+  /** AI decision status */
+  aiStatus: AIStatus;
+  /** AI chosen strategy */
+  aiStrategy: AIStrategy;
+  /** AI reasoning for the decision */
+  aiReasoning?: string;
+  /** User override of the view mode */
+  userModeOverride?: ViewMode;
+  /** AI-generated path selector result */
+  pathSelectorResult?: PathSelector;
+  /** Container type detected by AI */
+  containerType?: string;
 
   // Actions
   setMode: (mode: RecordingMode) => void;
@@ -55,6 +78,14 @@ interface RecordingStore {
   clearLogs: () => void;
   setProcessing: (processing: boolean) => void;
   reset: () => void;
+  
+  // AI Strategy Actions
+  setAIStatus: (status: AIStatus) => void;
+  setAIStrategy: (strategy: AIStrategy, reasoning?: string) => void;
+  setUserModeOverride: (mode: ViewMode | undefined) => void;
+  setPathSelectorResult: (result: PathSelector | undefined) => void;
+  setContainerType: (type: string | undefined) => void;
+  resetAIState: () => void;
 }
 
 export const useRecordingStore = create<RecordingStore>((set) => ({
@@ -68,13 +99,30 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   recordedActions: [],
   logs: [],
   isProcessing: false,
+  
+  // AI Strategy State - Initial values
+  aiStatus: 'idle',
+  aiStrategy: null,
+  aiReasoning: undefined,
+  userModeOverride: undefined,
+  pathSelectorResult: undefined,
+  containerType: undefined,
 
   setMode: (mode) => set({ mode }),
   setInspecting: (active) => set({ isInspecting: active }),
   setRecording: (active) => set({ isRecording: active }),
   setHoveredElement: (element) => set({ hoveredElement: element }),
   setSelectedElement: (element) => set({ selectedElement: element }),
-  setAnalysis: (analysis) => set({ analysis, selectorDraft: null }),  // Reset draft when analysis changes
+  setAnalysis: (analysis) => set({ 
+    analysis, 
+    selectorDraft: null,
+    // Reset AI state when analysis changes
+    aiStatus: 'idle',
+    aiStrategy: null,
+    aiReasoning: undefined,
+    userModeOverride: undefined,
+    pathSelectorResult: undefined,
+  }),
   setSelectorDraft: (draft) => set({ selectorDraft: draft }),
   addRecordedAction: (action) => set((state) => ({
     recordedActions: [...state.recordedActions, action],
@@ -102,5 +150,30 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
     analysis: null,
     selectorDraft: null,
     recordedActions: [],
+    // Reset AI state
+    aiStatus: 'idle',
+    aiStrategy: null,
+    aiReasoning: undefined,
+    userModeOverride: undefined,
+    pathSelectorResult: undefined,
+    containerType: undefined,
+  }),
+  
+  // AI Strategy Actions
+  setAIStatus: (status) => set({ aiStatus: status }),
+  setAIStrategy: (strategy, reasoning) => set({ 
+    aiStrategy: strategy, 
+    aiReasoning: reasoning,
+    aiStatus: 'decided',
+  }),
+  setUserModeOverride: (mode) => set({ userModeOverride: mode }),
+  setPathSelectorResult: (result) => set({ pathSelectorResult: result }),
+  setContainerType: (type) => set({ containerType: type }),
+  resetAIState: () => set({
+    aiStatus: 'idle',
+    aiStrategy: null,
+    aiReasoning: undefined,
+    userModeOverride: undefined,
+    pathSelectorResult: undefined,
   }),
 }));
