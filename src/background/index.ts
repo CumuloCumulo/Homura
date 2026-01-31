@@ -100,13 +100,46 @@ interface AIGeneratePathSelectorMessage {
   };
 }
 
+interface AIGenerateSmartSelectorMessage {
+  type: 'AI_GENERATE_SMART_SELECTOR';
+  payload: {
+    intent: string;
+    targetSelector: string;
+    targetHtml: string;
+    ancestorPath: Array<{
+      tagName: string;
+      id?: string;
+      classes: string[];
+      semanticScore: number;
+      selector: string;
+      outerHTML: string;
+      depth: number;
+      isSemanticRoot: boolean;
+    }>;
+    structureInfo: {
+      containerType: 'table' | 'list' | 'grid' | 'card' | 'single';
+      hasRepeatingStructure: boolean;
+      containerSelector?: string;
+      anchorCandidates: Array<{
+        selector: string;
+        type: 'text_match' | 'attribute_match';
+        text?: string;
+        attribute?: { name: string; value: string };
+        confidence: number;
+        isUnique: boolean;
+      }>;
+    };
+  };
+}
+
 type BackgroundMessage = 
   | RunMissionMessage 
   | OpenSidePanelMessage 
   | SetAPIKeyMessage
   | AIGenerateSelectorMessage
   | AIGenerateToolMessage
-  | AIGeneratePathSelectorMessage;
+  | AIGeneratePathSelectorMessage
+  | AIGenerateSmartSelectorMessage;
 
 chrome.runtime.onMessage.addListener((
   message: BackgroundMessage, 
@@ -148,6 +181,10 @@ async function handleMessage(
 
     case 'AI_GENERATE_PATH_SELECTOR':
       await handleAIGeneratePathSelector(message, sendResponse);
+      break;
+
+    case 'AI_GENERATE_SMART_SELECTOR':
+      await handleAIGenerateSmartSelector(message as AIGenerateSmartSelectorMessage, sendResponse);
       break;
 
     default:
@@ -280,6 +317,53 @@ async function handleAIGeneratePathSelector(
     });
   } catch (error) {
     console.error('[Homura] AI path selector generation error:', error);
+    sendResponse({ success: false, error: String(error) });
+  }
+}
+
+async function handleAIGenerateSmartSelector(
+  message: AIGenerateSmartSelectorMessage,
+  sendResponse: (response: unknown) => void
+): Promise<void> {
+  console.log('[Background] Routing SmartSelector to AI service:', {
+    containerType: message.payload.structureInfo.containerType,
+    hasRepeating: message.payload.structureInfo.hasRepeatingStructure,
+    anchorCount: message.payload.structureInfo.anchorCandidates.length,
+  });
+
+  if (!isAIClientInitialized()) {
+    sendResponse({ success: false, error: 'AI client not initialized' });
+    return;
+  }
+
+  try {
+    const { getAIClient } = await import('@services/ai');
+    const client = getAIClient();
+    
+    // Use the smart selector generation method
+    const result = await client.generateSmartSelector({
+      intent: message.payload.intent,
+      targetSelector: message.payload.targetSelector,
+      targetHtml: message.payload.targetHtml,
+      ancestorPath: message.payload.ancestorPath,
+      structureInfo: message.payload.structureInfo,
+    });
+
+    console.log('[Background] SmartSelector result:', {
+      strategy: result.strategy,
+      confidence: result.confidence,
+    });
+
+    sendResponse({ 
+      success: true,
+      strategy: result.strategy,
+      pathSelector: result.pathSelector,
+      selectorLogic: result.selectorLogic,
+      confidence: result.confidence,
+      reasoning: result.reasoning,
+    });
+  } catch (error) {
+    console.error('[Background] SmartSelector generation error:', error);
     sendResponse({ success: false, error: String(error) });
   }
 }

@@ -89,14 +89,31 @@ export function InspectMode() {
     addLog({
       timestamp: Date.now(),
       level: 'info',
-      message: '正在使用 AI 生成路径选择器...',
+      message: '正在使用 AI 智能生成选择器...',
     });
 
     try {
-      // Use the new path-based selector generation
+      // Build unified SmartSelector payload with all analysis data
+      const payload = {
+        intent: '定位并操作目标元素',
+        targetSelector: analysis.targetSelector || analysis.minimalSelector,
+        targetHtml: getTargetHtml(analysis),
+        ancestorPath: analysis.ancestorPath || [],
+        structureInfo: {
+          containerType: analysis.containerType,
+          hasRepeatingStructure: analysis.containerType !== 'single',
+          containerSelector: analysis.containerSelector,
+          anchorCandidates: analysis.anchorCandidates || [],
+        },
+      };
+
+      console.log('[InspectMode] Sending SmartSelector Context:', payload);
+
+      // Use the unified smart selector generation
       const result = await sendToContentScript<{ 
         success: boolean; 
-        draft?: SelectorDraft; 
+        draft?: SelectorDraft;
+        strategy?: 'path_selector' | 'scope_anchor_target';
         pathSelector?: {
           root: string;
           path: string[];
@@ -105,18 +122,30 @@ export function InspectMode() {
           confidence: number;
           reasoning?: string;
         };
+        selectorLogic?: {
+          scope?: { type: string; selector: string };
+          anchor?: { type: string; selector: string; value: string; matchMode: string };
+          target: { selector: string; action: string };
+        };
+        confidence?: number;
+        reasoning?: string;
         error?: string 
       }>({
-        type: 'AI_GENERATE_PATH_SELECTOR',
-        payload: {
-          intent: '定位并操作目标元素',
-          targetSelector: analysis.targetSelector || analysis.minimalSelector,
-          targetHtml: getTargetHtml(analysis),
-          ancestorPath: analysis.ancestorPath || [],
-        },
+        type: 'AI_GENERATE_SMART_SELECTOR',
+        payload,
       });
 
       if (result.success) {
+        const strategyName = result.strategy === 'scope_anchor_target' 
+          ? 'Scope+Anchor+Target' 
+          : 'Path Selector';
+        
+        addLog({
+          timestamp: Date.now(),
+          level: 'info',
+          message: `AI 选择策略: ${strategyName}`,
+        });
+
         if (result.pathSelector) {
           // Update the selector draft with the AI-generated path selector
           const newDraft: SelectorDraft = {
@@ -141,6 +170,42 @@ export function InspectMode() {
               timestamp: Date.now(),
               level: 'info',
               message: `理由: ${result.pathSelector.reasoning}`,
+            });
+          }
+        } else if (result.selectorLogic) {
+          // Handle Scope+Anchor+Target result
+          const newDraft: SelectorDraft = {
+            scope: result.selectorLogic.scope ? {
+              selector: result.selectorLogic.scope.selector,
+              type: result.selectorLogic.scope.type as 'container_list' | 'single_container',
+              matchCount: 0,
+            } : undefined,
+            anchor: result.selectorLogic.anchor ? {
+              selector: result.selectorLogic.anchor.selector,
+              type: result.selectorLogic.anchor.type as 'text_match' | 'attribute_match',
+              value: result.selectorLogic.anchor.value,
+              matchMode: result.selectorLogic.anchor.matchMode as 'contains' | 'exact',
+            } : undefined,
+            target: {
+              selector: result.selectorLogic.target.selector,
+              action: result.selectorLogic.target.action || selectorDraft?.target?.action || 'CLICK',
+            },
+            confidence: result.confidence || 0.8,
+            validated: false,
+          };
+          setSelectorDraft(newDraft);
+          
+          addLog({
+            timestamp: Date.now(),
+            level: 'info',
+            message: `AI 生成 Scope+Anchor+Target 选择器`,
+          });
+          
+          if (result.reasoning) {
+            addLog({
+              timestamp: Date.now(),
+              level: 'info',
+              message: `理由: ${result.reasoning}`,
             });
           }
         } else if (result.draft) {

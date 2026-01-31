@@ -103,6 +103,9 @@ async function handleMessage(message: { type: string; payload?: unknown }): Prom
     case 'AI_GENERATE_PATH_SELECTOR':
       return handleAIGeneratePathSelector(message.payload as AIGeneratePathSelectorPayload);
 
+    case 'AI_GENERATE_SMART_SELECTOR':
+      return handleAIGenerateSmartSelector(message.payload as SmartSelectorPayload);
+
     case 'AI_GENERATE_TOOL':
       return handleAIGenerateTool(message.payload as { actions: unknown[] });
 
@@ -847,6 +850,38 @@ interface AIGeneratePathSelectorPayload {
 }
 
 /**
+ * Payload for smart selector generation (unified entry point)
+ */
+interface SmartSelectorPayload {
+  intent: string;
+  targetSelector: string;
+  targetHtml: string;
+  ancestorPath: Array<{
+    tagName: string;
+    id?: string;
+    classes: string[];
+    semanticScore: number;
+    selector: string;
+    outerHTML: string;
+    depth: number;
+    isSemanticRoot: boolean;
+  }>;
+  structureInfo: {
+    containerType: 'table' | 'list' | 'grid' | 'card' | 'single';
+    hasRepeatingStructure: boolean;
+    containerSelector?: string;
+    anchorCandidates: Array<{
+      selector: string;
+      type: 'text_match' | 'attribute_match';
+      text?: string;
+      attribute?: { name: string; value: string };
+      confidence: number;
+      isUnique: boolean;
+    }>;
+  };
+}
+
+/**
  * Handle AI path selector generation
  * 
  * This forwards the request to the background script which has access to the AI client.
@@ -982,4 +1017,112 @@ async function handleAIGenerateTool(_payload: { actions: unknown[] }): Promise<{
     success: false, 
     error: 'AI tool generation not yet implemented.' 
   };
+}
+
+/**
+ * Handle smart selector generation (unified entry point)
+ * 
+ * This forwards the request to the background script which will:
+ * 1. Analyze the structureInfo to decide which strategy to use
+ * 2. Call the appropriate AI method (PathSelector or Scope+Anchor+Target)
+ * 3. Return the result
+ */
+async function handleAIGenerateSmartSelector(payload: SmartSelectorPayload): Promise<{
+  success: boolean;
+  strategy?: 'path_selector' | 'scope_anchor_target';
+  pathSelector?: {
+    root: string;
+    path: string[];
+    target: string;
+    fullSelector: string;
+    confidence: number;
+    reasoning?: string;
+  };
+  selectorLogic?: {
+    scope?: { type: string; selector: string };
+    anchor?: { type: string; selector: string; value: string; matchMode: string };
+    target: { selector: string; action: string };
+  };
+  confidence?: number;
+  reasoning?: string;
+  error?: string;
+}> {
+  console.log('[MessageHandler] Received SmartSelector request:', {
+    containerType: payload.structureInfo.containerType,
+    hasRepeating: payload.structureInfo.hasRepeatingStructure,
+    anchorCount: payload.structureInfo.anchorCandidates.length,
+  });
+
+  try {
+    // Forward to background script for AI processing
+    const response = await chrome.runtime.sendMessage({
+      type: 'AI_GENERATE_SMART_SELECTOR',
+      payload,
+    });
+    
+    if (response && response.success) {
+      console.log('[MessageHandler] SmartSelector result:', response);
+      return {
+        success: true,
+        strategy: response.strategy,
+        pathSelector: response.pathSelector,
+        selectorLogic: response.selectorLogic,
+        confidence: response.confidence,
+        reasoning: response.reasoning,
+      };
+    } else {
+      // If AI is not available, try fallback for path selector
+      if (!payload.structureInfo.hasRepeatingStructure && payload.ancestorPath.length > 0) {
+        const pathSelector = buildFallbackPathSelector({
+          intent: payload.intent,
+          targetSelector: payload.targetSelector,
+          targetHtml: payload.targetHtml,
+          ancestorPath: payload.ancestorPath,
+        });
+        
+        if (pathSelector) {
+          console.log('[MessageHandler] Using fallback path selector:', pathSelector);
+          return {
+            success: true,
+            strategy: 'path_selector',
+            pathSelector,
+            confidence: pathSelector.confidence,
+            reasoning: pathSelector.reasoning,
+          };
+        }
+      }
+      
+      return {
+        success: false,
+        error: response?.error || 'Smart selector generation failed',
+      };
+    }
+  } catch (error) {
+    console.error('[MessageHandler] SmartSelector error:', error);
+    
+    // Fallback to programmatic generation for non-repeating structures
+    if (!payload.structureInfo.hasRepeatingStructure && payload.ancestorPath.length > 0) {
+      const pathSelector = buildFallbackPathSelector({
+        intent: payload.intent,
+        targetSelector: payload.targetSelector,
+        targetHtml: payload.targetHtml,
+        ancestorPath: payload.ancestorPath,
+      });
+      
+      if (pathSelector) {
+        return {
+          success: true,
+          strategy: 'path_selector',
+          pathSelector,
+          confidence: pathSelector.confidence,
+          reasoning: pathSelector.reasoning,
+        };
+      }
+    }
+    
+    return {
+      success: false,
+      error: String(error),
+    };
+  }
 }

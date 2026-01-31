@@ -20,6 +20,8 @@ import type {
   SelfHealingResult,
   PathSelectorContext,
   PathSelectorResult,
+  SmartSelectorContext,
+  SmartSelectorResult,
 } from './types';
 import {
   SELECTOR_SYSTEM_PROMPT,
@@ -33,6 +35,7 @@ import {
 } from './prompts';
 import { PATH_SELECTOR_TOOL } from './tools';
 import type { PathSelectorToolResult } from './tools';
+import { shouldUseScopeAnchorTarget, getDecisionReason } from './smartRouter';
 
 // Default configuration
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
@@ -257,6 +260,115 @@ export class TongyiClient {
     }
 
     throw new Error('No valid response from AI for path selector generation');
+  }
+
+  /**
+   * Generate smart selector using the appropriate strategy
+   * 
+   * This method analyzes the structure info and decides whether to use:
+   * - Path Selector (for non-repeating or complex nested structures)
+   * - Scope+Anchor+Target (for table/list structures with anchors)
+   */
+  async generateSmartSelector(context: SmartSelectorContext): Promise<SmartSelectorResult> {
+    const timestamp = new Date().toISOString();
+    
+    console.log(`[SmartSelector ${timestamp}] Received request:`, {
+      containerType: context.structureInfo.containerType,
+      hasRepeating: context.structureInfo.hasRepeatingStructure,
+      anchorCount: context.structureInfo.anchorCandidates.length,
+      ancestorPathLength: context.ancestorPath.length,
+    });
+    
+    const useScopeAnchorTarget = shouldUseScopeAnchorTarget(context);
+    const reasoning = getDecisionReason(context);
+    
+    console.log(`[SmartSelector ${timestamp}] Strategy decision:`, {
+      strategy: useScopeAnchorTarget ? 'SCOPE_ANCHOR_TARGET' : 'PATH_SELECTOR',
+      reasoning,
+    });
+    
+    if (useScopeAnchorTarget) {
+      return this.generateScopeAnchorTargetFromContext(context, reasoning);
+    } else {
+      return this.generatePathSelectorFromContext(context, reasoning);
+    }
+  }
+
+  /**
+   * Generate Scope+Anchor+Target selector from SmartSelectorContext
+   * 
+   * This activates the previously idle Scope+Anchor+Target branch,
+   * using the existing generateSelector method.
+   */
+  private async generateScopeAnchorTargetFromContext(
+    context: SmartSelectorContext,
+    baseReasoning: string
+  ): Promise<SmartSelectorResult> {
+    const timestamp = new Date().toISOString();
+    
+    // Build the context for the existing generateSelector method
+    const topAnchor = context.structureInfo.anchorCandidates[0];
+    const selectorContext: SelectorGenerationContext = {
+      intent: context.intent,
+      targetHtml: context.targetHtml,
+      containerHtml: `<!-- Container: ${context.structureInfo.containerSelector || context.structureInfo.containerType} -->
+<!-- Anchor candidates: ${context.structureInfo.anchorCandidates.map(a => `${a.selector}="${a.text || a.attribute?.value}"`).join(', ')} -->`,
+      anchorValue: topAnchor?.text || topAnchor?.attribute?.value,
+    };
+    
+    console.log(`[SmartSelector ${timestamp}] Building Scope+Anchor+Target prompt...`);
+    
+    try {
+      const result = await this.generateSelector(selectorContext);
+      
+      console.log(`[SmartSelector ${timestamp}] AI response parsed: confidence=${result.confidence}`);
+      
+      return {
+        strategy: 'scope_anchor_target',
+        selectorLogic: result.selectorLogic,
+        confidence: result.confidence,
+        reasoning: `${baseReasoning}. ${result.explanation}`,
+      };
+    } catch (error) {
+      console.error(`[SmartSelector ${timestamp}] Scope+Anchor+Target generation failed:`, error);
+      
+      // Fallback to Path Selector if Scope+Anchor+Target fails
+      console.log(`[SmartSelector ${timestamp}] Falling back to Path Selector...`);
+      return this.generatePathSelectorFromContext(context, `${baseReasoning} (fallback due to error)`);
+    }
+  }
+
+  /**
+   * Generate Path Selector from SmartSelectorContext
+   */
+  private async generatePathSelectorFromContext(
+    context: SmartSelectorContext,
+    baseReasoning: string
+  ): Promise<SmartSelectorResult> {
+    const timestamp = new Date().toISOString();
+    
+    console.log(`[SmartSelector ${timestamp}] Building Path Selector prompt...`);
+    
+    try {
+      const pathResult = await this.generatePathSelector({
+        intent: context.intent,
+        targetSelector: context.targetSelector,
+        targetHtml: context.targetHtml,
+        ancestorPath: context.ancestorPath,
+      });
+      
+      console.log(`[SmartSelector ${timestamp}] AI response parsed: confidence=${pathResult.confidence}`);
+      
+      return {
+        strategy: 'path_selector',
+        pathSelector: pathResult,
+        confidence: pathResult.confidence,
+        reasoning: pathResult.reasoning || baseReasoning,
+      };
+    } catch (error) {
+      console.error(`[SmartSelector ${timestamp}] Path Selector generation failed:`, error);
+      throw error;
+    }
   }
 }
 

@@ -7,6 +7,7 @@
  */
 
 import type { AtomicTool, SelectorLogic } from '@shared/types';
+import type { AncestorInfo, AnchorCandidate, ContainerType, PathSelector } from '@shared/selectorBuilder';
 
 // =============================================================================
 // AI CLIENT TYPES
@@ -70,25 +71,12 @@ export interface SelectorSuggestion {
 }
 
 // =============================================================================
-// PATH-BASED SELECTOR TYPES (New)
+// PATH-BASED SELECTOR TYPES
 // =============================================================================
 
 /**
- * Ancestor info for path-based selector generation
- */
-export interface AncestorInfoForAI {
-  tagName: string;
-  id?: string;
-  classes: string[];
-  semanticScore: number;
-  selector: string;
-  outerHTML: string;
-  depth: number;
-  isSemanticRoot: boolean;
-}
-
-/**
  * Context for path-based selector generation
+ * Note: Uses AncestorInfo from @shared/selectorBuilder
  */
 export interface PathSelectorContext {
   /** Target element selector */
@@ -96,27 +84,59 @@ export interface PathSelectorContext {
   /** Target element HTML */
   targetHtml: string;
   /** Ancestor path from target upward */
-  ancestorPath: AncestorInfoForAI[];
+  ancestorPath: AncestorInfo[];
   /** User's intent description */
   intent?: string;
 }
 
+// Re-export PathSelector as PathSelectorResult for backward compatibility
+export type PathSelectorResult = PathSelector;
+
+// =============================================================================
+// SMART SELECTOR TYPES (Unified Entry Point)
+// =============================================================================
+
 /**
- * Result from AI path selector generation
+ * Context for smart selector generation
+ * Contains all information needed for both Path Selector and Scope+Anchor+Target strategies
  */
-export interface PathSelectorResult {
-  /** Semantic root selector */
-  root: string;
-  /** Intermediate path selectors */
-  path: string[];
+export interface SmartSelectorContext {
+  /** User's intent description */
+  intent: string;
   /** Target element selector */
-  target: string;
-  /** Full combined selector */
-  fullSelector: string;
+  targetSelector: string;
+  /** Target element HTML */
+  targetHtml: string;
+  /** Ancestor path from target upward (for Path Selector strategy) */
+  ancestorPath: AncestorInfo[];
+  /** Structure information for strategy routing */
+  structureInfo: {
+    /** Container type detected by analyzer */
+    containerType: ContainerType;
+    /** Whether the element is in a repeating structure */
+    hasRepeatingStructure: boolean;
+    /** Container selector (for Scope+Anchor+Target strategy) */
+    containerSelector?: string;
+    /** Anchor candidates found in container */
+    anchorCandidates: AnchorCandidate[];
+  };
+}
+
+/**
+ * Result from smart selector generation
+ * Can contain either PathSelector or SelectorLogic depending on strategy used
+ */
+export interface SmartSelectorResult {
+  /** Strategy used for generation */
+  strategy: 'path_selector' | 'scope_anchor_target';
+  /** Path selector result (if strategy is 'path_selector') */
+  pathSelector?: PathSelector;
+  /** Selector logic result (if strategy is 'scope_anchor_target') */
+  selectorLogic?: SelectorLogic;
   /** Confidence score (0-1) */
   confidence: number;
   /** Reasoning for the selection */
-  reasoning?: string;
+  reasoning: string;
 }
 
 // =============================================================================

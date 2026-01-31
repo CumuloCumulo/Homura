@@ -25,11 +25,21 @@ export type {
   ToolGenerationResult,
   SelfHealingContext,
   SelfHealingResult,
-  // Path selector types (new)
+  // Path selector types
   PathSelectorContext,
   PathSelectorResult,
-  AncestorInfoForAI,
+  // Smart selector types (unified entry point)
+  SmartSelectorContext,
+  SmartSelectorResult,
 } from './types';
+
+// Re-export shared types for convenience
+export type {
+  AncestorInfo,
+  PathSelector,
+  ContainerType,
+  AnchorCandidate,
+} from '@shared/selectorBuilder';
 
 // Prompts (for customization)
 export {
@@ -52,3 +62,9 @@ export type {
   PathSelectorToolResult,
   ScopeAnchorTargetToolResult,
 } from './tools';
+
+// Smart Router
+export {
+  shouldUseScopeAnchorTarget,
+  getDecisionReason,
+} from './smartRouter';
