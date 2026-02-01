@@ -10,6 +10,7 @@ Homura transforms traditional RPA (like Automa) from **imperative scripting** to
 - **AI-powered decisions**: LLM handles uncertain logic; engine handles precise DOM operations
 - **Self-healing**: Automatic selector repair when elements change
 - **Smart recording**: Record actions and let AI generate reusable tools
+- **Dual-strategy selectors**: AI automatically chooses Path or Structure mode based on DOM analysis
 
 ## 📐 Architecture
 
@@ -18,23 +19,29 @@ Homura transforms traditional RPA (like Automa) from **imperative scripting** to
 │                      Presentation Layer                          │
 ├────────────────────────────┬────────────────────────────────────┤
 │  SidePanel (录制器)         │  Dashboard (管理中心)              │
-│  • Inspect Mode (元素检查)  │  • Tool Library (工具库)          │
-│  • Record Mode (操作录制)   │  • Rule Book Editor (规则书)      │
-│  • Build Mode (选择器构建)  │  • Execution Logs (运行日志)      │
+│  ├── Inspect Mode 元素检查  │  ├── Tool Library 工具库          │
+│  │   ├── 路径模式 (Path)    │  ├── Rule Book Editor 规则书      │
+│  │   └── 结构模式 (Structure)│  └── Execution Log 运行日志       │
+│  ├── Record Mode 操作录制   │                                    │
+│  └── Quick Actions 快速操作 │                                    │
 └────────────────────────────┴────────────────────────────────────┘
-                              ↕ Messages
+                              ↕ Chrome Messages
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Intelligence Layer                          │
-│  • AI Client (通义 API)     - Selector generation               │
-│  • Tool Builder Agent       - Recording → JSON tool             │
-│  • Orchestrator Agent       - Rule Book → Tool calls            │
+│  ├── AI Client (通义 API)     选择器生成、策略路由              │
+│  │   ├── Smart Router         智能策略选择 (Path vs Structure)  │
+│  │   └── UnifiedSelector      统一选择器 Schema                 │
+│  ├── Tool Builder Agent       录制 → JSON 工具                  │
+│  └── Orchestrator Agent       规则 → 决策调用                   │
 └─────────────────────────────────────────────────────────────────┘
-                              ↕ Messages
+                              ↕ Chrome Messages
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Execution Layer                            │
-│  • Atomic Tool Engine       - Scope + Anchor + Target           │
-│  • Selector Builder         - DOM analysis & generation         │
-│  • Debug Highlighter        - Visual feedback                   │
+│  ├── Atomic Tool Engine       UnifiedSelector 执行器            │
+│  ├── Selector Builder         DOM 分析与双策略生成              │
+│  │   ├── Path Strategy        语义路径选择器                    │
+│  │   └── Scope+Anchor+Target  结构化选择器                      │
+│  └── Debug Highlighter        调试可视化                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -79,7 +86,19 @@ Click the extension icon to open:
 |------|-------------|
 | **检查 (Inspect)** | Click page elements to analyze structure |
 | **录制 (Record)** | Record user actions for tool generation |
-| **构建 (Build)** | Edit Scope + Anchor + Target selectors |
+
+#### Inspect Mode Features
+
+| Tab | Description |
+|-----|-------------|
+| **路径模式 (Path)** | Semantic ancestor path visualization with toggleable nodes |
+| **结构模式 (Structure)** | Scope + Anchor + Target configuration for repeating elements |
+
+**Quick Actions** (available in both modes):
+- 🔍 **高亮**: Highlight target element on page
+- 👆 **点击**: Test click action
+- 📄 **读取**: Extract text content
+- ✏️ **填写**: Test input action
 
 ### Dashboard (管理中心)
 
@@ -105,7 +124,7 @@ src/
 │   ├── index.tsx           # Entry point
 │   ├── messageHandler.ts   # Inspect/Record/Execute handlers
 │   └── engine/
-│       ├── executor.ts     # Atomic Tool Executor
+│       ├── executor.ts     # UnifiedSelector Executor
 │       ├── primitives.ts   # CLICK, INPUT, EXTRACT, etc.
 │       └── highlighter.ts  # Debug overlays
 │
@@ -113,12 +132,14 @@ src/
 │   ├── App.tsx             # Main app with mode tabs
 │   ├── components/
 │   │   ├── Header.tsx      # Header with Dashboard link
-│   │   ├── InspectMode.tsx # Element inspection UI
-│   │   ├── RecordingPanel.tsx # Action recording UI
-│   │   ├── SelectorBuilder.tsx # Selector editor
+│   │   ├── InspectMode.tsx # Element inspection (main orchestrator)
+│   │   ├── SmartStatus.tsx # AI decision panel
+│   │   ├── PathVisualizer.tsx   # Path mode view + quick actions
+│   │   ├── StructureView.tsx    # Structure mode view + quick actions
+│   │   ├── RecordingPanel.tsx   # Action recording UI
 │   │   └── LogViewer.tsx   # Execution logs
 │   ├── stores/
-│   │   └── recordingStore.ts
+│   │   └── recordingStore.ts    # State with UnifiedSelector
 │   └── utils/
 │       └── ensureContentScript.ts
 │
@@ -134,22 +155,71 @@ src/
 ├── services/               # External Services
 │   └── ai/
 │       ├── client.ts       # Tongyi API client
+│       ├── smartRouter.ts  # Strategy routing logic
 │       ├── prompts.ts      # AI prompt templates
 │       └── types.ts
 │
 └── shared/                 # Shared Modules
-    ├── types.ts            # Core type definitions
+    ├── types.ts            # Core types (incl. UnifiedSelector)
     ├── constants.ts
     ├── utils.ts
     └── selectorBuilder/    # Selector generation
-        ├── analyzer.ts     # DOM structure analysis
-        ├── generator.ts    # Scope+Anchor+Target gen
+        ├── analyzer.ts     # DOM analysis + semantic scoring
+        ├── generator.ts    # Dual-strategy generator + converters
+        ├── types.ts        # Selector-specific types
         └── validator.ts    # Real-time validation
 ```
 
 ## 🔧 Core Concepts
 
-### Selector Logic: Scope + Anchor + Target
+### UnifiedSelector (统一选择器)
+
+Homura uses a unified selector schema that supports two strategies:
+
+```typescript
+interface UnifiedSelector {
+  id: string;                    // Unique ID
+  strategy: 'path' | 'scope_anchor_target' | 'direct';
+  fullSelector: string;          // Final CSS selector
+  confidence: number;            // 0-1 confidence score
+  validated: boolean;            // Has been validated
+  
+  // Path Strategy Data
+  pathData?: {
+    root: string;                // Semantic root (e.g. ".header")
+    intermediates: string[];     // Path nodes (e.g. [".nav"])
+    target: string;              // Target selector (e.g. "button.submit")
+  };
+  
+  // Structure Strategy Data
+  structureData?: {
+    scope: { selector: string; type: 'container_list' | 'single_container' };
+    anchor?: { selector: string; type: 'text_match' | 'attribute_match'; value: string };
+    target: { selector: string };
+  };
+  
+  action: { type: 'CLICK' | 'INPUT' | 'EXTRACT' | 'WAIT' | 'NAVIGATE'; params?: object };
+}
+```
+
+### Strategy 1: Path Selector (路径选择器)
+
+Best for **single, complex, or non-repeating elements**:
+
+```
+目标: input.search-input
+        ↓ 向上遍历 DOM 树
+div.search-box (score: 0.2) ← 跳过
+        ↓
+header.main-header (score: 0.9) ← 语义根 ✓
+        
+生成: .main-header .search-box input.search-input
+置信度: 85%
+```
+
+### Strategy 2: Scope + Anchor + Target (结构选择器)
+
+Best for **repeating structures** (tables, lists, cards):
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -165,6 +235,16 @@ src/
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### Smart Routing (智能路由)
+
+AI automatically selects the best strategy:
+
+| Condition | Strategy |
+|-----------|----------|
+| Repeating container (table/list) detected | `scope_anchor_target` |
+| Single element with semantic ancestors | `path` |
+| Simple unique element | `direct` |
+
 ### Atomic Tool (原子工具)
 
 ```json
@@ -174,10 +254,16 @@ src/
   "parameters": {
     "student_name": { "type": "string", "required": true }
   },
-  "selector_logic": {
-    "scope": { "type": "container_list", "selector": "tr" },
-    "anchor": { "type": "text_match", "selector": ".name", "value": "{{student_name}}" },
-    "target": { "selector": ".btn-approve", "action": "CLICK" }
+  "unified_selector": {
+    "strategy": "scope_anchor_target",
+    "fullSelector": "tr .btn-approve",
+    "structureData": {
+      "scope": { "selector": "tr", "type": "container_list" },
+      "anchor": { "selector": ".name", "type": "text_match", "value": "{{student_name}}" },
+      "target": { "selector": ".btn-approve" }
+    },
+    "action": { "type": "CLICK" },
+    "confidence": 0.92
   }
 }
 ```
@@ -199,6 +285,8 @@ src/
 - [x] **v0.3**: Dashboard with Tool Library & Rule Book editor
 - [x] **v0.4**: AI service integration (Tongyi API)
 - [x] **v0.5**: Selector Builder with DOM analysis
+- [x] **v0.6**: Path Selector + AI Smart Routing
+- [x] **v0.7**: UnifiedSelector Schema + Dual-Mode UI
 - [ ] **v1.0**: Full AI-powered tool generation
 - [ ] **v1.5**: Rule Book parser & orchestrator
 - [ ] **v2.0**: Self-healing selectors
