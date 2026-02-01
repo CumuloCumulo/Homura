@@ -27,8 +27,10 @@ import type {
   WaitForParams,
   NavigateParams,
   ClickParams,
+  UnifiedSelector,
 } from '@shared/types';
 import { substituteVariables, matchText, getDOMSnapshot, safeQuerySelectorAll, safeQuerySelector, sleep } from '@shared/utils';
+import { convertUnifiedToSelectorLogic } from '@shared/selectorBuilder';
 
 // Import primitive executors
 import { 
@@ -387,4 +389,166 @@ function isExecutionError(error: unknown): error is ExecutionError {
     'code' in error &&
     'message' in error
   );
+}
+
+// =============================================================================
+// UNIFIED SELECTOR EXECUTION
+// =============================================================================
+
+/**
+ * Execute a UnifiedSelector
+ * 
+ * This is the new entry point for executing selectors that supports the unified
+ * data model. It converts the UnifiedSelector to SelectorLogic and executes it.
+ * 
+ * @param selector - The unified selector to execute
+ * @param params - Parameter values for variable substitution
+ * @param options - Executor options
+ */
+export async function executeUnifiedSelector(
+  selector: UnifiedSelector,
+  params: Record<string, string | number | boolean> = {},
+  options: ExecutorOptions = {}
+): Promise<ExecuteToolResult> {
+  const startTime = performance.now();
+  const { debug = false, debugDelay = 500 } = options;
+
+  console.log(`[Homura] Executing UnifiedSelector: ${selector.id}`, { 
+    strategy: selector.strategy,
+    fullSelector: selector.fullSelector,
+    debug 
+  });
+
+  // Clear any existing highlights
+  if (debug) {
+    clearAllHighlights();
+  }
+
+  try {
+    // Convert UnifiedSelector to SelectorLogic
+    const selectorLogic = convertUnifiedToSelectorLogic(selector);
+    
+    // Substitute variables
+    const resolvedLogic = resolveVariables(selectorLogic, params);
+    
+    // Execute the selector logic
+    const result = await executeSelectionLogic(resolvedLogic, { debug, debugDelay });
+    
+    const duration = Math.round(performance.now() - startTime);
+    
+    return {
+      success: true,
+      data: result.data,
+      metadata: {
+        duration,
+        scopeMatchCount: result.scopeMatchCount,
+        anchorMatchIndex: result.anchorMatchIndex,
+      },
+    };
+  } catch (error) {
+    const duration = Math.round(performance.now() - startTime);
+    
+    if (isExecutionError(error)) {
+      console.error(`[Homura] UnifiedSelector execution error:`, error);
+      return {
+        success: false,
+        error,
+        metadata: { duration },
+      };
+    }
+    
+    // Wrap unexpected errors
+    const executionError: ExecutionError = {
+      code: 'UNKNOWN',
+      message: error instanceof Error ? error.message : String(error),
+      failedSelector: selector.fullSelector,
+    };
+    
+    console.error(`[Homura] Unexpected error:`, error);
+    return {
+      success: false,
+      error: executionError,
+      metadata: { duration },
+    };
+  }
+}
+
+/**
+ * Quick execution of a UnifiedSelector using just the fullSelector string
+ * 
+ * This is useful for simple cases where you just need to find and act on an element
+ * without the full Scope+Anchor+Target logic.
+ * 
+ * @param selector - The unified selector
+ * @param options - Executor options
+ */
+export async function executeUnifiedSelectorDirect(
+  selector: UnifiedSelector,
+  options: ExecutorOptions = {}
+): Promise<ExecuteToolResult> {
+  const startTime = performance.now();
+  const { debug = false, debugDelay = 500 } = options;
+
+  console.log(`[Homura] Direct execution of UnifiedSelector: ${selector.fullSelector}`);
+
+  if (debug) {
+    clearAllHighlights();
+  }
+
+  try {
+    const element = safeQuerySelector<HTMLElement>(selector.fullSelector);
+    
+    if (!element) {
+      const error: ExecutionError = {
+        code: 'TARGET_NOT_FOUND',
+        message: `Element not found: ${selector.fullSelector}`,
+        failedSelector: selector.fullSelector,
+      };
+      return {
+        success: false,
+        error,
+        metadata: { duration: Math.round(performance.now() - startTime) },
+      };
+    }
+
+    if (debug) {
+      highlightTarget(element);
+      await sleep(debugDelay);
+    }
+
+    // Execute action based on selector.action
+    const target: SelectorTarget = {
+      selector: selector.fullSelector,
+      action: selector.action.type,
+      actionParams: selector.action.params,
+    };
+
+    const result = await executeAction(element, target);
+
+    if (debug) {
+      flashElement(element, true);
+    }
+
+    const duration = Math.round(performance.now() - startTime);
+
+    return {
+      success: true,
+      data: result,
+      metadata: { duration },
+    };
+  } catch (error) {
+    const duration = Math.round(performance.now() - startTime);
+    
+    const executionError: ExecutionError = {
+      code: 'ACTION_FAILED',
+      message: error instanceof Error ? error.message : String(error),
+      failedSelector: selector.fullSelector,
+    };
+    
+    return {
+      success: false,
+      error: executionError,
+      metadata: { duration },
+    };
+  }
 }

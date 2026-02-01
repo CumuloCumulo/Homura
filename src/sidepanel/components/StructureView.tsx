@@ -10,6 +10,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { ElementAnalysis, AnchorCandidate, SelectorDraft } from '@shared/selectorBuilder';
+import type { UnifiedSelector } from '@shared/types';
 import { sendToContentScript } from '../utils/ensureContentScript';
 
 // =============================================================================
@@ -19,6 +20,7 @@ import { sendToContentScript } from '../utils/ensureContentScript';
 interface StructureViewProps {
   analysis: ElementAnalysis;
   selectorDraft: SelectorDraft | null;
+  unifiedSelector?: UnifiedSelector | null;  // New prop for unified selector
   onDraftChange: (draft: SelectorDraft) => void;
   onLog: (log: { timestamp: number; level: 'info' | 'error'; message: string }) => void;
 }
@@ -164,42 +166,84 @@ function AnchorCandidateItem({ candidate, index, isSelected, onSelect }: AnchorC
 }
 
 // =============================================================================
-// QUICK ACTION PANEL
+// QUICK ACTION PANEL - Supports both Path and Structure strategies
 // =============================================================================
 
 interface QuickActionPanelProps {
   analysis: ElementAnalysis;
   selectorDraft: SelectorDraft | null;
+  unifiedSelector?: UnifiedSelector | null;  // New prop for unified selector
   onLog: (log: { timestamp: number; level: 'info' | 'error'; message: string }) => void;
 }
 
-function QuickActionPanel({ analysis, selectorDraft, onLog }: QuickActionPanelProps) {
+function QuickActionPanel({ analysis, selectorDraft, unifiedSelector, onLog }: QuickActionPanelProps) {
   const [inputValue, setInputValue] = React.useState('');
   const [extractedText, setExtractedText] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState<ActionType>(null);
   
+  // Determine which strategy is active
+  const strategy = unifiedSelector?.strategy || 
+    (selectorDraft?.scope ? 'scope_anchor_target' : 'path');
+  const isPathMode = strategy === 'path' || strategy === 'direct';
+  const isStructureMode = strategy === 'scope_anchor_target';
+  
   // Anchor value for repeating structures
-  const defaultAnchorValue = selectorDraft?.anchor?.value || 
+  const defaultAnchorValue = unifiedSelector?.structureData?.anchor?.value ||
+    selectorDraft?.anchor?.value || 
     analysis.anchorCandidates?.[0]?.text || 
     analysis.anchorCandidates?.[0]?.attribute?.value || '';
   const [anchorValue, setAnchorValue] = React.useState(defaultAnchorValue);
   
+  // Use targetSelector as a stable identity for the selected element
+  const analysisId = analysis.targetSelector || analysis.minimalSelector;
+  
   React.useEffect(() => {
-    const newValue = selectorDraft?.anchor?.value || 
+    // Reset states when element changes
+    const newValue = unifiedSelector?.structureData?.anchor?.value ||
+      selectorDraft?.anchor?.value || 
       analysis.anchorCandidates?.[0]?.text || 
       analysis.anchorCandidates?.[0]?.attribute?.value || '';
     setAnchorValue(newValue);
-  }, [analysis, selectorDraft]);
+    setExtractedText(null);  // Clear previous extracted text
+  }, [analysisId, unifiedSelector, selectorDraft, analysis.anchorCandidates]);
 
   const hasRepeatingContainer = analysis.containerType !== 'single' && !!analysis.containerSelector;
   
-  const buildPayload = () => ({
-    scopeSelector: selectorDraft?.scope?.selector || analysis.containerSelector,
-    anchorSelector: selectorDraft?.anchor?.selector || analysis.anchorCandidates?.[0]?.selector,
-    anchorValue: anchorValue,
-    anchorMatchMode: selectorDraft?.anchor?.matchMode || 'contains',
-    targetSelector: selectorDraft?.target?.selector || analysis.targetSelector || analysis.minimalSelector,
-  });
+  // Build payload from UnifiedSelector or SelectorDraft
+  const buildPayload = () => {
+    // If we have a UnifiedSelector, use it as the primary source
+    if (unifiedSelector) {
+      if (isPathMode) {
+        // Path strategy: use fullSelector directly
+        return {
+          targetSelector: unifiedSelector.fullSelector,
+          // No scope/anchor for path mode
+          scopeSelector: undefined,
+          anchorSelector: undefined,
+          anchorValue: undefined,
+          anchorMatchMode: undefined,
+        };
+      } else if (unifiedSelector.structureData) {
+        // Structure strategy: use structureData
+        return {
+          scopeSelector: unifiedSelector.structureData.scope.selector,
+          anchorSelector: unifiedSelector.structureData.anchor?.selector,
+          anchorValue: anchorValue, // Use local state (user may have edited it)
+          anchorMatchMode: unifiedSelector.structureData.anchor?.matchMode || 'contains',
+          targetSelector: unifiedSelector.structureData.target.selector,
+        };
+      }
+    }
+    
+    // Fallback to legacy SelectorDraft
+    return {
+      scopeSelector: selectorDraft?.scope?.selector || analysis.containerSelector,
+      anchorSelector: selectorDraft?.anchor?.selector || analysis.anchorCandidates?.[0]?.selector,
+      anchorValue: anchorValue,
+      anchorMatchMode: selectorDraft?.anchor?.matchMode || 'contains',
+      targetSelector: selectorDraft?.target?.selector || analysis.targetSelector || analysis.minimalSelector,
+    };
+  };
 
   const handleAction = async (action: ActionType, value?: string) => {
     if (!action) return;
@@ -210,6 +254,8 @@ function QuickActionPanel({ analysis, selectorDraft, onLog }: QuickActionPanelPr
         ...buildPayload(),
         action,
         inputValue: value,
+        // Include strategy for the executor to handle appropriately
+        strategy: strategy,
       };
       
       const result = await sendToContentScript<{ 
@@ -241,20 +287,58 @@ function QuickActionPanel({ analysis, selectorDraft, onLog }: QuickActionPanelPr
     }
   };
 
+  // Get display values
+  const displaySelector = unifiedSelector?.fullSelector || 
+    selectorDraft?.target?.selector || 
+    analysis.targetSelector || 
+    analysis.minimalSelector;
+
   return (
     <div className="p-2.5 rounded-lg bg-zinc-800/60 border border-violet-500/20">
       <h3 className="text-[10px] font-medium text-violet-400 mb-2 flex items-center gap-1.5">
         <TargetIcon className="w-3 h-3" />
         快速操作
+        {/* Strategy Badge */}
+        <span className={`
+          ml-auto px-1.5 py-0.5 text-[8px] rounded
+          ${isPathMode 
+            ? 'bg-violet-500/20 text-violet-400' 
+            : 'bg-emerald-500/20 text-emerald-400'}
+        `}>
+          {isPathMode ? 'Path' : 'Structure'}
+        </span>
       </h3>
       
-      {/* Container & Anchor Info */}
-      {hasRepeatingContainer && (
+      {/* Path Mode: Show full selector directly */}
+      {isPathMode && (
+        <div className="mb-2.5 p-2 rounded bg-black/20 border border-white/5">
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-zinc-500 shrink-0">选择器:</span>
+            <code className="text-[9px] font-mono text-violet-400 truncate flex-1">
+              {displaySelector}
+            </code>
+          </div>
+          {unifiedSelector?.pathData && (
+            <div className="mt-1.5 text-[8px] text-zinc-600">
+              根: <span className="text-violet-400/70">{unifiedSelector.pathData.root}</span>
+              {unifiedSelector.pathData.intermediates.length > 0 && (
+                <> → 路径: <span className="text-violet-400/70">{unifiedSelector.pathData.intermediates.join(' → ')}</span></>
+              )}
+              → 目标: <span className="text-violet-400/70">{unifiedSelector.pathData.target}</span>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Structure Mode: Show Container & Anchor Info */}
+      {isStructureMode && hasRepeatingContainer && (
         <div className="mb-2.5 p-2 rounded bg-black/20 border border-white/5 space-y-1.5">
           <div className="flex items-center gap-2">
             <span className="text-[9px] text-zinc-500 shrink-0">容器:</span>
             <code className="text-[9px] font-mono text-blue-400 truncate">
-              {analysis.containerSelector || analysis.containerTagName}
+              {unifiedSelector?.structureData?.scope.selector || 
+               analysis.containerSelector || 
+               analysis.containerTagName}
             </code>
             <span className="text-[8px] text-zinc-600">
               ({analysis.containerType})
@@ -275,6 +359,14 @@ function QuickActionPanel({ analysis, selectorDraft, onLog }: QuickActionPanelPr
                 transition-colors
               "
             />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-zinc-500 shrink-0">目标:</span>
+            <code className="text-[9px] font-mono text-violet-400 truncate">
+              {unifiedSelector?.structureData?.target.selector || 
+               selectorDraft?.target?.selector || 
+               analysis.relativeSelector}
+            </code>
           </div>
         </div>
       )}
@@ -426,10 +518,19 @@ function EditIcon() {
 // MAIN STRUCTURE VIEW COMPONENT
 // =============================================================================
 
-export function StructureView({ analysis, selectorDraft, onDraftChange, onLog }: StructureViewProps) {
+export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraftChange, onLog }: StructureViewProps) {
   const { containerType, anchorCandidates, relativeSelector, minimalSelector } = analysis;
   const [showAllAnchors, setShowAllAnchors] = React.useState(false);
   const [selectedAnchorIndex, setSelectedAnchorIndex] = React.useState(0);
+  
+  // ========== FIX Issue 2: Reset anchor index when analysis changes ==========
+  // Use targetSelector as a stable identity for the selected element
+  const analysisId = analysis.targetSelector || analysis.minimalSelector;
+  React.useEffect(() => {
+    // Reset to default (best) anchor when user selects a new element
+    setSelectedAnchorIndex(0);
+    setShowAllAnchors(false);
+  }, [analysisId]);
   
   const visibleAnchors = showAllAnchors ? anchorCandidates : anchorCandidates.slice(0, 3);
   
@@ -489,7 +590,12 @@ export function StructureView({ analysis, selectorDraft, onDraftChange, onLog }:
       </div>
 
       {/* Quick Actions */}
-      <QuickActionPanel analysis={analysis} selectorDraft={selectorDraft} onLog={onLog} />
+      <QuickActionPanel 
+        analysis={analysis} 
+        selectorDraft={selectorDraft} 
+        unifiedSelector={unifiedSelector}
+        onLog={onLog} 
+      />
 
       {/* Selector Configuration */}
       {selectorDraft && (

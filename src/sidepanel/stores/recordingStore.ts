@@ -13,7 +13,7 @@ import type {
   RecordedAction,
   PathSelector,
 } from '@shared/selectorBuilder';
-import type { LogEntry } from '@shared/types';
+import type { LogEntry, UnifiedSelector } from '@shared/types';
 
 export type RecordingMode = 'inspect' | 'record';
 
@@ -35,8 +35,13 @@ interface RecordingStore {
   selectedElement: HTMLElement | null;
   /** Current element analysis */
   analysis: ElementAnalysis | null;
-  /** Draft selector being built */
+  /** Draft selector being built - @deprecated Use unifiedSelector instead */
   selectorDraft: SelectorDraft | null;
+  /** 
+   * Unified selector - the single source of truth for selector data
+   * Replaces fragmented selectorDraft + pathSelectorResult
+   */
+  unifiedSelector: UnifiedSelector | null;
   /** Recorded actions */
   recordedActions: RecordedAction[];
   /** Logs */
@@ -56,7 +61,7 @@ interface RecordingStore {
   aiReasoning?: string;
   /** User override of the view mode */
   userModeOverride?: ViewMode;
-  /** AI-generated path selector result */
+  /** AI-generated path selector result - @deprecated Use unifiedSelector.pathData instead */
   pathSelectorResult?: PathSelector;
   /** Container type detected by AI */
   containerType?: string;
@@ -68,7 +73,12 @@ interface RecordingStore {
   setHoveredElement: (element: HTMLElement | null) => void;
   setSelectedElement: (element: HTMLElement | null) => void;
   setAnalysis: (analysis: ElementAnalysis | null) => void;
+  /** @deprecated Use setUnifiedSelector instead */
   setSelectorDraft: (draft: SelectorDraft | null) => void;
+  /** Set the unified selector (primary method) */
+  setUnifiedSelector: (selector: UnifiedSelector | null) => void;
+  /** Update specific fields of the unified selector */
+  updateUnifiedSelector: (updates: Partial<UnifiedSelector>) => void;
   addRecordedAction: (action: RecordedAction) => void;
   setRecordedActions: (actions: RecordedAction[]) => void;
   deleteRecordedAction: (id: string) => void;
@@ -83,6 +93,7 @@ interface RecordingStore {
   setAIStatus: (status: AIStatus) => void;
   setAIStrategy: (strategy: AIStrategy, reasoning?: string) => void;
   setUserModeOverride: (mode: ViewMode | undefined) => void;
+  /** @deprecated Use setUnifiedSelector instead */
   setPathSelectorResult: (result: PathSelector | undefined) => void;
   setContainerType: (type: string | undefined) => void;
   resetAIState: () => void;
@@ -96,6 +107,7 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   selectedElement: null,
   analysis: null,
   selectorDraft: null,
+  unifiedSelector: null,
   recordedActions: [],
   logs: [],
   isProcessing: false,
@@ -116,6 +128,7 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   setAnalysis: (analysis) => set({ 
     analysis, 
     selectorDraft: null,
+    unifiedSelector: null,
     // Reset AI state when analysis changes
     aiStatus: 'idle',
     aiStrategy: null,
@@ -124,6 +137,18 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
     pathSelectorResult: undefined,
   }),
   setSelectorDraft: (draft) => set({ selectorDraft: draft }),
+  setUnifiedSelector: (selector) => set({ 
+    unifiedSelector: selector,
+    // Keep selectorDraft in sync for backward compatibility
+    // This can be removed once all components migrate to UnifiedSelector
+    aiStrategy: selector?.strategy === 'path' ? 'path_selector' : 
+                selector?.strategy === 'scope_anchor_target' ? 'scope_anchor_target' : null,
+  }),
+  updateUnifiedSelector: (updates) => set((state) => ({
+    unifiedSelector: state.unifiedSelector 
+      ? { ...state.unifiedSelector, ...updates }
+      : null,
+  })),
   addRecordedAction: (action) => set((state) => ({
     recordedActions: [...state.recordedActions, action],
   })),
@@ -149,6 +174,7 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
     selectedElement: null,
     analysis: null,
     selectorDraft: null,
+    unifiedSelector: null,
     recordedActions: [],
     // Reset AI state
     aiStatus: 'idle',
@@ -175,5 +201,6 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
     aiReasoning: undefined,
     userModeOverride: undefined,
     pathSelectorResult: undefined,
+    unifiedSelector: null,
   }),
 }));

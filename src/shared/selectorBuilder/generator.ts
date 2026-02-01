@@ -4,10 +4,26 @@
  * =============================================================================
  * 
  * Generates Scope + Anchor + Target selector logic from element analysis
+ * Also provides converters to/from UnifiedSelector
  */
 
-import type { SelectorLogic, SelectorScope, SelectorAnchor, SelectorTarget, PrimitiveAction } from '@shared/types';
-import type { ElementAnalysis, SelectorDraft, AnchorCandidate } from './types';
+import type { 
+  SelectorLogic, 
+  SelectorScope, 
+  SelectorAnchor, 
+  SelectorTarget, 
+  PrimitiveAction,
+  UnifiedSelector,
+  SelectorStrategy,
+  PathStrategyData,
+  StructureStrategyData,
+} from '@shared/types';
+import { 
+  generateSelectorId,
+  buildFullSelectorFromPath,
+  buildFullSelectorFromStructure,
+} from '@shared/types';
+import type { ElementAnalysis, SelectorDraft, AnchorCandidate, PathSelector } from './types';
 import { buildMinimalSelector } from './analyzer';
 
 /**
@@ -278,4 +294,338 @@ export function generateSelectorStrategies(
   }
   
   return strategies;
+}
+
+// =============================================================================
+// UNIFIED SELECTOR CONVERTERS
+// =============================================================================
+
+/**
+ * Determine the best strategy for an element analysis
+ * This uses the same logic as SmartRouter but is self-contained
+ */
+export function determineStrategy(analysis: ElementAnalysis): SelectorStrategy {
+  const hasRepeatingStructure = analysis.containerType !== 'single';
+  const hasAnchorCandidates = analysis.anchorCandidates && analysis.anchorCandidates.length > 0;
+  
+  // Rule: Use scope_anchor_target for tables/lists with anchors
+  if (hasRepeatingStructure && 
+      (analysis.containerType === 'table' || analysis.containerType === 'list') &&
+      hasAnchorCandidates) {
+    return 'scope_anchor_target';
+  }
+  
+  // Rule: Use path for single elements or elements with ancestor path
+  if (analysis.ancestorPath && analysis.ancestorPath.length > 0) {
+    return 'path';
+  }
+  
+  // Fallback: direct selector
+  return 'direct';
+}
+
+/**
+ * Build PathStrategyData from ElementAnalysis
+ */
+export function buildPathData(analysis: ElementAnalysis): PathStrategyData | undefined {
+  if (!analysis.ancestorPath || analysis.ancestorPath.length === 0) {
+    return undefined;
+  }
+  
+  // Find semantic root (highest score or isSemanticRoot)
+  let rootIndex = analysis.ancestorPath.findIndex(a => a.isSemanticRoot);
+  if (rootIndex === -1) {
+    let maxScore = 0;
+    analysis.ancestorPath.forEach((a, i) => {
+      if (a.semanticScore > maxScore) {
+        maxScore = a.semanticScore;
+        rootIndex = i;
+      }
+    });
+  }
+  
+  if (rootIndex === -1 || analysis.ancestorPath[rootIndex].semanticScore < 0.3) {
+    return undefined;
+  }
+  
+  const root = analysis.ancestorPath[rootIndex].selector;
+  const intermediates: string[] = [];
+  
+  // Add intermediate nodes with decent semantic value
+  for (let i = rootIndex - 1; i >= 0; i--) {
+    const ancestor = analysis.ancestorPath[i];
+    if (ancestor.semanticScore >= 0.5) {
+      intermediates.push(ancestor.selector);
+    }
+  }
+  
+  const target = analysis.targetSelector || analysis.minimalSelector;
+  
+  return {
+    root,
+    intermediates,
+    target,
+  };
+}
+
+/**
+ * Build StructureStrategyData from ElementAnalysis
+ */
+export function buildStructureData(analysis: ElementAnalysis): StructureStrategyData | undefined {
+  const hasContainer = !!(analysis.container || analysis.containerSelector || analysis.containerTagName);
+  
+  if (!hasContainer) {
+    return undefined;
+  }
+  
+  const scopeData = buildScope(analysis);
+  const topAnchor = analysis.anchorCandidates?.[0];
+  
+  const structureData: StructureStrategyData = {
+    scope: {
+      selector: scopeData.selector,
+      type: scopeData.type,
+    },
+    target: {
+      selector: analysis.relativeSelector || analysis.targetSelector || analysis.minimalSelector,
+    },
+  };
+  
+  if (topAnchor) {
+    structureData.anchor = {
+      selector: topAnchor.selector,
+      type: topAnchor.type,
+      value: topAnchor.text || topAnchor.attribute?.value || '',
+      matchMode: 'contains',
+    };
+  }
+  
+  return structureData;
+}
+
+/**
+ * Convert ElementAnalysis to UnifiedSelector
+ * 
+ * This is the primary converter that bridges DOM analysis with the unified data model.
+ * It automatically determines the best strategy and populates the appropriate data fields.
+ * 
+ * @param analysis - The element analysis from analyzeElement()
+ * @param action - The action to perform (default: CLICK)
+ * @param forceStrategy - Optional: force a specific strategy instead of auto-detecting
+ */
+export function createUnifiedSelector(
+  analysis: ElementAnalysis,
+  action: PrimitiveAction = 'CLICK',
+  forceStrategy?: SelectorStrategy
+): UnifiedSelector {
+  const strategy = forceStrategy || determineStrategy(analysis);
+  
+  let fullSelector: string;
+  let pathData: PathStrategyData | undefined;
+  let structureData: StructureStrategyData | undefined;
+  let confidence = 0.5;
+  
+  switch (strategy) {
+    case 'path':
+      pathData = buildPathData(analysis);
+      if (pathData) {
+        fullSelector = buildFullSelectorFromPath(pathData);
+        confidence = analysis.ancestorPath?.find(a => a.isSemanticRoot)?.semanticScore || 0.7;
+      } else {
+        // Fallback if path data couldn't be built
+        fullSelector = analysis.pathSelector || analysis.scopedSelector || analysis.minimalSelector;
+        confidence = 0.5;
+      }
+      break;
+      
+    case 'scope_anchor_target':
+      structureData = buildStructureData(analysis);
+      if (structureData) {
+        fullSelector = buildFullSelectorFromStructure(structureData);
+        confidence = structureData.anchor ? 0.85 : 0.7;
+      } else {
+        // Fallback if structure data couldn't be built
+        fullSelector = analysis.scopedSelector || analysis.minimalSelector;
+        confidence = 0.5;
+      }
+      break;
+      
+    case 'direct':
+    default:
+      fullSelector = analysis.scopedSelector || analysis.minimalSelector;
+      confidence = 0.5;
+      break;
+  }
+  
+  return {
+    id: generateSelectorId(),
+    strategy,
+    fullSelector,
+    pathData,
+    structureData,
+    action: {
+      type: action,
+    },
+    confidence,
+    validated: false,
+    metadata: {
+      source: 'programmatic',
+      createdAt: Date.now(),
+    },
+  };
+}
+
+/**
+ * Convert PathSelector (legacy AI result) to UnifiedSelector
+ */
+export function convertPathSelectorToUnified(
+  pathSelector: PathSelector,
+  action: PrimitiveAction = 'CLICK'
+): UnifiedSelector {
+  return {
+    id: generateSelectorId(),
+    strategy: 'path',
+    fullSelector: pathSelector.fullSelector,
+    pathData: {
+      root: pathSelector.root,
+      intermediates: pathSelector.path,
+      target: pathSelector.target,
+    },
+    action: {
+      type: action,
+    },
+    confidence: pathSelector.confidence,
+    validated: false,
+    reasoning: pathSelector.reasoning,
+    metadata: {
+      source: 'ai',
+      createdAt: Date.now(),
+    },
+  };
+}
+
+/**
+ * Convert SelectorLogic (legacy execution format) to UnifiedSelector
+ */
+export function convertSelectorLogicToUnified(
+  logic: SelectorLogic,
+  confidence = 0.7
+): UnifiedSelector {
+  const hasScope = !!logic.scope;
+  const strategy: SelectorStrategy = hasScope ? 'scope_anchor_target' : 'direct';
+  
+  let fullSelector: string;
+  let structureData: StructureStrategyData | undefined;
+  
+  if (hasScope && logic.scope) {
+    structureData = {
+      scope: {
+        selector: logic.scope.selector,
+        type: logic.scope.type,
+      },
+      target: {
+        selector: logic.target.selector,
+      },
+    };
+    
+    if (logic.anchor) {
+      structureData.anchor = {
+        selector: logic.anchor.selector,
+        type: logic.anchor.type === 'index' ? 'text_match' : logic.anchor.type,
+        value: logic.anchor.value,
+        matchMode: logic.anchor.matchMode || 'contains',
+      };
+    }
+    
+    fullSelector = `${logic.scope.selector} ${logic.target.selector}`;
+  } else {
+    fullSelector = logic.target.selector;
+  }
+  
+  return {
+    id: generateSelectorId(),
+    strategy,
+    fullSelector,
+    structureData,
+    action: {
+      type: logic.target.action,
+      params: logic.target.actionParams,
+    },
+    confidence,
+    validated: false,
+    metadata: {
+      source: 'programmatic',
+      createdAt: Date.now(),
+    },
+  };
+}
+
+/**
+ * Convert UnifiedSelector back to SelectorLogic (for legacy executor compatibility)
+ */
+export function convertUnifiedToSelectorLogic(unified: UnifiedSelector): SelectorLogic {
+  const logic: SelectorLogic = {
+    target: {
+      selector: unified.structureData?.target.selector || 
+                unified.pathData?.target || 
+                unified.fullSelector,
+      action: unified.action.type,
+      actionParams: unified.action.params,
+    },
+  };
+  
+  if (unified.strategy === 'scope_anchor_target' && unified.structureData) {
+    logic.scope = {
+      type: unified.structureData.scope.type,
+      selector: unified.structureData.scope.selector,
+    };
+    
+    if (unified.structureData.anchor) {
+      logic.anchor = {
+        type: unified.structureData.anchor.type,
+        selector: unified.structureData.anchor.selector,
+        value: unified.structureData.anchor.value,
+        matchMode: unified.structureData.anchor.matchMode,
+      };
+    }
+  }
+  
+  return logic;
+}
+
+/**
+ * Convert UnifiedSelector to SelectorDraft (for legacy UI compatibility)
+ * @deprecated Use UnifiedSelector directly in UI when possible
+ */
+export function convertUnifiedToSelectorDraft(unified: UnifiedSelector): SelectorDraft {
+  const draft: SelectorDraft = {
+    target: {
+      selector: unified.fullSelector,
+      action: unified.action.type,
+    },
+    confidence: unified.confidence,
+    validated: unified.validated,
+  };
+  
+  if (unified.strategy === 'scope_anchor_target' && unified.structureData) {
+    draft.scope = {
+      selector: unified.structureData.scope.selector,
+      type: unified.structureData.scope.type,
+      matchCount: 0,
+    };
+    
+    if (unified.structureData.anchor) {
+      draft.anchor = {
+        selector: unified.structureData.anchor.selector,
+        type: unified.structureData.anchor.type,
+        value: unified.structureData.anchor.value,
+        matchMode: unified.structureData.anchor.matchMode,
+      };
+    }
+    
+    // Use the relative target selector for structure mode
+    draft.target.selector = unified.structureData.target.selector;
+  }
+  
+  return draft;
 }

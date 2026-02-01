@@ -2,7 +2,11 @@
  * Homura Engine - Public API
  */
 
-export { executeTool } from './executor';
+export { 
+  executeTool,
+  executeUnifiedSelector,
+  executeUnifiedSelectorDirect,
+} from './executor';
 export { 
   highlightElement, 
   removeHighlight, 

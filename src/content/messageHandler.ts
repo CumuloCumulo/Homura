@@ -18,9 +18,12 @@ import { executeClick, executeInput, executeExtractText } from './engine/primiti
 import { 
   analyzeElement, 
   validateSelectorDraft,
+  buildPathData,
   type SelectorDraft,
-  type ElementAnalysis 
+  type ElementAnalysis,
+  type AncestorInfo,
 } from '@shared/selectorBuilder';
+import { buildFullSelectorFromPath } from '@shared/types';
 
 // =============================================================================
 // STATE FOR INSPECT/RECORD MODE
@@ -832,52 +835,29 @@ async function handleAIGenerateSelector(_payload: { intent: string; analysis: El
 
 /**
  * Payload for AI path selector generation
+ * Uses AncestorInfo from @shared/selectorBuilder
  */
 interface AIGeneratePathSelectorPayload {
   intent: string;
   targetSelector: string;
   targetHtml: string;
-  ancestorPath: Array<{
-    tagName: string;
-    id?: string;
-    classes: string[];
-    semanticScore: number;
-    selector: string;
-    outerHTML: string;
-    depth: number;
-    isSemanticRoot: boolean;
-  }>;
+  ancestorPath: AncestorInfo[];
 }
 
 /**
  * Payload for smart selector generation (unified entry point)
+ * Uses types from @shared/selectorBuilder
  */
 interface SmartSelectorPayload {
   intent: string;
   targetSelector: string;
   targetHtml: string;
-  ancestorPath: Array<{
-    tagName: string;
-    id?: string;
-    classes: string[];
-    semanticScore: number;
-    selector: string;
-    outerHTML: string;
-    depth: number;
-    isSemanticRoot: boolean;
-  }>;
+  ancestorPath: AncestorInfo[];
   structureInfo: {
-    containerType: 'table' | 'list' | 'grid' | 'card' | 'single';
+    containerType: ElementAnalysis['containerType'];
     hasRepeatingStructure: boolean;
     containerSelector?: string;
-    anchorCandidates: Array<{
-      selector: string;
-      type: 'text_match' | 'attribute_match';
-      text?: string;
-      attribute?: { name: string; value: string };
-      confidence: number;
-      isUnique: boolean;
-    }>;
+    anchorCandidates: ElementAnalysis['anchorCandidates'];
   };
 }
 
@@ -956,6 +936,9 @@ async function handleAIGeneratePathSelector(payload: AIGeneratePathSelectorPaylo
 
 /**
  * Build a fallback path selector when AI is not available
+ * 
+ * This function delegates to buildPathData from @shared/selectorBuilder
+ * to avoid code duplication.
  */
 function buildFallbackPathSelector(payload: AIGeneratePathSelectorPayload): {
   root: string;
@@ -971,43 +954,33 @@ function buildFallbackPathSelector(payload: AIGeneratePathSelectorPayload): {
     return null;
   }
   
-  // Find semantic root (last item with isSemanticRoot or highest score)
-  let rootIndex = ancestorPath.findIndex(a => a.isSemanticRoot);
-  if (rootIndex === -1) {
-    // Use ancestor with highest semantic score
-    let maxScore = 0;
-    ancestorPath.forEach((a, i) => {
-      if (a.semanticScore > maxScore) {
-        maxScore = a.semanticScore;
-        rootIndex = i;
-      }
-    });
-  }
+  // Create a minimal ElementAnalysis-like object for buildPathData
+  const analysisLike: Pick<ElementAnalysis, 'ancestorPath' | 'targetSelector' | 'minimalSelector'> = {
+    ancestorPath: ancestorPath as AncestorInfo[],
+    targetSelector,
+    minimalSelector: targetSelector,
+  };
   
-  if (rootIndex === -1 || ancestorPath[rootIndex].semanticScore < 0.3) {
+  // Use the unified buildPathData function from generator.ts
+  const pathData = buildPathData(analysisLike as ElementAnalysis);
+  
+  if (!pathData) {
     return null;
   }
   
-  const root = ancestorPath[rootIndex].selector;
-  const path: string[] = [];
-  
-  // Add intermediate nodes with decent semantic value
-  for (let i = rootIndex - 1; i >= 0; i--) {
-    const ancestor = ancestorPath[i];
-    if (ancestor.semanticScore >= 0.5) {
-      path.push(ancestor.selector);
-    }
-  }
-  
-  const fullSelector = [root, ...path, targetSelector].join(' ');
+  // Find the semantic root's score for confidence calculation
+  const semanticRoot = ancestorPath.find(a => a.isSemanticRoot);
+  const confidence = semanticRoot 
+    ? semanticRoot.semanticScore * 0.9 
+    : 0.6;
   
   return {
-    root,
-    path,
-    target: targetSelector,
-    fullSelector,
-    confidence: ancestorPath[rootIndex].semanticScore * 0.9,
-    reasoning: `Fallback: 使用 ${root} 作为语义根 (score: ${Math.round(ancestorPath[rootIndex].semanticScore * 100)}%)`,
+    root: pathData.root,
+    path: pathData.intermediates,
+    target: pathData.target,
+    fullSelector: buildFullSelectorFromPath(pathData),
+    confidence,
+    reasoning: `Fallback: 使用 ${pathData.root} 作为语义根`,
   };
 }
 

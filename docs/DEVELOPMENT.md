@@ -27,16 +27,19 @@ homura/
     │       ├── primitives.ts     # 底层基元 (CLICK/INPUT/...)
     │       └── highlighter.ts    # 调试高亮
     │
-    ├── sidepanel/             # 录制器 UI (React)
+    ├── sidepanel/             # 录制器 UI (React + Framer Motion)
     │   ├── App.tsx            # 主应用（双模式切换）
     │   ├── components/
     │   │   ├── Header.tsx         # 头部（含 Dashboard 入口）
-    │   │   ├── InspectMode.tsx    # 元素检查模式（含快速操作、祖先路径）
+    │   │   ├── InspectMode.tsx    # 元素检查模式（主编排器）
+    │   │   ├── SmartStatus.tsx    # AI 决策面板（呼吸动画）
+    │   │   ├── PathVisualizer.tsx # 路径模式（祖先阶梯）
+    │   │   ├── StructureView.tsx  # 结构模式（Scope+Anchor+Target）
     │   │   ├── RecordingPanel.tsx # 操作录制模式
     │   │   └── LogViewer.tsx      # 日志查看器
     │   ├── stores/
     │   │   ├── missionStore.ts    # 任务状态（旧）
-    │   │   └── recordingStore.ts  # 录制状态
+    │   │   └── recordingStore.ts  # 录制状态 + AI 策略状态
     │   └── utils/
     │       └── ensureContentScript.ts # Content Script 注入工具
     │
@@ -52,10 +55,11 @@ homura/
     ├── services/              # 外部服务模块
     │   └── ai/                # AI 服务
     │       ├── index.ts          # 统一导出
-    │       ├── client.ts         # 通义 API 客户端（含 Tool Calling）
-    │       ├── prompts.ts        # AI Prompt 模板（含路径选择器）
+    │       ├── client.ts         # 通义 API 客户端（含 generateSmartSelector）
+    │       ├── smartRouter.ts    # 智能策略路由（Path vs Structure）
+    │       ├── prompts.ts        # AI Prompt 模板
     │       ├── tools.ts          # AI Tool Schema 定义
-    │       └── types.ts          # AI 相关类型
+    │       └── types.ts          # 含 SmartSelectorContext/Result
     │
     ├── shared/                # 共享模块
     │   ├── types.ts           # 核心类型定义
@@ -96,9 +100,11 @@ pnpm dev
 3. 点击扩展图标打开 SidePanel
 4. 选择模式：
    - **检查**：点击"开始检查"，然后点击页面元素
-     - 快速操作：高亮、点击、输入、读取
-     - 祖先路径：查看元素路径和语义评分
-     - AI 优化：使用 AI 生成更稳定的选择器
+     - SmartStatus：查看 AI 决策状态和策略
+     - Tab 切换：Path（路径模式）/ Structure（结构模式）
+     - PathVisualizer：交互式祖先阶梯，勾选包含层级
+     - StructureView：Scope+Anchor+Target 配置
+     - AI 优化：智能路由，自动选择最佳策略
    - **录制**：点击"开始录制"，在页面上操作
 
 ### 4. 测试 Dashboard（管理中心）

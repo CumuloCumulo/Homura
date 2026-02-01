@@ -405,14 +405,64 @@ const result = await aiClient.generatePathSelector({
 
 ---
 
+## 🤖 AI 智能路由 (Smart Routing)
+
+### 统一入口
+
+系统通过 `AI_GENERATE_SMART_SELECTOR` 消息统一处理选择器生成请求，AI 自动选择最佳策略：
+
+```typescript
+// SmartSelectorContext - 统一上下文
+interface SmartSelectorContext {
+  intent: string;              // 用户意图
+  targetSelector: string;      // 目标选择器
+  targetHtml: string;          // 目标 HTML
+  ancestorPath: AncestorInfo[]; // 祖先路径
+  structureInfo: {
+    containerType: ContainerType;
+    hasRepeatingStructure: boolean;
+    anchorCandidates: AnchorCandidate[];
+  };
+}
+```
+
+### 路由决策逻辑
+
+```typescript
+// smartRouter.ts
+function shouldUseScopeAnchorTarget(context: SmartSelectorContext): boolean {
+  const { containerType, hasRepeatingStructure, anchorCandidates } = context.structureInfo;
+  
+  // 规则 A: 表格/列表 + 有锚点 → Scope+Anchor+Target
+  if (hasRepeatingStructure && 
+      (containerType === 'table' || containerType === 'list') &&
+      anchorCandidates.length > 0) {
+    return true;
+  }
+  
+  // 规则 B: 其他情况 → Path Selector
+  return false;
+}
+```
+
+### UI 集成
+
+用户可以在 SidePanel 中看到 AI 的决策过程：
+
+1. **SmartStatus** 显示当前策略和理由
+2. **Tab Bar** 允许手动切换 Path / Structure 模式
+3. **PathVisualizer** 或 **StructureView** 根据模式显示
+
+---
+
 ## 📊 选择器策略对比
 
-| 场景 | 推荐策略 | 示例 |
-|------|---------|------|
-| **表格/列表** | Scope + Anchor + Target | `tr` → `{{name}}` → `.btn` |
-| **单一元素（有语义容器）** | Path Selector | `.search-bar input` |
-| **单一元素（无容器）** | Minimal Selector | `[data-testid="search"]` |
-| **复杂嵌套** | AI 辅助 Path Selector | AI 分析祖先路径 |
+| 场景 | 推荐策略 | 触发条件 |
+|------|---------|----------|
+| **表格/列表** | Scope + Anchor + Target | `containerType ∈ {table, list}` + 有锚点 |
+| **单一元素** | Path Selector | `containerType === 'single'` |
+| **复杂嵌套** | AI Path Selector | 祖先路径复杂，需语义分析 |
+| **用户覆盖** | 手动模式 | 用户点击 Tab 切换 |
 
 ---
 
@@ -438,6 +488,18 @@ const result = await aiClient.generatePathSelector({
 3. 添加 `buildPathSelector` 程序化生成路径
 4. 添加 AI Tool `generate_path_selector` 支持 AI 辅助生成
 5. 在 UI 中显示祖先路径，支持 AI 优化
+
+### 2026-01-31: AI-First UI 重构
+
+**问题**：原 UI 直接硬编码调用 `AI_GENERATE_PATH_SELECTOR`，未利用完整的 `ElementAnalysis` 数据；用户无法看到 AI 的决策过程。
+
+**解决**：
+1. 创建 `SmartSelectorContext` 统一传递分析数据
+2. 添加 `smartRouter.ts` 实现程序化路由决策
+3. 创建 `SmartStatus` 组件可视化 AI 状态流
+4. 创建 `PathVisualizer` 和 `StructureView` 双视图
+5. 添加 Tab 系统支持用户手动覆盖
+6. 使用 Framer Motion 实现平滑过渡动画
 
 ---
 

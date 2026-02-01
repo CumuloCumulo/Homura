@@ -41,15 +41,18 @@
 ├────────────────────────────┬────────────────────────────────────┤
 │  SidePanel (录制器)         │  Dashboard (管理中心)              │
 │  ├── Inspect Mode 元素检查  │  ├── Tool Library 工具库          │
-│  │   ├── 快速操作           │  ├── Rule Book Editor 规则书      │
-│  │   ├── 祖先路径可视化     │  └── Execution Log 运行日志       │
-│  │   └── AI 优化选择器      │                                    │
+│  │   ├── SmartStatus 面板   │  ├── Rule Book Editor 规则书      │
+│  │   ├── 双模式 Tab 切换    │  └── Execution Log 运行日志       │
+│  │   │   ├── Path 路径模式  │                                    │
+│  │   │   └── Structure 模式 │                                    │
+│  │   └── AI 智能路由        │                                    │
 │  └── Record Mode 操作录制   │                                    │
 ├────────────────────────────┴────────────────────────────────────┤
 │                      智能层 (Intelligence)                       │
 │  ├── AI Client (通义 API)     选择器生成、工具构建              │
 │  │   ├── Tool Calling         结构化输出                        │
-│  │   └── Path Selector Gen    路径选择器生成                    │
+│  │   ├── Smart Router         智能策略路由                      │
+│  │   └── Path/Structure Gen   双模式选择器生成                  │
 │  ├── Tool Builder Agent       录制 → JSON 工具                  │
 │  ├── Orchestrator Agent       规则 → 决策调用                   │
 │  └── Self-Healing Agent       异常 → 自动修复                   │
@@ -80,13 +83,16 @@ src/
 │       ├── primitives.ts   # 五大基元
 │       └── highlighter.ts  # 调试高亮
 │
-├── sidepanel/              # 录制器 UI (React)
+├── sidepanel/              # 录制器 UI (React + Framer Motion)
 │   ├── components/
-│   │   ├── InspectMode.tsx    # 元素检查
+│   │   ├── InspectMode.tsx    # 元素检查（主编排器）
+│   │   ├── SmartStatus.tsx    # AI 决策面板
+│   │   ├── PathVisualizer.tsx # 路径模式视图
+│   │   ├── StructureView.tsx  # 结构模式视图
 │   │   ├── RecordingPanel.tsx # 操作录制
-│   │   └── SelectorBuilder.tsx # 选择器编辑
+│   │   └── LogViewer.tsx      # 日志查看器
 │   └── stores/
-│       └── recordingStore.ts
+│       └── recordingStore.ts  # 含 AI 策略状态
 │
 ├── dashboard/              # 管理中心 UI (React)
 │   ├── components/
@@ -98,10 +104,11 @@ src/
 │
 ├── services/               # 外部服务
 │   └── ai/
-│       ├── client.ts       # 通义 API 客户端（含 Tool Calling）
-│       ├── prompts.ts      # AI Prompt 模板（含路径选择器）
+│       ├── client.ts       # 通义 API 客户端（含 Smart Selector）
+│       ├── smartRouter.ts  # 智能策略路由
+│       ├── prompts.ts      # AI Prompt 模板
 │       ├── tools.ts        # AI Tool Schema 定义
-│       └── types.ts
+│       └── types.ts        # 含 SmartSelectorContext
 │
 └── shared/                 # 共享模块
     ├── types.ts            # 核心类型

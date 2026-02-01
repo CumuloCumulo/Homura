@@ -40,6 +40,15 @@ export {
   createSelectorDraft,
   draftToSelectorLogic,
   generateSelectorStrategies,
+  // UnifiedSelector converters (NEW)
+  createUnifiedSelector,
+  convertPathSelectorToUnified,
+  convertSelectorLogicToUnified,
+  convertUnifiedToSelectorLogic,
+  convertUnifiedToSelectorDraft,
+  determineStrategy,
+  buildPathData,
+  buildStructureData,
 } from './generator';
 
 // Validator

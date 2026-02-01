@@ -16,6 +16,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRecordingStore } from '../stores/recordingStore';
 import { sendToContentScript } from '../utils/ensureContentScript';
 import type { ElementAnalysis, SelectorDraft } from '@shared/selectorBuilder';
+import { 
+  createUnifiedSelector,
+  convertPathSelectorToUnified,
+  convertUnifiedToSelectorDraft,
+} from '@shared/selectorBuilder';
+import type { UnifiedSelector } from '@shared/types';
 import type { ViewMode } from '../stores/recordingStore';
 
 // Sub-components
@@ -34,6 +40,8 @@ export function InspectMode() {
     analysis,
     selectorDraft,
     setSelectorDraft,
+    unifiedSelector,
+    setUnifiedSelector,
     addLog,
     isProcessing,
     setProcessing,
@@ -63,29 +71,32 @@ export function InspectMode() {
     return 'path';
   }, [userModeOverride, aiStrategy, analysis]);
 
-  // Initialize draft from analysis
+  // Initialize UnifiedSelector from analysis
+  // This is the primary initialization path - creates a UnifiedSelector immediately
   React.useEffect(() => {
-    if (analysis && !selectorDraft) {
-      import('@shared/selectorBuilder').then(({ createSelectorDraft }) => {
-        try {
+    if (analysis && !unifiedSelector) {
+      try {
+        // Create UnifiedSelector from analysis (primary path)
+        const selector = createUnifiedSelector(analysis, 'CLICK');
+        setUnifiedSelector(selector);
+        
+        // Also create legacy SelectorDraft for backward compatibility
+        const draft = convertUnifiedToSelectorDraft(selector);
+        setSelectorDraft(draft);
+        
+        console.log('[Homura] Created UnifiedSelector:', selector);
+      } catch (error) {
+        console.error('[Homura] Failed to create UnifiedSelector:', error);
+        // Fallback to basic selector
+        import('@shared/selectorBuilder').then(({ createSelectorDraft }) => {
           const draft = createSelectorDraft(analysis, 'CLICK');
           setSelectorDraft(draft);
-        } catch (error) {
-          console.error('[Homura] Failed to create selector draft:', error);
-          setSelectorDraft({
-            target: {
-              selector: analysis.minimalSelector || analysis.targetSelector || '*',
-              action: 'CLICK',
-            },
-            confidence: 0.3,
-            validated: false,
-          });
-        }
-      }).catch(error => {
-        console.error('[Homura] Failed to import selectorBuilder:', error);
-      });
+        }).catch(err => {
+          console.error('[Homura] Fallback also failed:', err);
+        });
+      }
     }
-  }, [analysis, selectorDraft, setSelectorDraft]);
+  }, [analysis, unifiedSelector, setUnifiedSelector, setSelectorDraft]);
 
   const handleStartInspect = async () => {
     try {
@@ -183,17 +194,18 @@ export function InspectMode() {
         });
 
         if (result.pathSelector) {
+          // Convert PathSelector to UnifiedSelector (preserving full structure)
+          const newUnified = convertPathSelectorToUnified(
+            result.pathSelector, 
+            unifiedSelector?.action?.type || 'CLICK'
+          );
+          setUnifiedSelector(newUnified);
+          
+          // Also set legacy pathSelectorResult for backward compatibility
           setPathSelectorResult(result.pathSelector);
           
-          const newDraft: SelectorDraft = {
-            ...selectorDraft,
-            target: {
-              selector: result.pathSelector.fullSelector,
-              action: selectorDraft?.target?.action || 'CLICK',
-            },
-            confidence: result.pathSelector.confidence,
-            validated: false,
-          };
+          // Sync to SelectorDraft for backward compatibility
+          const newDraft = convertUnifiedToSelectorDraft(newUnified);
           setSelectorDraft(newDraft);
           
           addLog({
@@ -202,25 +214,48 @@ export function InspectMode() {
             message: `AI 生成选择器: ${result.pathSelector.fullSelector}`,
           });
         } else if (result.selectorLogic) {
-          const newDraft: SelectorDraft = {
-            scope: result.selectorLogic.scope ? {
-              selector: result.selectorLogic.scope.selector,
-              type: result.selectorLogic.scope.type as 'container_list' | 'single_container',
-              matchCount: 0,
+          // Build UnifiedSelector from selectorLogic
+          const scopeType = result.selectorLogic.scope?.type as 'container_list' | 'single_container' | undefined;
+          const anchorType = result.selectorLogic.anchor?.type as 'text_match' | 'attribute_match' | undefined;
+          const matchMode = result.selectorLogic.anchor?.matchMode as 'exact' | 'contains' | 'startsWith' | 'endsWith' | undefined;
+          
+          const newUnified: UnifiedSelector = {
+            id: unifiedSelector?.id || `sel_${Date.now().toString(36)}`,
+            strategy: 'scope_anchor_target',
+            fullSelector: result.selectorLogic.scope 
+              ? `${result.selectorLogic.scope.selector} ${result.selectorLogic.target.selector}`
+              : result.selectorLogic.target.selector,
+            structureData: result.selectorLogic.scope ? {
+              scope: {
+                selector: result.selectorLogic.scope.selector,
+                type: scopeType || 'container_list',
+              },
+              anchor: result.selectorLogic.anchor ? {
+                selector: result.selectorLogic.anchor.selector,
+                type: anchorType || 'text_match',
+                value: result.selectorLogic.anchor.value,
+                matchMode: matchMode || 'contains',
+              } : undefined,
+              target: {
+                selector: result.selectorLogic.target.selector,
+              },
             } : undefined,
-            anchor: result.selectorLogic.anchor ? {
-              selector: result.selectorLogic.anchor.selector,
-              type: result.selectorLogic.anchor.type as 'text_match' | 'attribute_match',
-              value: result.selectorLogic.anchor.value,
-              matchMode: result.selectorLogic.anchor.matchMode as 'contains' | 'exact',
-            } : undefined,
-            target: {
-              selector: result.selectorLogic.target.selector,
-              action: result.selectorLogic.target.action || selectorDraft?.target?.action || 'CLICK',
+            action: {
+              type: (result.selectorLogic.target.action as UnifiedSelector['action']['type']) || 
+                    unifiedSelector?.action?.type || 'CLICK',
             },
             confidence: result.confidence || 0.8,
             validated: false,
+            reasoning: result.reasoning,
+            metadata: {
+              source: 'ai',
+              createdAt: Date.now(),
+            },
           };
+          setUnifiedSelector(newUnified);
+          
+          // Sync to SelectorDraft for backward compatibility
+          const newDraft = convertUnifiedToSelectorDraft(newUnified);
           setSelectorDraft(newDraft);
           
           addLog({
@@ -229,6 +264,7 @@ export function InspectMode() {
             message: `AI 生成 Scope+Anchor+Target 选择器`,
           });
         } else if (result.draft) {
+          // Legacy path: just set the draft directly
           setSelectorDraft(result.draft);
           addLog({
             timestamp: Date.now(),
@@ -327,6 +363,8 @@ export function InspectMode() {
                   ancestorPath={analysis.ancestorPath || []}
                   pathSelector={pathSelectorResult}
                   targetSelector={analysis.targetSelector || analysis.minimalSelector}
+                  unifiedSelector={unifiedSelector}
+                  onLog={addLog}
                 />
               </motion.div>
             ) : (
@@ -340,6 +378,7 @@ export function InspectMode() {
                 <StructureView
                   analysis={analysis}
                   selectorDraft={selectorDraft}
+                  unifiedSelector={unifiedSelector}
                   onDraftChange={setSelectorDraft}
                   onLog={addLog}
                 />
