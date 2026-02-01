@@ -126,6 +126,12 @@ export async function executeTool(
 
 /**
  * Execute the selection logic: Scope -> Anchor -> Target
+ * 
+ * ENHANCED: Supports "Virtual Composite Scope" for split table layouts (e.g., jqxGrid).
+ * When multiple scope elements share the same ID (split table rows), they are treated
+ * as a single logical row:
+ * - Anchor can match in ANY of the scope elements with that ID
+ * - Target is searched across ALL scope elements with the same ID
  */
 async function executeSelectionLogic(
   logic: SelectorLogic,
@@ -134,6 +140,7 @@ async function executeSelectionLogic(
   const { debug = false, debugDelay = 500 } = options;
   
   let context: Element | Document = document;
+  let compositeScope: Element[] | null = null; // For split table support
   let scopeMatchCount: number | undefined;
   let anchorMatchIndex: number | undefined;
 
@@ -153,7 +160,11 @@ async function executeSelectionLogic(
       );
     }
     
-    console.log(`[Homura] Scope matched ${scopeElements.length} elements`);
+    // Detect split table layout (multiple elements with same ID)
+    const splitTableGroups = detectSplitTableGroups(scopeElements);
+    const hasSplitTable = splitTableGroups !== null;
+    
+    console.log(`[Homura] Scope matched ${scopeElements.length} elements${hasSplitTable ? ' (split table detected)' : ''}`);
     
     if (debug) {
       highlightScope(scopeElements);
@@ -164,7 +175,15 @@ async function executeSelectionLogic(
     // Step 2: Resolve Anchor (if defined)
     // ==========================================================================
     if (logic.anchor) {
-      const matchedContext = resolveAnchor(scopeElements, logic.anchor);
+      let matchedContext: { element: Element; index: number; compositeScope?: Element[] } | null = null;
+      
+      if (hasSplitTable) {
+        // Split table mode: search across composite groups
+        matchedContext = resolveAnchorInSplitTable(splitTableGroups!, logic.anchor);
+      } else {
+        // Normal mode: standard anchor resolution
+        matchedContext = resolveAnchor(scopeElements, logic.anchor);
+      }
       
       if (!matchedContext) {
         throw createError(
@@ -177,6 +196,12 @@ async function executeSelectionLogic(
       
       context = matchedContext.element;
       anchorMatchIndex = matchedContext.index;
+      
+      // For split tables, save composite scope for target search
+      if (matchedContext.compositeScope) {
+        compositeScope = matchedContext.compositeScope;
+        console.log(`[Homura] Using composite scope with ${compositeScope.length} elements for target search`);
+      }
       
       console.log(`[Homura] Anchor matched at index ${anchorMatchIndex}`);
       
@@ -194,7 +219,14 @@ async function executeSelectionLogic(
   // Step 3: Find and Execute Target
   // ==========================================================================
   const { target } = logic;
-  const targetElement = findTarget(target.selector, context);
+  let targetElement: HTMLElement | null = null;
+  
+  // For split tables, search across composite scope (all elements with same ID)
+  if (compositeScope) {
+    targetElement = findTargetInCompositeScope(target.selector, compositeScope);
+  } else {
+    targetElement = findTarget(target.selector, context);
+  }
   
   if (!targetElement) {
     throw createError(
@@ -236,6 +268,14 @@ function resolveScopeElements(scope: SelectorScope): Element[] {
 
 /**
  * Find the anchor-matched element within scope elements
+ * 
+ * FIXED: Now uses querySelectorAll to check ALL matching elements within each scope,
+ * not just the first one. This fixes the issue where "安排教室" couldn't be found
+ * when it's the second <a> element in a cell: <a>详情</a> | <a>安排教室</a>
+ * 
+ * @param scopeElements - Array of scope containers to search
+ * @param anchor - Anchor configuration
+ * @returns Matched element and its index, or null if not found
  */
 function resolveAnchor(
   scopeElements: Element[],
@@ -251,21 +291,28 @@ function resolveAnchor(
         return { element: scopeEl, index: i };
       }
     } else if (anchor.type === 'text_match') {
-      // Text-based anchor
-      const anchorTarget = safeQuerySelector(anchor.selector, scopeEl);
-      if (anchorTarget) {
-        const text = anchorTarget.textContent || '';
+      // Text-based anchor - check ALL matching elements, not just the first
+      // This fixes the bug where "安排教室" couldn't be found when preceded by "详情"
+      const anchorCandidates = safeQuerySelectorAll(anchor.selector, scopeEl);
+      
+      for (const candidate of anchorCandidates) {
+        const text = candidate.textContent || '';
         if (matchText(text, anchor.value, anchor.matchMode)) {
+          console.log(`[Homura] Anchor matched: "${anchor.value}" in scope[${i}] (checked ${anchorCandidates.length} candidates)`);
           return { element: scopeEl, index: i };
         }
       }
     } else if (anchor.type === 'attribute_match') {
-      // Attribute-based anchor
-      const anchorTarget = safeQuerySelector(anchor.selector, scopeEl);
-      if (anchorTarget && anchor.attribute) {
-        const attrValue = anchorTarget.getAttribute(anchor.attribute) || '';
-        if (matchText(attrValue, anchor.value, anchor.matchMode)) {
-          return { element: scopeEl, index: i };
+      // Attribute-based anchor - check ALL matching elements
+      const anchorCandidates = safeQuerySelectorAll(anchor.selector, scopeEl);
+      
+      for (const candidate of anchorCandidates) {
+        if (anchor.attribute) {
+          const attrValue = candidate.getAttribute(anchor.attribute) || '';
+          if (matchText(attrValue, anchor.value, anchor.matchMode)) {
+            console.log(`[Homura] Anchor matched: [${anchor.attribute}="${anchor.value}"] in scope[${i}]`);
+            return { element: scopeEl, index: i };
+          }
         }
       }
     }
@@ -471,6 +518,131 @@ export async function executeUnifiedSelector(
       metadata: { duration },
     };
   }
+}
+
+// =============================================================================
+// SPLIT TABLE SUPPORT (Virtual Composite Scope)
+// =============================================================================
+
+/**
+ * Detect split table layout where multiple elements share the same ID.
+ * This is common in legacy grid frameworks (jqxGrid, jQuery UI) that use
+ * two separate tables for frozen columns.
+ * 
+ * @param scopeElements - Array of scope elements
+ * @returns Map of ID -> Element[] if split table detected, null otherwise
+ */
+function detectSplitTableGroups(scopeElements: Element[]): Map<string, Element[]> | null {
+  const idGroups = new Map<string, Element[]>();
+  
+  for (const el of scopeElements) {
+    const id = el.id;
+    if (!id) continue;
+    
+    if (!idGroups.has(id)) {
+      idGroups.set(id, []);
+    }
+    idGroups.get(id)!.push(el);
+  }
+  
+  // Check if any group has more than one element (duplicate IDs)
+  const hasDuplicateIds = Array.from(idGroups.values()).some(group => group.length > 1);
+  
+  if (hasDuplicateIds) {
+    console.log('[Homura] Split table layout detected:', 
+      Array.from(idGroups.entries())
+        .filter(([, els]) => els.length > 1)
+        .map(([id, els]) => `${id}: ${els.length} elements`)
+    );
+    return idGroups;
+  }
+  
+  return null;
+}
+
+/**
+ * Resolve anchor in split table layout.
+ * Searches across all elements in each composite group (rows with same ID).
+ * 
+ * @param groups - Map of ID -> Element[] representing row groups
+ * @param anchor - Anchor configuration
+ * @returns Matched element info with composite scope for cross-table target search
+ */
+function resolveAnchorInSplitTable(
+  groups: Map<string, Element[]>,
+  anchor: SelectorAnchor
+): { element: Element; index: number; compositeScope: Element[] } | null {
+  let groupIndex = 0;
+  
+  for (const [id, elements] of groups) {
+    // Search for anchor across ALL elements in this composite group
+    for (const scopeEl of elements) {
+      // Handle different anchor types
+      if (anchor.type === 'index') {
+        const targetIndex = parseInt(anchor.value, 10);
+        if (groupIndex === targetIndex) {
+          return { element: scopeEl, index: groupIndex, compositeScope: elements };
+        }
+      } else if (anchor.type === 'text_match') {
+        const anchorCandidates = safeQuerySelectorAll(anchor.selector, scopeEl);
+        
+        for (const candidate of anchorCandidates) {
+          const text = candidate.textContent || '';
+          if (matchText(text, anchor.value, anchor.matchMode)) {
+            console.log(`[Homura] Split table anchor matched in group "${id}": "${anchor.value}"`);
+            return {
+              element: scopeEl,
+              index: groupIndex,
+              compositeScope: elements, // Return ALL elements in this row group
+            };
+          }
+        }
+      } else if (anchor.type === 'attribute_match' && anchor.attribute) {
+        const anchorCandidates = safeQuerySelectorAll(anchor.selector, scopeEl);
+        
+        for (const candidate of anchorCandidates) {
+          const attrValue = candidate.getAttribute(anchor.attribute) || '';
+          if (matchText(attrValue, anchor.value, anchor.matchMode)) {
+            console.log(`[Homura] Split table anchor matched in group "${id}": [${anchor.attribute}="${anchor.value}"]`);
+            return {
+              element: scopeEl,
+              index: groupIndex,
+              compositeScope: elements,
+            };
+          }
+        }
+      }
+    }
+    groupIndex++;
+  }
+  
+  return null;
+}
+
+/**
+ * Find target in composite scope (multiple elements).
+ * Searches across all elements in the composite scope.
+ * 
+ * This enables finding targets in split table layouts where the anchor
+ * is in one table (e.g., right table with names) and the target is in
+ * another table (e.g., left table with action buttons).
+ * 
+ * @param selector - Target selector
+ * @param compositeScope - Array of elements to search across
+ * @returns First matching element or null
+ */
+function findTargetInCompositeScope(
+  selector: string,
+  compositeScope: Element[]
+): HTMLElement | null {
+  for (const scopeEl of compositeScope) {
+    const target = safeQuerySelector<HTMLElement>(selector, scopeEl);
+    if (target) {
+      console.log(`[Homura] Target found in composite scope element:`, scopeEl.id || scopeEl.tagName);
+      return target;
+    }
+  }
+  return null;
 }
 
 /**

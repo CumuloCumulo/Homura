@@ -19,6 +19,137 @@ const UNIQUE_ATTRIBUTES = ['id', 'data-id', 'data-testid', 'data-key', 'name'];
 // Semantic attributes for selectors
 const SEMANTIC_ATTRIBUTES = ['role', 'aria-label', 'title', 'data-testid'];
 
+// =============================================================================
+// LOW-ENTROPY WORD BLACKLIST (High Frequency, Low Distinctiveness)
+// =============================================================================
+
+/**
+ * Common words that appear repeatedly across rows and have low distinctiveness.
+ * These are penalized as anchors unless no better option exists.
+ */
+const LOW_ENTROPY_WORDS = new Set([
+  // Status labels
+  'pending', 'approved', 'rejected', 'active', 'inactive', 'completed', 'processing',
+  'success', 'failed', 'error', 'warning', 'info', 'done', 'cancelled', 'expired',
+  'open', 'closed', 'draft', 'published', 'archived',
+  // Actions
+  'edit', 'delete', 'remove', 'add', 'save', 'cancel', 'submit', 'confirm', 'approve',
+  'reject', 'view', 'details', 'more', 'expand', 'collapse', 'refresh', 'update',
+  'download', 'upload', 'export', 'import', 'copy', 'share', 'print',
+  // Common labels
+  'status', 'action', 'actions', 'name', 'date', 'time', 'type', 'category',
+  'description', 'notes', 'comment', 'comments', 'amount', 'total', 'price', 'quantity',
+  'yes', 'no', 'true', 'false', 'n/a', '-', '—', '...', '•',
+  // Numbers and symbols
+  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+]);
+
+/**
+ * Check if text is a low-entropy word (common action/status)
+ */
+function isLowEntropyText(text: string): boolean {
+  const normalized = text.toLowerCase().trim();
+  return LOW_ENTROPY_WORDS.has(normalized) || normalized.length <= 2;
+}
+
+// =============================================================================
+// SIBLING CONTAINER ANALYSIS (Inter-row Uniqueness)
+// =============================================================================
+
+/**
+ * Get sibling containers for cross-row uniqueness validation.
+ * Samples up to maxSiblings containers to avoid performance issues.
+ * 
+ * @param container - The current container (e.g., a TR)
+ * @param maxSiblings - Maximum number of siblings to sample (default: 6)
+ * @returns Array of sibling containers (excluding the current one)
+ */
+function getSiblingContainers(container: HTMLElement, maxSiblings = 6): HTMLElement[] {
+  const parent = container.parentElement;
+  if (!parent) return [];
+  
+  const siblings = Array.from(parent.children).filter(
+    child => child.tagName === container.tagName && child !== container
+  ) as HTMLElement[];
+  
+  if (siblings.length <= maxSiblings) {
+    return siblings;
+  }
+  
+  // Sample: first 3 + last 3
+  const half = Math.floor(maxSiblings / 2);
+  return [
+    ...siblings.slice(0, half),
+    ...siblings.slice(-half),
+  ];
+}
+
+/**
+ * Count how many sibling containers contain an element with matching text/attribute.
+ * Returns the frequency (1 = unique to current container, >1 = repeated).
+ * 
+ * @param siblings - Array of sibling containers to check
+ * @param selector - CSS selector to find the anchor element
+ * @param matchType - Type of matching: 'text' or 'attribute'
+ * @param matchValue - The value to match against
+ * @param attributeName - Attribute name (for attribute matching)
+ * @returns Frequency count across siblings (0 = not found in any sibling)
+ */
+function countSiblingMatches(
+  siblings: HTMLElement[],
+  selector: string,
+  matchType: 'text' | 'attribute',
+  matchValue: string,
+  attributeName?: string
+): number {
+  let count = 0;
+  
+  for (const sibling of siblings) {
+    try {
+      const element = sibling.querySelector(selector);
+      if (!element) continue;
+      
+      if (matchType === 'text') {
+        const text = getDirectTextContent(element as HTMLElement);
+        if (text && text.toLowerCase().trim() === matchValue.toLowerCase().trim()) {
+          count++;
+        }
+      } else if (matchType === 'attribute' && attributeName) {
+        const attrValue = element.getAttribute(attributeName);
+        if (attrValue === matchValue) {
+          count++;
+        }
+      }
+    } catch {
+      // Invalid selector, skip
+      continue;
+    }
+  }
+  
+  return count;
+}
+
+/**
+ * Calculate uniqueness score based on sibling frequency.
+ * 
+ * @param siblingFrequency - How many siblings have the same value (0 = unique)
+ * @param totalSiblings - Total number of siblings checked
+ * @returns Score multiplier (1.0 = unique, 0.1 = highly repeated)
+ */
+function calculateUniquenessScore(siblingFrequency: number, totalSiblings: number): number {
+  if (totalSiblings === 0) return 1.0; // No siblings to compare
+  if (siblingFrequency === 0) return 1.0; // Unique - best case
+  
+  // Calculate frequency ratio
+  const ratio = siblingFrequency / totalSiblings;
+  
+  // Penalize based on frequency:
+  // - 0% frequency → 1.0 (unique, no penalty)
+  // - 50% frequency → 0.3 (major penalty)
+  // - 100% frequency → 0.1 (almost useless as anchor)
+  return Math.max(0.1, 1.0 - (ratio * 0.9));
+}
+
 // Patterns for identifying semantic class names (stable container identifiers)
 const SEMANTIC_CLASS_PATTERNS = [
   /^(search|header|footer|nav|sidebar|content|main|form|modal|dialog|toolbar|menu)/i,
@@ -489,29 +620,37 @@ function detectContainerType(container: HTMLElement): ContainerType {
 }
 
 /**
- * Find anchor candidates within a container
+ * Find anchor candidates within a container with HIGH-ENTROPY PRIORITY.
  * 
- * IMPORTANT: Anchors must be able to DISTINGUISH different container instances.
- * For example, in a table with multiple rows, the anchor should be something unique
- * to each row (like student name "Alice Johnson"), not something shared by all rows
- * (like data-testid="audit-row").
+ * This algorithm prioritizes anchors that are UNIQUE across sibling containers,
+ * not just unique within the current container.
  * 
- * Priority:
- * 1. text_match - Text content that varies between instances (best for automation)
- * 2. attribute_match on CHILD elements - Attributes that might vary
+ * Example: In a table where "Pending" appears in 5 rows but "张三" appears only once,
+ * "张三" is a much better anchor even if "Pending" has semantic class names.
  * 
- * Container's own attributes are NOT good anchors because they're the same for all instances.
+ * Algorithm:
+ * 1. Collect all potential text and attribute candidates from current container
+ * 2. Get sibling containers (same parent, same tag)
+ * 3. For each candidate, check frequency across siblings (Inter-row Uniqueness)
+ * 4. Apply entropy-based scoring:
+ *    - Unique across all rows: HIGH confidence (Tier 1)
+ *    - Low-entropy word (status/action): PENALTY (Tier 3)
+ *    - Repeated across rows: MAJOR PENALTY (Tier 3 / unusable)
+ * 5. Sort by adjusted confidence, return top candidates
  */
 export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] {
   const candidates: AnchorCandidate[] = [];
   
-  // 1. Find text elements that could be anchors (PRIORITY - these distinguish instances)
+  // Step 1: Get sibling containers for cross-row validation
+  const siblings = getSiblingContainers(container);
+  const hasSiblings = siblings.length > 0;
+  
+  // Step 2: Collect all text elements in current container
   const textElements = container.querySelectorAll('*');
   const textsFound = new Map<string, HTMLElement>();
   
   textElements.forEach(el => {
     const htmlEl = el as HTMLElement;
-    // Get direct text content (not from children)
     const directText = getDirectTextContent(htmlEl);
     
     if (directText && directText.length >= 2 && directText.length <= 100) {
@@ -521,44 +660,99 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
     }
   });
   
-  // Convert to candidates - text matches get high priority
+  // Step 3: Evaluate each text candidate with cross-row uniqueness check
   textsFound.forEach((el, text) => {
     const selector = buildMinimalSelector(el, container);
-    const confidence = calculateTextConfidence(el, text);
+    let confidence = calculateTextConfidence(el, text);
+    let isUnique = false;
+    
+    // Check 1: Low-entropy word penalty
+    if (isLowEntropyText(text)) {
+      confidence *= 0.3; // Heavy penalty for common words
+    }
+    
+    // Check 2: Cross-row uniqueness (the key improvement)
+    let siblingFrequency = 0;
+    const isLowEntropy = isLowEntropyText(text);
+    
+    if (hasSiblings) {
+      siblingFrequency = countSiblingMatches(siblings, selector, 'text', text);
+      const uniquenessScore = calculateUniquenessScore(siblingFrequency, siblings.length);
+      
+      // If value appears in siblings, it's NOT unique
+      isUnique = siblingFrequency === 0;
+      
+      // Apply uniqueness multiplier
+      confidence *= uniquenessScore;
+      
+      // Boost if truly unique across all rows
+      if (isUnique) {
+        confidence = Math.min(1.0, confidence + 0.3);
+      }
+    } else {
+      // No siblings to compare - use heuristic uniqueness check
+      isUnique = isLikelyUnique(text);
+      if (isUnique) {
+        confidence += 0.1;
+      }
+    }
     
     candidates.push({
       selector,
       type: 'text_match',
       text,
-      confidence: confidence + 0.2, // Boost text matches - they distinguish instances
-      isUnique: isLikelyUnique(text),
+      confidence: Math.min(1.0, confidence),
+      isUnique,
+      siblingFrequency: hasSiblings ? siblingFrequency : undefined,
+      isLowEntropy,
     });
   });
   
-  // 2. Check for semantic attributes on CHILD elements (not container itself)
-  // These might vary between instances (e.g., data-id="123" vs data-id="456")
+  // Step 4: Check semantic attributes on CHILD elements
   textElements.forEach(el => {
-    // Skip the container itself - its attributes are the same for all instances
     if (el === container) return;
     
     for (const attr of SEMANTIC_ATTRIBUTES) {
       const value = el.getAttribute(attr);
       if (value && value.length > 2) {
         const selector = buildMinimalSelector(el as HTMLElement, container);
+        let confidence = 0.6;
+        let isUnique = false;
+        
+        // Low-entropy check for attribute values too
+        const isLowEntropy = isLowEntropyText(value);
+        if (isLowEntropy) {
+          confidence *= 0.3;
+        }
+        
+        // Cross-row uniqueness check
+        let siblingFrequency = 0;
+        if (hasSiblings) {
+          siblingFrequency = countSiblingMatches(siblings, selector, 'attribute', value, attr);
+          const uniquenessScore = calculateUniquenessScore(siblingFrequency, siblings.length);
+          
+          isUnique = siblingFrequency === 0;
+          confidence *= uniquenessScore;
+          
+          if (isUnique) {
+            confidence = Math.min(1.0, confidence + 0.2);
+          }
+        }
+        
         candidates.push({
           selector,
           type: 'attribute_match',
           attribute: { name: attr, value },
-          confidence: 0.6, // Lower than text matches
-          isUnique: false,
+          confidence: Math.min(1.0, confidence),
+          isUnique,
+          siblingFrequency: hasSiblings ? siblingFrequency : undefined,
+          isLowEntropy,
         });
       }
     }
   });
   
-  // 3. Container's own unique attributes - LOWEST priority
-  // These identify the container TYPE but not specific instances
-  // Only include as fallback for when no better anchors exist
+  // Step 5: Container's own unique attributes (LOWEST priority - fallback only)
   for (const attr of UNIQUE_ATTRIBUTES) {
     const value = container.getAttribute(attr);
     if (value) {
@@ -566,27 +760,50 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
         selector: `[${attr}]`,
         type: 'attribute_match',
         attribute: { name: attr, value },
-        confidence: 0.3, // Low - doesn't distinguish instances
-        isUnique: false, // NOT unique per instance!
+        confidence: 0.2, // Very low - same for all instances
+        isUnique: false,
       });
     }
   }
   
-  // Sort by: 1) type (text_match first), 2) uniqueness, 3) confidence
-  return candidates
-    .sort((a, b) => {
-      // Priority 1: text_match over attribute_match
-      if (a.type !== b.type) {
-        return a.type === 'text_match' ? -1 : 1;
-      }
-      // Priority 2: unique candidates first
-      if (a.isUnique !== b.isUnique) {
-        return a.isUnique ? -1 : 1;
-      }
-      // Priority 3: higher confidence first
-      return b.confidence - a.confidence;
-    })
-    .slice(0, 5); // Top 5 candidates
+  // Step 6: Sort by entropy-aware priority
+  const sorted = candidates.sort((a, b) => {
+    // Tier 1: Unique across all rows (highest priority)
+    if (a.isUnique !== b.isUnique) {
+      return a.isUnique ? -1 : 1;
+    }
+    
+    // Tier 2: Text matches over attribute matches
+    if (a.type !== b.type) {
+      return a.type === 'text_match' ? -1 : 1;
+    }
+    
+    // Tier 3: Higher confidence first
+    return b.confidence - a.confidence;
+  });
+  
+  // Log debug info for development
+  if (typeof console !== 'undefined' && sorted.length > 0) {
+    console.log('[Homura] Anchor candidates (entropy-aware):', {
+      siblingCount: siblings.length,
+      topCandidate: sorted[0] ? {
+        value: sorted[0].text || sorted[0].attribute?.value,
+        isUnique: sorted[0].isUnique,
+        isLowEntropy: sorted[0].isLowEntropy,
+        siblingFrequency: sorted[0].siblingFrequency,
+        confidence: Math.round(sorted[0].confidence * 100) + '%',
+      } : null,
+      allCandidates: sorted.slice(0, 5).map(c => ({
+        value: c.text || c.attribute?.value,
+        unique: c.isUnique ? '✓' : '✗',
+        entropy: c.isLowEntropy ? 'LOW' : 'OK',
+        freq: c.siblingFrequency ?? 'N/A',
+        conf: Math.round(c.confidence * 100) + '%',
+      })),
+    });
+  }
+  
+  return sorted.slice(0, 5);
 }
 
 /**
@@ -650,12 +867,17 @@ function isLikelyUnique(text: string): boolean {
  * - Rely on container + structural position (nth-of-type) for disambiguation
  * - Text matching should be handled by Anchor mechanism, not selectors
  * - Only use standard CSS selectors (no jQuery extensions like :contains)
+ * 
+ * IMPORTANT: For repeating elements (like TD cells in a table row), class-based
+ * selectors may not be unique. This function checks uniqueness and adds 
+ * nth-of-type when necessary.
  */
 export function buildMinimalSelector(
   element: HTMLElement, 
   context?: HTMLElement
 ): string {
   const tag = element.tagName.toLowerCase();
+  const parent = context || element.parentElement;
   
   // Priority 1: Stable ID (only if not dynamic/random)
   if (element.id && !element.id.match(/\d{5,}|uid|uuid|random|react|vue/i)) {
@@ -679,36 +901,44 @@ export function buildMinimalSelector(
     .filter(c => !c.match(/\d{5,}|active|hover|focus|selected|disabled|ng-|vue-|react-/i))
     .slice(0, 2);
   
+  // Build base selector from classes or role/type
+  let baseSelector = tag;
+  
   if (stableClasses.length > 0) {
-    return `${tag}.${stableClasses.join('.')}`;
-  }
-  
-  // Priority 5: Tag + role or type attributes
-  const role = element.getAttribute('role');
-  if (role) {
-    return `${tag}[role="${role}"]`;
-  }
-  
-  const type = element.getAttribute('type');
-  if (type && ['button', 'submit', 'text', 'checkbox', 'radio', 'email', 'password'].includes(type)) {
-    return `${tag}[type="${type}"]`;
-  }
-  
-  // Priority 6: Structural position within context/parent
-  // Use nth-of-type for disambiguation when no semantic attributes exist
-  const parent = context || element.parentElement;
-  if (parent) {
-    const siblings = Array.from(parent.querySelectorAll(`:scope > ${tag}`));
-    if (siblings.length > 1) {
-      const index = siblings.indexOf(element) + 1;
-      if (index > 0) {
-        return `${tag}:nth-of-type(${index})`;
+    baseSelector = `${tag}.${stableClasses.join('.')}`;
+  } else {
+    // Priority 5: Tag + role or type attributes
+    const role = element.getAttribute('role');
+    if (role) {
+      baseSelector = `${tag}[role="${role}"]`;
+    } else {
+      const type = element.getAttribute('type');
+      if (type && ['button', 'submit', 'text', 'checkbox', 'radio', 'email', 'password'].includes(type)) {
+        baseSelector = `${tag}[type="${type}"]`;
       }
     }
   }
   
-  // Fallback: just the tag (rely on container context for uniqueness)
-  return tag;
+  // Priority 6: Check uniqueness and add nth-of-type if needed
+  // This is CRITICAL for table cells and other repeating elements
+  if (parent) {
+    try {
+      const matches = parent.querySelectorAll(`:scope > ${baseSelector}`);
+      if (matches.length > 1) {
+        // Selector is not unique within parent - add positional index
+        const index = Array.from(matches).indexOf(element) + 1;
+        if (index > 0) {
+          // Combine class selector with nth-of-type for precise targeting
+          // e.g., "td.jqx-cell:nth-of-type(5)" instead of just "td.jqx-cell"
+          return `${baseSelector}:nth-of-type(${index})`;
+        }
+      }
+    } catch {
+      // Invalid selector syntax, fall through
+    }
+  }
+  
+  return baseSelector;
 }
 
 /**

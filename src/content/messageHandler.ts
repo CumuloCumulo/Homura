@@ -560,25 +560,33 @@ async function handleExecuteWithLogic(payload: ExecuteWithLogicPayload): Promise
       let matchedScope: Element | null = null;
       
       if (anchorValue && anchorSelector) {
-        // Filter by anchor
+        // Filter by anchor - FIX: use querySelectorAll to check ALL matching elements
+        // This fixes the bug where "安排教室" couldn't be found when preceded by "详情"
+        // in the same cell: <a>详情</a> | <a>安排教室</a>
         console.log('[Homura] Filtering by anchor:', anchorSelector, '=', anchorValue);
-        for (const scope of scopeElements) {
-          const anchor = scope.querySelector(anchorSelector);
-          if (!anchor) {
+        
+        scopeLoop: for (const scope of scopeElements) {
+          // FIX: Get ALL anchor candidates, not just the first one
+          const anchorCandidates = scope.querySelectorAll(anchorSelector);
+          
+          if (anchorCandidates.length === 0) {
             console.log('[Homura] No anchor found in scope');
             continue;
           }
           
-          const anchorText = anchor.textContent?.trim() || 
-                           anchor.getAttribute('value') || 
-                           anchor.getAttribute('data-value') || '';
-          
-          console.log('[Homura] Anchor text:', anchorText);
-          const matches = matchText(anchorText, anchorValue, anchorMatchMode);
-          if (matches) {
-            console.log('[Homura] Anchor matched!');
-            matchedScope = scope;
-            break;
+          // Iterate through ALL candidates to find a match
+          for (const anchor of anchorCandidates) {
+            const anchorText = anchor.textContent?.trim() || 
+                             anchor.getAttribute('value') || 
+                             anchor.getAttribute('data-value') || '';
+            
+            console.log('[Homura] Checking anchor candidate:', anchorText);
+            const matches = matchText(anchorText, anchorValue, anchorMatchMode);
+            if (matches) {
+              console.log('[Homura] Anchor matched!', anchorText);
+              matchedScope = scope;
+              break scopeLoop; // Found a match, exit both loops
+            }
           }
         }
         

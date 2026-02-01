@@ -287,6 +287,7 @@ AI automatically selects the best strategy:
 - [x] **v0.5**: Selector Builder with DOM analysis
 - [x] **v0.6**: Path Selector + AI Smart Routing
 - [x] **v0.7**: UnifiedSelector Schema + Dual-Mode UI
+- [x] **v0.7.1**: Entropy-aware Anchor + Split Table Support
 - [ ] **v1.0**: Full AI-powered tool generation
 - [ ] **v1.5**: Rule Book parser & orchestrator
 - [ ] **v2.0**: Self-healing selectors

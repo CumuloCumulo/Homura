@@ -109,10 +109,27 @@ export interface AnchorCandidate {
     name: string;
     value: string;
   };
-  /** Confidence score (0-1) */
+  /** 
+   * Confidence score (0-1)
+   * Adjusted by entropy analysis: unique values get boosted, repeated values get penalized
+   */
   confidence: number;
-  /** Is this a unique identifier? */
+  /** 
+   * Is this anchor unique across all sibling containers?
+   * true = appears only in current row (HIGH entropy, BEST anchor)
+   * false = appears in multiple rows (LOW entropy, POOR anchor)
+   */
   isUnique: boolean;
+  /**
+   * How many sibling containers have the same anchor value (optional metadata)
+   * 0 = unique, >0 = repeated in that many siblings
+   */
+  siblingFrequency?: number;
+  /**
+   * Whether this is a low-entropy word (status, action, etc.)
+   * Low-entropy words are penalized even if unique in current context
+   */
+  isLowEntropy?: boolean;
 }
 
 // =============================================================================
