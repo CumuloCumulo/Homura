@@ -221,11 +221,35 @@ async function executeSelectionLogic(
   const { target } = logic;
   let targetElement: HTMLElement | null = null;
   
-  // For split tables, search across composite scope (all elements with same ID)
-  if (compositeScope) {
+  // CRITICAL: Handle self-targeting (empty target selector means scope IS the target)
+  if (!target.selector || target.selector === '') {
+    console.log('[Homura] Self-targeting: using context element as target');
+    if (context instanceof Document) {
+      throw createError(
+        'TARGET_NOT_FOUND',
+        'Self-targeting requires a scope context, not document',
+        '',
+        document.body
+      );
+    }
+    targetElement = context as HTMLElement;
+  } else if (compositeScope) {
+    // For split tables, search across composite scope (all elements with same ID)
     targetElement = findTargetInCompositeScope(target.selector, compositeScope);
   } else {
     targetElement = findTarget(target.selector, context);
+    
+    // Fallback: if not found as descendant, check if context itself matches
+    if (!targetElement && !(context instanceof Document)) {
+      try {
+        if ((context as Element).matches(target.selector)) {
+          console.log('[Homura] Target selector matches context itself');
+          targetElement = context as HTMLElement;
+        }
+      } catch {
+        // Invalid selector, ignore
+      }
+    }
   }
   
   if (!targetElement) {

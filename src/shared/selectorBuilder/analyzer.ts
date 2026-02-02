@@ -176,6 +176,34 @@ const SKIP_CLASS_PATTERNS = [
 ];
 
 /**
+ * Check if a CSS class name is safe to use in selectors.
+ * Filters out Tailwind arbitrary values, responsive variants, and state modifiers.
+ * 
+ * @example
+ * isSafeCssClass('bg-white')           // true - safe
+ * isSafeCssClass('pb-[env(...)]')      // false - contains []()
+ * isSafeCssClass('sm:flex')            // false - contains :
+ * isSafeCssClass('bg-black/50')        // false - contains /
+ */
+function isSafeCssClass(className: string): boolean {
+  // Filter out dynamic/state classes (existing logic)
+  if (className.match(/\d{5,}|active|hover|focus|selected|disabled|ng-|vue-|react-/i)) {
+    return false;
+  }
+  
+  // Filter out Tailwind special patterns that break CSS selector syntax:
+  // - [] : arbitrary values like w-[200px], pb-[env(safe-area-inset-bottom)]
+  // - () : function syntax in arbitrary values  
+  // - :  : responsive/state variants like sm:, lg:, hover:, dark:
+  // - /  : opacity modifiers like bg-black/50, text-white/80
+  if (/[\[\]():\/]/.test(className)) {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
  * Class name patterns with semantic meaning (higher = better)
  */
 const SEMANTIC_SCORE_PATTERNS: Array<{ pattern: RegExp; score: number }> = [
@@ -393,6 +421,7 @@ function buildAncestorSelector(element: HTMLElement): string {
   // Priority 3: Semantic class with high score
   const classes = Array.from(element.classList);
   const scoredClasses = classes
+    .filter(isSafeCssClass)  // Filter out Tailwind arbitrary values first
     .map(c => ({ cls: c, score: calculateClassSemanticScore(c) }))
     .filter(x => x.score >= 0.5)
     .sort((a, b) => b.score - a.score);
@@ -403,6 +432,7 @@ function buildAncestorSelector(element: HTMLElement): string {
   
   // Priority 4: Any non-skipped class
   const validClasses = classes.filter(c => 
+    isSafeCssClass(c) &&  // Must be safe for CSS selectors
     !SKIP_CLASS_PATTERNS.some(pattern => pattern.test(c))
   );
   if (validClasses.length > 0) {
@@ -484,20 +514,103 @@ export function buildPathSelector(ancestorPath: AncestorInfo[], targetSelector: 
 
 // Elements that should NOT be used as repeating containers
 // These are too granular - we should continue upward to find a more meaningful container
-const SKIP_AS_CONTAINER = ['TD', 'TH', 'SPAN', 'A', 'STRONG', 'EM', 'B', 'I'];
+// NOTE: 'A' is handled specially by isGridOrFlexContainer logic (valid as Grid Item)
+const SKIP_AS_CONTAINER = ['TD', 'TH', 'SPAN', 'STRONG', 'EM', 'B', 'I', 'LABEL'];
 
 // Elements that are ideal repeating containers
 const PREFERRED_CONTAINERS = ['TR', 'LI', 'ARTICLE', 'SECTION'];
 
+// Elements that are valid as Grid/Flex item containers (even if typically skipped)
+const VALID_GRID_ITEMS = ['A', 'DIV', 'ARTICLE', 'SECTION', 'LI'];
+
 /**
- * Find the nearest repeating container (e.g., table row, list item)
+ * Check if an element is a CSS Grid or Flex container
+ * Supports both Tailwind class detection and computed style detection
+ */
+function isGridOrFlexContainer(element: HTMLElement | null): boolean {
+  if (!element) return false;
+  
+  // Check by class name (Tailwind patterns)
+  const className = element.className || '';
+  if (/\b(grid|flex)\b/.test(className) || /grid-cols-/.test(className)) {
+    return true;
+  }
+  
+  // Check computed style
+  try {
+    const style = window.getComputedStyle(element);
+    return style.display === 'grid' || style.display === 'flex';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if an element is a button toolbar/group container
+ * Button toolbars should not make their child <a> elements into repeating containers
+ */
+function isButtonToolbar(element: HTMLElement | null): boolean {
+  if (!element) return false;
+  
+  const className = element.className || '';
+  // Common button toolbar/group patterns
+  return /\b(btn-group|buttons|toolbar|btn-toolbar|actions|button-group|bh-buttons)\b/i.test(className);
+}
+
+/**
+ * Find the nearest repeating container (e.g., table row, list item, card)
  * 
  * Design principle:
  * - Skip granular elements like TD/TH (they repeat within a row, but a row is the meaningful unit)
  * - Prefer semantic containers like TR, LI, ARTICLE
  * - For tables: always use TR as the container, not TD
+ * - For Grid/Flex layouts: <a>, <div> etc. are valid item containers
+ * - IMPORTANT: When target IS the list item, return the element itself as container
  */
 export function findRepeatingContainer(element: HTMLElement): HTMLElement | null {
+  // ========== PHASE 1: Check if element ITSELF is a repeating item ==========
+  // When user clicks directly on a list item (e.g., <a> card in Grid),
+  // the element itself should be the container, not its parent
+  const elementParent = element.parentElement;
+  if (elementParent) {
+    // Check if element has siblings with same tag
+    const elementSiblings = Array.from(elementParent.children).filter(child => {
+      if (child.tagName !== element.tagName) return false;
+      // For A/DIV elements, also check class similarity
+      if (['A', 'DIV'].includes(child.tagName)) {
+        const elementClasses = new Set(element.className.split(/\s+/));
+        const childClasses = new Set((child as HTMLElement).className.split(/\s+/));
+        const overlap = [...elementClasses].filter(c => childClasses.has(c)).length;
+        return overlap >= Math.min(elementClasses.size, childClasses.size) * 0.5;
+      }
+      return true;
+    });
+    
+    // If element itself has siblings → element itself is the repeating container
+    if (elementSiblings.length >= 2) {
+      // Grid/Flex layout: valid list items
+      if (isGridOrFlexContainer(elementParent) && VALID_GRID_ITEMS.includes(element.tagName)) {
+        return element;
+      }
+      // Preferred container tags (TR, LI, ARTICLE, etc.)
+      if (PREFERRED_CONTAINERS.includes(element.tagName)) {
+        return element;
+      }
+      // Non-skipped elements with siblings
+      // EXCEPT: <a> elements in button toolbars should NOT be treated as containers
+      // (they're buttons, not list items like cards)
+      if (!SKIP_AS_CONTAINER.includes(element.tagName)) {
+        // For <a> elements, only treat as container if NOT in a button toolbar
+        if (element.tagName === 'A' && isButtonToolbar(elementParent)) {
+          // Skip - this is a button in a toolbar, not a card in a grid
+        } else {
+          return element;
+        }
+      }
+    }
+  }
+  
+  // ========== PHASE 2: Element is INSIDE a container, traverse up ==========
   let current = element.parentElement;
   let foundCandidate: HTMLElement | null = null;
   
@@ -521,7 +634,13 @@ export function findRepeatingContainer(element: HTMLElement): HTMLElement | null
     
     // Found repeating structure
     if (siblings.length >= 2) {
-      // If this is a granular element (TD/TH), skip it and continue looking for a better container
+      // Special case: If parent is a Grid/Flex container and current is a valid grid item,
+      // use current as the container (even if it's an <a> element)
+      if (isGridOrFlexContainer(parent) && VALID_GRID_ITEMS.includes(current.tagName)) {
+        return current;
+      }
+      
+      // If this is a granular element (TD/TH/SPAN), skip it and continue looking
       if (SKIP_AS_CONTAINER.includes(current.tagName)) {
         // Remember this as a fallback, but keep looking
         if (!foundCandidate) {
@@ -769,9 +888,9 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
   // Step 6: Sort by entropy-aware priority
   const sorted = candidates.sort((a, b) => {
     // Tier 1: Unique across all rows (highest priority)
-    if (a.isUnique !== b.isUnique) {
-      return a.isUnique ? -1 : 1;
-    }
+      if (a.isUnique !== b.isUnique) {
+        return a.isUnique ? -1 : 1;
+      }
     
     // Tier 2: Text matches over attribute matches
     if (a.type !== b.type) {
@@ -779,7 +898,7 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
     }
     
     // Tier 3: Higher confidence first
-    return b.confidence - a.confidence;
+      return b.confidence - a.confidence;
   });
   
   // Log debug info for development
@@ -897,8 +1016,9 @@ export function buildMinimalSelector(
   }
   
   // Priority 4: Tag + semantic/stable classes
+  // Use isSafeCssClass to filter out Tailwind arbitrary values that break CSS selectors
   const stableClasses = Array.from(element.classList)
-    .filter(c => !c.match(/\d{5,}|active|hover|focus|selected|disabled|ng-|vue-|react-/i))
+    .filter(isSafeCssClass)
     .slice(0, 2);
   
   // Build base selector from classes or role/type
@@ -907,13 +1027,13 @@ export function buildMinimalSelector(
   if (stableClasses.length > 0) {
     baseSelector = `${tag}.${stableClasses.join('.')}`;
   } else {
-    // Priority 5: Tag + role or type attributes
-    const role = element.getAttribute('role');
-    if (role) {
+  // Priority 5: Tag + role or type attributes
+  const role = element.getAttribute('role');
+  if (role) {
       baseSelector = `${tag}[role="${role}"]`;
     } else {
-      const type = element.getAttribute('type');
-      if (type && ['button', 'submit', 'text', 'checkbox', 'radio', 'email', 'password'].includes(type)) {
+  const type = element.getAttribute('type');
+  if (type && ['button', 'submit', 'text', 'checkbox', 'radio', 'email', 'password'].includes(type)) {
         baseSelector = `${tag}[type="${type}"]`;
       }
     }
@@ -927,11 +1047,11 @@ export function buildMinimalSelector(
       if (matches.length > 1) {
         // Selector is not unique within parent - add positional index
         const index = Array.from(matches).indexOf(element) + 1;
-        if (index > 0) {
+      if (index > 0) {
           // Combine class selector with nth-of-type for precise targeting
           // e.g., "td.jqx-cell:nth-of-type(5)" instead of just "td.jqx-cell"
           return `${baseSelector}:nth-of-type(${index})`;
-        }
+      }
       }
     } catch {
       // Invalid selector syntax, fall through

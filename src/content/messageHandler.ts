@@ -605,8 +605,28 @@ async function handleExecuteWithLogic(payload: ExecuteWithLogicPayload): Promise
 
       // Find target within scope
       console.log('[Homura] Finding target in scope:', targetSelector);
-      targetElement = matchedScope.querySelector(targetSelector) as HTMLElement;
-      usedSelector = `${scopeSelector} >> ${anchorSelector || '(无锚点)'} = "${anchorValue}" >> ${targetSelector}`;
+      
+      // CRITICAL: Handle self-targeting (empty targetSelector means scope IS the target)
+      if (!targetSelector || targetSelector === '') {
+        console.log('[Homura] Self-targeting: scope element is the target');
+        targetElement = matchedScope as HTMLElement;
+      } else {
+        targetElement = matchedScope.querySelector(targetSelector) as HTMLElement;
+        
+        // Fallback: if not found as descendant, check if scope itself matches
+        if (!targetElement) {
+          try {
+            if (matchedScope.matches(targetSelector)) {
+              console.log('[Homura] Target selector matches scope itself');
+              targetElement = matchedScope as HTMLElement;
+            }
+          } catch {
+            // Invalid selector, ignore
+          }
+        }
+      }
+      
+      usedSelector = `${scopeSelector} >> ${anchorSelector || '(无锚点)'} = "${anchorValue}" >> ${targetSelector || '(self)'}`;
       console.log('[Homura] Target found:', !!targetElement);
       
     } else {

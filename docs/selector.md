@@ -276,6 +276,47 @@ if (matches.length > 1) {
 新: td.jqx-cell:nth-of-type(5) span    ← 只匹配第5列
 ```
 
+### Grid/Flex 卡片布局支持 (Card Layout Fix)
+
+**问题**: Tailwind Grid 布局中，`<a>` 元素作为卡片容器被错误跳过：
+```html
+<div class="grid grid-cols-1">
+  <a class="block p-6...">        ← 被 SKIP_AS_CONTAINER 跳过
+    <div class="flex">            ← 错误识别为容器
+      <h2>我的AI伴侣</h2>
+    </div>
+  </a>
+</div>
+```
+
+导致策略路由失败：
+- `containerType: 'card'` 但 `determineStrategy` 只支持 `'table'` 和 `'list'`
+- 回退到 `'path'` 策略 → 生成泛化选择器 `div.grid-cols-1 h2...`
+
+**修复 1: 策略路由扩展**
+```typescript
+// determineStrategy 现在支持所有重复结构类型
+const isStructuredContainer = 
+  containerType === 'table' || 
+  containerType === 'list' ||
+  containerType === 'card' ||   // 新增
+  containerType === 'grid';     // 新增
+```
+
+**修复 2: Grid/Flex Item 容器识别**
+```typescript
+// 如果父元素是 Grid/Flex，<a> 是有效的列表项容器
+if (isGridOrFlexContainer(parent) && VALID_GRID_ITEMS.includes(current.tagName)) {
+  return current;  // <a> 作为容器返回
+}
+```
+
+**结果**:
+```
+旧: containerType: 'card', strategy: 'path' → div.grid-cols-1 h2... (匹配所有)
+新: containerType: 'grid', strategy: 'scope_anchor_target' → 精确定位
+```
+
 ---
 
 ## 📝 设计决策
@@ -290,6 +331,8 @@ if (matches.length > 1) {
 | 2026-02-01 | **多候选锚点遍历** | 修复 Cell 内多元素场景 `<a>详情</a>\|<a>安排</a>` |
 | 2026-02-01 | **Split Table 支持** | 支持 jqxGrid 等双表拼接布局 (Virtual Composite Scope) |
 | 2026-02-01 | **单元格精确定位** | 检查选择器唯一性，不唯一时添加 `nth-of-type` |
+| 2026-02-02 | **Grid/Flex Item 识别** | `<a>` 在 Grid 布局中是有效的列表项容器 |
+| 2026-02-02 | **策略路由扩展** | `card`/`grid` 类型启用 Scope+Anchor 策略 |
 
 ---
 

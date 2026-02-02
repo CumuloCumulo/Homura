@@ -188,8 +188,15 @@ export function createSelectorDraft(
   const hasContainer = !!(analysis.container || analysis.containerSelector || analysis.containerTagName);
   const topAnchor = analysis.anchorCandidates?.[0];
   
+  // CRITICAL: Check if target IS the container (self-targeting)
+  // When relativeSelector is empty and we have a container, target is the container itself
+  const isSelfTarget = hasContainer && !analysis.relativeSelector;
+  
   // Use targetSelector if available, otherwise fall back to relativeSelector or minimalSelector
-  const targetSelector = analysis.targetSelector || analysis.relativeSelector || analysis.minimalSelector;
+  // BUT: if self-targeting, use empty string to signal "return scope element as target"
+  const targetSelector = isSelfTarget 
+    ? ''  // Empty string signals: use scope element as target
+    : (analysis.targetSelector || analysis.relativeSelector || analysis.minimalSelector);
   
   const draft: SelectorDraft = {
     target: {
@@ -273,10 +280,13 @@ export function generateSelectorStrategies(
   // Strategy 2: With scope but no anchor
   if (hasContainer) {
     const scope = buildScope(analysis);
+    // Check for self-targeting (target IS the container)
+    const isSelfTarget = !analysis.relativeSelector;
     strategies.push({
       scope,
       target: {
-        selector: analysis.relativeSelector || analysis.targetSelector || analysis.minimalSelector,
+        // Empty string signals: use scope element as target
+        selector: isSelfTarget ? '' : (analysis.relativeSelector || analysis.targetSelector || analysis.minimalSelector),
         action,
       },
     });
@@ -303,15 +313,25 @@ export function generateSelectorStrategies(
 /**
  * Determine the best strategy for an element analysis
  * This uses the same logic as SmartRouter but is self-contained
+ * 
+ * Strategy Priority:
+ * 1. scope_anchor_target: For repeating structures (table, list, card, grid) with anchors
+ * 2. path: For single elements with semantic ancestor path
+ * 3. direct: Fallback for simple elements
  */
 export function determineStrategy(analysis: ElementAnalysis): SelectorStrategy {
   const hasRepeatingStructure = analysis.containerType !== 'single';
   const hasAnchorCandidates = analysis.anchorCandidates && analysis.anchorCandidates.length > 0;
   
-  // Rule: Use scope_anchor_target for tables/lists with anchors
-  if (hasRepeatingStructure && 
-      (analysis.containerType === 'table' || analysis.containerType === 'list') &&
-      hasAnchorCandidates) {
+  // Rule: Use scope_anchor_target for ALL repeating structures with anchors
+  // This includes: table, list, card, grid (Tailwind Grid/Flex layouts)
+  const isStructuredContainer = 
+    analysis.containerType === 'table' || 
+    analysis.containerType === 'list' ||
+    analysis.containerType === 'card' ||
+    analysis.containerType === 'grid';
+  
+  if (hasRepeatingStructure && isStructuredContainer && hasAnchorCandidates) {
     return 'scope_anchor_target';
   }
   
@@ -381,13 +401,18 @@ export function buildStructureData(analysis: ElementAnalysis): StructureStrategy
   const scopeData = buildScope(analysis);
   const topAnchor = analysis.anchorCandidates?.[0];
   
+  // CRITICAL: Check if target IS the container (self-targeting)
+  // When relativeSelector is empty, target is the container itself
+  const isSelfTarget = !analysis.relativeSelector;
+  
   const structureData: StructureStrategyData = {
     scope: {
       selector: scopeData.selector,
       type: scopeData.type,
     },
     target: {
-      selector: analysis.relativeSelector || analysis.targetSelector || analysis.minimalSelector,
+      // Empty string signals: use scope element as target (self-targeting)
+      selector: isSelfTarget ? '' : (analysis.relativeSelector || analysis.targetSelector || analysis.minimalSelector),
     },
   };
   
