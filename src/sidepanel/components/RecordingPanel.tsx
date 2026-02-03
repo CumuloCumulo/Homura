@@ -21,6 +21,8 @@ import { Reorder, useDragControls } from 'framer-motion';
 import { useRecordingStore } from '../stores/recordingStore';
 import { sendToContentScript } from '../utils/ensureContentScript';
 import type { RecordedAction, SelectorDraft, ElementAnalysis, AnchorCandidate } from '@shared/selectorBuilder';
+import type { UnifiedSelector } from '@shared/types';
+import { QuickActionPanel } from './QuickActionPanel';
 
 // =============================================================================
 // ICONS
@@ -71,15 +73,47 @@ export function RecordingPanel() {
     setProcessing
   } = useRecordingStore();
 
+  // Restore recording state on mount (e.g., when sidepanel reopens)
+  React.useEffect(() => {
+    const checkRecordingState = async () => {
+      try {
+        const response = await chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' });
+        if (response?.state?.isRecording && !isRecording) {
+          setRecording(true);
+          addLog({
+            timestamp: Date.now(),
+            level: 'info',
+            message: '已恢复录制状态',
+          });
+        }
+      } catch (error) {
+        console.log('[Homura] Could not check recording state:', error);
+      }
+    };
+    checkRecordingState();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
   const handleStartRecording = async () => {
     try {
+      // Get current tab ID for cross-page tracking
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) throw new Error('No active tab');
+      
+      // Notify background to track recording state (enables cross-page recording)
+      await chrome.runtime.sendMessage({ 
+        type: 'SET_RECORDING_STATE', 
+        payload: { isRecording: true, tabId: tab.id } 
+      });
+      
+      // Start recording in content script
       await sendToContentScript({ type: 'START_RECORDING' });
       setRecording(true);
       clearRecordedActions();
       addLog({
         timestamp: Date.now(),
         level: 'info',
-        message: '开始录制，请在页面上操作',
+        message: '开始录制（支持跨页面）',
       });
     } catch (error) {
       addLog({
@@ -92,6 +126,12 @@ export function RecordingPanel() {
 
   const handleStopRecording = async () => {
     try {
+      // Stop tracking in background
+      await chrome.runtime.sendMessage({ 
+        type: 'SET_RECORDING_STATE', 
+        payload: { isRecording: false } 
+      });
+      
       await sendToContentScript({ type: 'STOP_RECORDING' });
       setRecording(false);
       addLog({
@@ -101,6 +141,13 @@ export function RecordingPanel() {
       });
     } catch (error) {
       console.error('Stop recording error:', error);
+      // Ensure background state is cleared even if content script fails
+      try {
+        await chrome.runtime.sendMessage({ 
+          type: 'SET_RECORDING_STATE', 
+          payload: { isRecording: false } 
+        });
+      } catch {}
       setRecording(false);
     }
   };
@@ -193,6 +240,7 @@ export function RecordingPanel() {
         onDelete={deleteRecordedAction}
         onUpdate={updateRecordedAction}
         onReorder={setRecordedActions}
+        onLog={addLog}
       />
 
       {/* Generate Button */}
@@ -240,9 +288,10 @@ interface ActionListProps {
   onDelete: (id: string) => void;
   onUpdate: (id: string, updates: Partial<RecordedAction>) => void;
   onReorder: (actions: RecordedAction[]) => void;
+  onLog: (log: { timestamp: number; level: 'info' | 'error'; message: string }) => void;
 }
 
-function ActionList({ actions, isRecording, onDelete, onUpdate, onReorder }: ActionListProps) {
+function ActionList({ actions, isRecording, onDelete, onUpdate, onReorder, onLog }: ActionListProps) {
   if (actions.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto p-3">
@@ -266,6 +315,7 @@ function ActionList({ actions, isRecording, onDelete, onUpdate, onReorder }: Act
             index={index}
             onDelete={() => onDelete(action.id)}
             onUpdate={(updates) => onUpdate(action.id, updates)}
+            onLog={onLog}
           />
         ))}
       </Reorder.Group>
@@ -282,9 +332,10 @@ interface ReorderableActionCardProps {
   index: number;
   onDelete: () => void;
   onUpdate: (updates: Partial<RecordedAction>) => void;
+  onLog: (log: { timestamp: number; level: 'info' | 'error'; message: string }) => void;
 }
 
-function ReorderableActionCard({ action, index, onDelete, onUpdate }: ReorderableActionCardProps) {
+function ReorderableActionCard({ action, index, onDelete, onUpdate, onLog }: ReorderableActionCardProps) {
   const dragControls = useDragControls();
 
   return (
@@ -316,6 +367,7 @@ function ReorderableActionCard({ action, index, onDelete, onUpdate }: Reorderabl
         index={index}
         onDelete={onDelete}
         onUpdate={onUpdate}
+        onLog={onLog}
         dragControls={dragControls}
       />
     </Reorder.Item>
@@ -331,6 +383,7 @@ interface ActionCardProps {
   index: number;
   onDelete: () => void;
   onUpdate: (updates: Partial<RecordedAction>) => void;
+  onLog: (log: { timestamp: number; level: 'info' | 'error'; message: string }) => void;
   dragControls: ReturnType<typeof useDragControls>;
 }
 
@@ -357,6 +410,7 @@ function ActionCard({
   index, 
   onDelete, 
   onUpdate,
+  onLog,
   dragControls,
 }: ActionCardProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
@@ -493,7 +547,7 @@ function ActionCard({
         </span>
       </div>
 
-      {/* Expanded Content - Selector Configuration */}
+      {/* Expanded Content - Selector Configuration + Quick Actions */}
       {isExpanded && (
         <div className="px-3 pb-3 pt-1 space-y-2.5 animate-fade-in border-t border-white/5">
           {/* Input Value (if applicable) */}
@@ -504,10 +558,20 @@ function ActionCard({
             </div>
           )}
 
+          {/* Quick Action Panel - Test recorded action */}
+          <QuickActionPanel
+            analysis={action.elementAnalysis}
+            selectorDraft={action.selectorDraft}
+            unifiedSelector={action.unifiedSelector}
+            onLog={onLog}
+            compact
+          />
+
           {/* Selector Logic Editor */}
           <SelectorEditor 
             analysis={action.elementAnalysis}
             draft={action.selectorDraft}
+            unifiedSelector={action.unifiedSelector}
             onChange={(draft) => onUpdate({ selectorDraft: draft })}
           />
         </div>
@@ -523,13 +587,50 @@ function ActionCard({
 interface SelectorEditorProps {
   analysis: ElementAnalysis;
   draft?: SelectorDraft;
+  unifiedSelector?: UnifiedSelector;
   onChange: (draft: SelectorDraft) => void;
 }
 
-function SelectorEditor({ analysis, draft, onChange }: SelectorEditorProps) {
-  // Initialize draft from analysis if not provided
+function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: SelectorEditorProps) {
+  // Initialize draft from UnifiedSelector, existing draft, or analysis
   const [localDraft, setLocalDraft] = React.useState<SelectorDraft>(() => {
     if (draft) return draft;
+    
+    // If we have a UnifiedSelector with structureData, use it
+    if (unifiedSelector?.structureData) {
+      const { scope, anchor, target } = unifiedSelector.structureData;
+      return {
+        scope: {
+          selector: scope.selector,
+          type: 'container_list',
+          matchCount: 0,
+        },
+        anchor: anchor ? {
+          selector: anchor.selector,
+          type: 'text_match' as const, // Use SelectorDraft anchor type
+          value: anchor.value || '',
+          matchMode: anchor.matchMode || 'contains',
+        } : undefined,
+        target: {
+          selector: target.selector,
+          action: 'CLICK',
+        },
+        confidence: unifiedSelector.confidence,
+        validated: false,
+      };
+    }
+    
+    // If UnifiedSelector has pathData, create minimal draft
+    if (unifiedSelector?.pathData) {
+      return {
+        target: {
+          selector: unifiedSelector.fullSelector,
+          action: 'CLICK',
+        },
+        confidence: unifiedSelector.confidence,
+        validated: false,
+      };
+    }
     
     // Build initial draft from element analysis
     // Note: Use serializable fields (containerSelector, containerTagName) 

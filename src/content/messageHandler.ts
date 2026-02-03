@@ -19,6 +19,7 @@ import {
   analyzeElement, 
   validateSelectorDraft,
   buildPathData,
+  createUnifiedSelector,
   type SelectorDraft,
   type ElementAnalysis,
   type AncestorInfo,
@@ -390,6 +391,9 @@ function onRecordClick(e: MouseEvent): void {
   
   const analysis = analyzeElement(target);
   
+  // Auto-generate UnifiedSelector for recorded action
+  const unifiedSelector = createUnifiedSelector(analysis, 'CLICK');
+  
   chrome.runtime.sendMessage({
     type: 'ACTION_RECORDED',
     payload: {
@@ -398,7 +402,14 @@ function onRecordClick(e: MouseEvent): void {
       type: 'click',
       timestamp: Date.now(),
       elementAnalysis: analysis,
+      unifiedSelector,
     },
+  });
+  
+  console.log('[Homura] Recorded click with UnifiedSelector:', {
+    strategy: unifiedSelector.strategy,
+    fullSelector: unifiedSelector.fullSelector,
+    confidence: unifiedSelector.confidence,
   });
 }
 
@@ -410,6 +421,9 @@ function onRecordInput(e: Event): void {
   
   const analysis = analyzeElement(target);
   
+  // Auto-generate UnifiedSelector for recorded action
+  const unifiedSelector = createUnifiedSelector(analysis, 'INPUT');
+  
   chrome.runtime.sendMessage({
     type: 'ACTION_RECORDED',
     payload: {
@@ -419,7 +433,14 @@ function onRecordInput(e: Event): void {
       timestamp: Date.now(),
       elementAnalysis: analysis,
       value: target.value,
+      unifiedSelector,
     },
+  });
+  
+  console.log('[Homura] Recorded input with UnifiedSelector:', {
+    strategy: unifiedSelector.strategy,
+    fullSelector: unifiedSelector.fullSelector,
+    confidence: unifiedSelector.confidence,
   });
 }
 

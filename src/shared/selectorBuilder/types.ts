@@ -6,7 +6,7 @@
  * Type definitions for the selector builder module
  */
 
-import type { SelectorScope, SelectorAnchor } from '@shared/types';
+import type { SelectorScope, SelectorAnchor, UnifiedSelector } from '@shared/types';
 
 // =============================================================================
 // ELEMENT ANALYSIS
@@ -237,6 +237,11 @@ export interface RecordedAction {
   value?: string;
   /** Screenshot data URL (optional) */
   screenshot?: string;
-  /** User-edited selector draft */
+  /** User-edited selector draft @deprecated Use unifiedSelector instead */
   selectorDraft?: SelectorDraft;
+  /** 
+   * Unified selector - automatically generated during recording
+   * Contains both Path and Structure strategy data for execution
+   */
+  unifiedSelector?: UnifiedSelector;
 }
