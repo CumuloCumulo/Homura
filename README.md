@@ -10,6 +10,7 @@ Homura transforms traditional RPA (like Automa) from **imperative scripting** to
 - **AI-powered decisions**: LLM handles uncertain logic; engine handles precise DOM operations
 - **Self-healing**: Automatic selector repair when elements change
 - **Smart recording**: Record actions and let AI generate reusable tools
+- **Cross-page recording**: Continue recording across page navigations and new tabs
 - **Dual-strategy selectors**: AI automatically chooses Path or Structure mode based on DOM analysis
 
 ## 📐 Architecture
@@ -85,7 +86,7 @@ Click the extension icon to open:
 | Mode | Description |
 |------|-------------|
 | **检查 (Inspect)** | Click page elements to analyze structure |
-| **录制 (Record)** | Record user actions for tool generation |
+| **录制 (Record)** | Record user actions for tool generation (supports cross-page & cross-tab) |
 
 #### Inspect Mode Features
 
@@ -117,7 +118,7 @@ Features:
 ```
 src/
 ├── background/              # Service Worker (Orchestrator)
-│   ├── index.ts            # Entry + message routing
+│   ├── index.ts            # Entry + message routing + recording state management
 │   └── orchestrator.ts     # Mission execution logic
 │
 ├── content/                # Content Script (Executor)
@@ -288,6 +289,7 @@ AI automatically selects the best strategy:
 - [x] **v0.6**: Path Selector + AI Smart Routing
 - [x] **v0.7**: UnifiedSelector Schema + Dual-Mode UI
 - [x] **v0.7.1**: Entropy-aware Anchor + Split Table Support
+- [x] **v0.7.2**: Cross-page & Cross-tab Recording
 - [ ] **v1.0**: Full AI-powered tool generation
 - [ ] **v1.5**: Rule Book parser & orchestrator
 - [ ] **v2.0**: Self-healing selectors
