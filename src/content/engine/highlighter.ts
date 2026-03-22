@@ -2,12 +2,12 @@
  * =============================================================================
  * Homura - Debug Highlighter
  * =============================================================================
- * 
+ *
  * Provides visual debugging by highlighting elements during execution.
  * Creates overlay divs that follow element positions.
  */
 
-import { HIGHLIGHT_COLORS, CSS_CLASSES } from '@shared/constants';
+import { HIGHLIGHT_COLORS, CSS_CLASSES } from "@homura/sdk/constants";
 
 interface HighlightOptions {
   color: string;
@@ -21,49 +21,49 @@ const activeHighlights = new Map<string, HTMLDivElement>();
  * Highlight an element with a colored overlay
  */
 export function highlightElement(
-  element: Element, 
+  element: Element,
   id: string,
-  options: HighlightOptions
+  options: HighlightOptions,
 ): void {
   // Remove existing highlight with same ID
   removeHighlight(id);
 
   const rect = element.getBoundingClientRect();
-  
-  const overlay = document.createElement('div');
+
+  const overlay = document.createElement("div");
   overlay.className = CSS_CLASSES.highlightOverlay;
   overlay.id = `homura-highlight-${id}`;
-  
+
   Object.assign(overlay.style, {
-    position: 'fixed',
+    position: "fixed",
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
     backgroundColor: options.color,
-    border: `2px solid ${options.color.replace('0.5', '1')}`,
-    borderRadius: '4px',
-    pointerEvents: 'none',
-    zIndex: '2147483647',
-    transition: 'all 0.2s ease',
-    boxSizing: 'border-box',
+    border: `2px solid ${options.color.replace("0.5", "1")}`,
+    borderRadius: "4px",
+    pointerEvents: "none",
+    zIndex: "2147483647",
+    transition: "all 0.2s ease",
+    boxSizing: "border-box",
   });
 
   // Add label if provided
   if (options.label) {
-    const label = document.createElement('div');
+    const label = document.createElement("div");
     Object.assign(label.style, {
-      position: 'absolute',
-      top: '-24px',
-      left: '0',
-      backgroundColor: options.color.replace('0.5', '0.9'),
-      color: 'white',
-      fontSize: '11px',
-      fontFamily: 'system-ui, sans-serif',
-      fontWeight: '600',
-      padding: '2px 8px',
-      borderRadius: '4px 4px 0 0',
-      whiteSpace: 'nowrap',
+      position: "absolute",
+      top: "-24px",
+      left: "0",
+      backgroundColor: options.color.replace("0.5", "0.9"),
+      color: "white",
+      fontSize: "11px",
+      fontFamily: "system-ui, sans-serif",
+      fontWeight: "600",
+      padding: "2px 8px",
+      borderRadius: "4px 4px 0 0",
+      whiteSpace: "nowrap",
     });
     label.textContent = options.label;
     overlay.appendChild(label);
@@ -113,7 +113,7 @@ export function highlightScope(elements: Element[]): void {
  * Highlight anchor-matched element (green)
  */
 export function highlightAnchor(element: Element, index: number): void {
-  highlightElement(element, 'anchor', {
+  highlightElement(element, "anchor", {
     color: HIGHLIGHT_COLORS.anchor,
     label: `Anchor Match [${index}]`,
   });
@@ -123,9 +123,9 @@ export function highlightAnchor(element: Element, index: number): void {
  * Highlight target element (orange)
  */
 export function highlightTarget(element: Element): void {
-  highlightElement(element, 'target', {
+  highlightElement(element, "target", {
     color: HIGHLIGHT_COLORS.target,
-    label: 'Target',
+    label: "Target",
   });
 }
 
@@ -134,8 +134,8 @@ export function highlightTarget(element: Element): void {
  */
 export function highlightError(element: Element | null, message: string): void {
   if (!element) return;
-  
-  highlightElement(element, 'error', {
+
+  highlightElement(element, "error", {
     color: HIGHLIGHT_COLORS.error,
     label: `Error: ${message}`,
     duration: 5000,
@@ -146,11 +146,11 @@ export function highlightError(element: Element | null, message: string): void {
  * Flash animation for action feedback
  */
 export function flashElement(element: Element, success: boolean): void {
-  const color = success 
-    ? 'rgba(34, 197, 94, 0.6)'  // Green for success
-    : 'rgba(239, 68, 68, 0.6)'; // Red for failure
-  
-  highlightElement(element, 'flash', {
+  const color = success
+    ? "rgba(34, 197, 94, 0.6)" // Green for success
+    : "rgba(239, 68, 68, 0.6)"; // Red for failure
+
+  highlightElement(element, "flash", {
     color,
     duration: 500,
   });

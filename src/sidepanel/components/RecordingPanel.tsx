@@ -2,55 +2,89 @@
  * =============================================================================
  * Homura SidePanel - Recording Panel (Enhanced)
  * =============================================================================
- * 
+ *
  * Features:
  * - Delete recorded actions
  * - Editable name/description for each action
  * - Reorder actions (up/down)
  * - Expandable selector configuration (Scope + Anchor + Target)
  * - Inline selector editing
- * 
+ *
  * Design: Following UI-DESIGN.md principles
  * - Progressive disclosure (collapsed by default)
  * - Space efficient (compact padding, small text)
  * - Calm interface (gentle animations)
  */
 
-import React from 'react';
-import { Reorder, useDragControls } from 'framer-motion';
-import { useRecordingStore } from '../stores/recordingStore';
-import { sendToContentScript } from '../utils/ensureContentScript';
-import type { RecordedAction, SelectorDraft, ElementAnalysis, AnchorCandidate } from '@shared/selectorBuilder';
-import type { UnifiedSelector } from '@shared/types';
-import { QuickActionPanel } from './QuickActionPanel';
+import React from "react";
+import { Reorder, useDragControls } from "framer-motion";
+import { useRecordingStore } from "../stores/recordingStore";
+import { sendToContentScript } from "../utils/ensureContentScript";
+import type {
+  RecordedAction,
+  SelectorDraft,
+  ElementAnalysis,
+  AnchorCandidate,
+} from "@shared/selectorBuilder/types";
+import type { UnifiedSelector } from "@homura/sdk/types";
+import { QuickActionPanel } from "./QuickActionPanel";
 
 // =============================================================================
 // ICONS
 // =============================================================================
 
 const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
-  <svg 
-    className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} 
-    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+  <svg
+    className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
   >
     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
   </svg>
 );
 
 const DeleteIcon = () => (
-  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  <svg
+    className="w-3.5 h-3.5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+    />
   </svg>
 );
 
 const EditIcon = () => (
-  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+  <svg
+    className="w-2.5 h-2.5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+    />
   </svg>
 );
 
 const DragHandleIcon = () => (
-  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+  <svg
+    className="w-3.5 h-3.5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
   </svg>
 );
@@ -60,65 +94,84 @@ const DragHandleIcon = () => (
 // =============================================================================
 
 export function RecordingPanel() {
-  const { 
-    isRecording, 
-    setRecording, 
-    recordedActions, 
+  const {
+    isRecording,
+    setRecording,
+    recordedActions,
     clearRecordedActions,
     setRecordedActions,
     deleteRecordedAction,
     updateRecordedAction,
+    addRecordedAction,
     addLog,
     isProcessing,
-    setProcessing
+    setProcessing,
   } = useRecordingStore();
 
   // Restore recording state on mount (e.g., when sidepanel reopens)
   React.useEffect(() => {
     const checkRecordingState = async () => {
       try {
-        const response = await chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' });
+        const response = await chrome.runtime.sendMessage({
+          type: "GET_RECORDING_STATE",
+        });
         if (response?.state?.isRecording && !isRecording) {
           setRecording(true);
           addLog({
             timestamp: Date.now(),
-            level: 'info',
-            message: '已恢复录制状态',
+            level: "info",
+            message: "已恢复录制状态",
           });
         }
       } catch (error) {
-        console.log('[Homura] Could not check recording state:', error);
+        console.log("[Homura] Could not check recording state:", error);
       }
     };
     checkRecordingState();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 
   const handleStartRecording = async () => {
     try {
       // Get current tab ID for cross-page tracking
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) throw new Error('No active tab');
-      
-      // Notify background to track recording state (enables cross-page recording)
-      await chrome.runtime.sendMessage({ 
-        type: 'SET_RECORDING_STATE', 
-        payload: { isRecording: true, tabId: tab.id } 
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
       });
-      
+      if (!tab?.id) throw new Error("No active tab");
+
+      // Notify background to track recording state (enables cross-page recording)
+      await chrome.runtime.sendMessage({
+        type: "SET_RECORDING_STATE",
+        payload: { isRecording: true, tabId: tab.id },
+      });
+
       // Start recording in content script
-      await sendToContentScript({ type: 'START_RECORDING' });
+      await sendToContentScript({ type: "START_RECORDING" });
       setRecording(true);
       clearRecordedActions();
+
+      // Record current page as initial navigation
+      if (tab.url) {
+        addRecordedAction({
+          id: `nav_${Date.now()}_initial`,
+          type: "navigate",
+          name: "起始页面",
+          url: tab.url,
+          navigationType: "direct",
+          timestamp: Date.now(),
+        });
+      }
+
       addLog({
         timestamp: Date.now(),
-        level: 'info',
-        message: '开始录制（支持跨页面）',
+        level: "info",
+        message: "开始录制（支持跨页面）",
       });
     } catch (error) {
       addLog({
         timestamp: Date.now(),
-        level: 'error',
+        level: "error",
         message: `启动录制失败: ${error}`,
       });
     }
@@ -127,25 +180,25 @@ export function RecordingPanel() {
   const handleStopRecording = async () => {
     try {
       // Stop tracking in background
-      await chrome.runtime.sendMessage({ 
-        type: 'SET_RECORDING_STATE', 
-        payload: { isRecording: false } 
+      await chrome.runtime.sendMessage({
+        type: "SET_RECORDING_STATE",
+        payload: { isRecording: false },
       });
-      
-      await sendToContentScript({ type: 'STOP_RECORDING' });
+
+      await sendToContentScript({ type: "STOP_RECORDING" });
       setRecording(false);
       addLog({
         timestamp: Date.now(),
-        level: 'info',
+        level: "info",
         message: `录制结束，共 ${recordedActions.length} 个操作`,
       });
     } catch (error) {
-      console.error('Stop recording error:', error);
+      console.error("Stop recording error:", error);
       // Ensure background state is cleared even if content script fails
       try {
-        await chrome.runtime.sendMessage({ 
-          type: 'SET_RECORDING_STATE', 
-          payload: { isRecording: false } 
+        await chrome.runtime.sendMessage({
+          type: "SET_RECORDING_STATE",
+          payload: { isRecording: false },
         });
       } catch {}
       setRecording(false);
@@ -156,8 +209,8 @@ export function RecordingPanel() {
     if (recordedActions.length === 0) {
       addLog({
         timestamp: Date.now(),
-        level: 'error',
-        message: '没有可用的录制操作',
+        level: "error",
+        message: "没有可用的录制操作",
       });
       return;
     }
@@ -165,33 +218,37 @@ export function RecordingPanel() {
     setProcessing(true);
     addLog({
       timestamp: Date.now(),
-      level: 'info',
-      message: '正在使用 AI 生成工具...',
+      level: "info",
+      message: "正在使用 AI 生成工具...",
     });
 
     try {
-      const result = await sendToContentScript<{ success: boolean; tool?: { name: string }; error?: string }>({
-        type: 'AI_GENERATE_TOOL',
+      const result = await sendToContentScript<{
+        success: boolean;
+        tool?: { name: string };
+        error?: string;
+      }>({
+        type: "AI_GENERATE_TOOL",
         payload: { actions: recordedActions },
       });
 
       if (result.success && result.tool) {
         addLog({
           timestamp: Date.now(),
-          level: 'info',
+          level: "info",
           message: `工具生成成功: ${result.tool.name}`,
         });
       } else {
         addLog({
           timestamp: Date.now(),
-          level: 'error',
+          level: "error",
           message: `生成失败: ${result.error}`,
         });
       }
     } catch (error) {
       addLog({
         timestamp: Date.now(),
-        level: 'error',
+        level: "error",
         message: `AI 请求失败: ${error}`,
       });
     } finally {
@@ -234,7 +291,7 @@ export function RecordingPanel() {
       </div>
 
       {/* Recorded Actions */}
-      <ActionList 
+      <ActionList
         actions={recordedActions}
         isRecording={isRecording}
         onDelete={deleteRecordedAction}
@@ -265,8 +322,18 @@ export function RecordingPanel() {
               </>
             ) : (
               <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
                 </svg>
                 <span>AI 生成工具</span>
               </>
@@ -288,10 +355,21 @@ interface ActionListProps {
   onDelete: (id: string) => void;
   onUpdate: (id: string, updates: Partial<RecordedAction>) => void;
   onReorder: (actions: RecordedAction[]) => void;
-  onLog: (log: { timestamp: number; level: 'info' | 'error'; message: string }) => void;
+  onLog: (log: {
+    timestamp: number;
+    level: "info" | "error";
+    message: string;
+  }) => void;
 }
 
-function ActionList({ actions, isRecording, onDelete, onUpdate, onReorder, onLog }: ActionListProps) {
+function ActionList({
+  actions,
+  isRecording,
+  onDelete,
+  onUpdate,
+  onReorder,
+  onLog,
+}: ActionListProps) {
   if (actions.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto p-3">
@@ -332,10 +410,20 @@ interface ReorderableActionCardProps {
   index: number;
   onDelete: () => void;
   onUpdate: (updates: Partial<RecordedAction>) => void;
-  onLog: (log: { timestamp: number; level: 'info' | 'error'; message: string }) => void;
+  onLog: (log: {
+    timestamp: number;
+    level: "info" | "error";
+    message: string;
+  }) => void;
 }
 
-function ReorderableActionCard({ action, index, onDelete, onUpdate, onLog }: ReorderableActionCardProps) {
+function ReorderableActionCard({
+  action,
+  index,
+  onDelete,
+  onUpdate,
+  onLog,
+}: ReorderableActionCardProps) {
   const dragControls = useDragControls();
 
   return (
@@ -349,16 +437,16 @@ function ReorderableActionCard({ action, index, onDelete, onUpdate, onLog }: Reo
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ 
-        layout: { duration: 0.2, ease: 'easeOut' },
+      transition={{
+        layout: { duration: 0.2, ease: "easeOut" },
         opacity: { duration: 0.15 },
         scale: { duration: 0.15 },
       }}
-      whileDrag={{ 
-        scale: 1.02, 
-        boxShadow: '0 10px 30px -10px rgba(139, 92, 246, 0.3)',
+      whileDrag={{
+        scale: 1.02,
+        boxShadow: "0 10px 30px -10px rgba(139, 92, 246, 0.3)",
         zIndex: 50,
-        cursor: 'grabbing',
+        cursor: "grabbing",
       }}
       dragElastic={0}
     >
@@ -383,39 +471,75 @@ interface ActionCardProps {
   index: number;
   onDelete: () => void;
   onUpdate: (updates: Partial<RecordedAction>) => void;
-  onLog: (log: { timestamp: number; level: 'info' | 'error'; message: string }) => void;
+  onLog: (log: {
+    timestamp: number;
+    level: "info" | "error";
+    message: string;
+  }) => void;
   dragControls: ReturnType<typeof useDragControls>;
 }
 
 const actionIcons: Record<string, string> = {
-  click: '👆',
-  input: '⌨️',
-  select: '📋',
-  scroll: '📜',
+  click: "👆",
+  input: "⌨️",
+  select: "📋",
+  scroll: "📜",
+  navigate: "🌐",
 };
 
 /** Get default action name based on type (stable, doesn't change on reorder) */
 function getDefaultActionName(type: string): string {
   const names: Record<string, string> = {
-    click: '点击',
-    input: '输入',
-    select: '选择',
-    scroll: '滚动',
+    click: "点击",
+    input: "输入",
+    select: "选择",
+    scroll: "滚动",
+    navigate: "导航",
   };
-  return names[type] || '操作';
+  return names[type] || "操作";
 }
 
-function ActionCard({ 
-  action, 
-  index, 
-  onDelete, 
+/** Truncate URL for display */
+function truncateUrl(url: string, maxLength: number = 40): string {
+  if (!url || url.length <= maxLength) return url;
+  return url.slice(0, maxLength) + "...";
+}
+
+/** Get navigation type badge color */
+function getNavigationTypeColor(type: string): string {
+  const colors: Record<string, string> = {
+    link: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+    form: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    direct: "text-violet-400 bg-violet-500/10 border-violet-500/20",
+    reload: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20",
+    typed: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+  };
+  return colors[type] || colors.direct;
+}
+
+/** Get navigation type label */
+function getNavigationTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    link: "链接",
+    form: "表单",
+    direct: "跳转",
+    reload: "刷新",
+    typed: "输入",
+  };
+  return labels[type] || "跳转";
+}
+
+function ActionCard({
+  action,
+  index,
+  onDelete,
   onUpdate,
   onLog,
   dragControls,
 }: ActionCardProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [isEditingName, setIsEditingName] = React.useState(false);
-  
+
   // Default name based on action type (not index, so it doesn't change on reorder)
   const defaultName = getDefaultActionName(action.type);
   const [localName, setLocalName] = React.useState(action.name || defaultName);
@@ -443,28 +567,29 @@ function ActionCard({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleNameSubmit();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setLocalName(action.name || defaultName);
       setIsEditingName(false);
     }
   };
 
   return (
-    <div 
+    <div
       className={`
         group rounded-lg overflow-hidden
-        ${isExpanded 
-          ? 'bg-zinc-800/60 border border-violet-500/20 shadow-[0_0_15px_-3px_rgba(139,92,246,0.15)]' 
-          : 'bg-zinc-900/50 border border-white/5 hover:border-white/10'
+        ${
+          isExpanded
+            ? "bg-zinc-800/60 border border-violet-500/20 shadow-[0_0_15px_-3px_rgba(139,92,246,0.15)]"
+            : "bg-zinc-900/50 border border-white/5 hover:border-white/10"
         }
       `}
     >
       {/* Header - Always visible */}
       <div className="flex items-center gap-2 px-3 py-2.5">
         {/* Drag Handle - triggers Framer Motion drag */}
-        <div 
+        <div
           className="shrink-0 cursor-grab active:cursor-grabbing p-1 -ml-1 text-zinc-600 hover:text-zinc-400 transition-colors touch-none select-none"
           title="拖拽排序"
           onPointerDown={(e) => {
@@ -476,17 +601,49 @@ function ActionCard({
         </div>
 
         {/* Icon */}
-        <span className={`
+        <span
+          className={`
           shrink-0 w-6 h-6 flex items-center justify-center rounded text-xs
           transition-colors duration-200
-          ${isExpanded ? 'bg-violet-500/20' : 'bg-zinc-800'}
-        `}>
-          {actionIcons[action.type] || '•'}
+          ${isExpanded ? "bg-violet-500/20" : "bg-zinc-800"}
+        `}
+        >
+          {actionIcons[action.type] || "•"}
         </span>
 
         {/* Name - Editable */}
         <div className="flex-1 min-w-0">
-          {isEditingName ? (
+          {action.type === "navigate" ? (
+            // Navigation action: display URL instead of selector
+            <div className="flex flex-col gap-0.5">
+              <div
+                className="flex items-center gap-1.5 cursor-pointer group/name"
+                onClick={() => setIsEditingName(true)}
+              >
+                <span className="text-xs font-medium text-zinc-300 truncate">
+                  {localName}
+                </span>
+                <span className="text-zinc-600 opacity-0 group-hover/name:opacity-100 transition-opacity">
+                  <EditIcon />
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <code
+                  className="text-[9px] font-mono text-blue-300 truncate"
+                  title={action.url}
+                >
+                  🌐 {truncateUrl(action.url || "", 35)}
+                </code>
+                {action.navigationType && (
+                  <span
+                    className={`px-1 py-0.5 rounded text-[8px] border ${getNavigationTypeColor(action.navigationType)}`}
+                  >
+                    {getNavigationTypeLabel(action.navigationType)}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : isEditingName ? (
             <input
               ref={inputRef}
               type="text"
@@ -501,7 +658,7 @@ function ActionCard({
               "
             />
           ) : (
-            <div 
+            <div
               className="flex items-center gap-1.5 cursor-pointer group/name"
               onClick={() => setIsEditingName(true)}
             >
@@ -513,9 +670,11 @@ function ActionCard({
               </span>
             </div>
           )}
-          <code className="block text-[9px] font-mono text-zinc-600 truncate mt-0.5">
-            {action.elementAnalysis.minimalSelector}
-          </code>
+          {action.type !== "navigate" && (
+            <code className="block text-[9px] font-mono text-zinc-600 truncate mt-0.5">
+              {action.elementAnalysis?.minimalSelector || ""}
+            </code>
+          )}
         </div>
 
         {/* Action Badge */}
@@ -527,14 +686,17 @@ function ActionCard({
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="shrink-0 p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
-          title={isExpanded ? '收起' : '展开选择器配置'}
+          title={isExpanded ? "收起" : "展开选择器配置"}
         >
           <ChevronIcon expanded={isExpanded} />
         </button>
 
         {/* Delete Button */}
         <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
           className="shrink-0 p-1 text-zinc-600 hover:text-rose-400 transition-colors"
           title="删除"
         >
@@ -550,30 +712,132 @@ function ActionCard({
       {/* Expanded Content - Selector Configuration + Quick Actions */}
       {isExpanded && (
         <div className="px-3 pb-3 pt-1 space-y-2.5 animate-fade-in border-t border-white/5">
-          {/* Input Value (if applicable) */}
-          {action.value && (
-            <div className="flex items-center gap-2 text-[10px] p-2 rounded bg-violet-500/5 border border-violet-500/10">
-              <span className="text-zinc-500">输入值:</span>
-              <code className="text-violet-400 font-mono">"{action.value}"</code>
-            </div>
-          )}
+          {action.type === "navigate" ? (
+            // Navigation action: show URL and test button
+            <>
+              <div className="p-2 rounded bg-zinc-900/80 border border-blue-500/20">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[9px] font-medium text-blue-400">
+                    URL
+                  </span>
+                </div>
+                <code className="block text-[10px] font-mono text-zinc-300 break-all leading-relaxed">
+                  {action.url}
+                </code>
+              </div>
 
-          {/* Quick Action Panel - Test recorded action */}
-          <QuickActionPanel
-            analysis={action.elementAnalysis}
-            selectorDraft={action.selectorDraft}
-            unifiedSelector={action.unifiedSelector}
-            onLog={onLog}
-            compact
-          />
+              {/* Navigation Test Actions */}
+              <div className="flex gap-1.5">
+                <button
+                  onClick={async () => {
+                    if (!action.url) return;
+                    onLog({
+                      timestamp: Date.now(),
+                      level: "info",
+                      message: `正在跳转到: ${truncateUrl(action.url, 30)}`,
+                    });
+                    try {
+                      const result = await chrome.runtime.sendMessage({
+                        type: "EXECUTE_NAVIGATE",
+                        payload: { url: action.url, newTab: false },
+                      });
+                      if (result.success) {
+                        onLog({
+                          timestamp: Date.now(),
+                          level: "info",
+                          message: "跳转成功",
+                        });
+                      } else {
+                        onLog({
+                          timestamp: Date.now(),
+                          level: "error",
+                          message: `跳转失败: ${result.error}`,
+                        });
+                      }
+                    } catch (error) {
+                      onLog({
+                        timestamp: Date.now(),
+                        level: "error",
+                        message: `跳转错误: ${error}`,
+                      });
+                    }
+                  }}
+                  className="flex-1 h-7 flex items-center justify-center gap-1 px-2 rounded text-[10px] font-medium bg-blue-600/20 text-blue-400 border border-blue-500/20 hover:bg-blue-600/30 transition-colors"
+                >
+                  <span>🔄</span>
+                  <span>当前标签页跳转</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!action.url) return;
+                    onLog({
+                      timestamp: Date.now(),
+                      level: "info",
+                      message: `正在新标签页打开: ${truncateUrl(action.url, 30)}`,
+                    });
+                    try {
+                      const result = await chrome.runtime.sendMessage({
+                        type: "EXECUTE_NAVIGATE",
+                        payload: { url: action.url, newTab: true },
+                      });
+                      if (result.success) {
+                        onLog({
+                          timestamp: Date.now(),
+                          level: "info",
+                          message: "新标签页已打开",
+                        });
+                      } else {
+                        onLog({
+                          timestamp: Date.now(),
+                          level: "error",
+                          message: `打开失败: ${result.error}`,
+                        });
+                      }
+                    } catch (error) {
+                      onLog({
+                        timestamp: Date.now(),
+                        level: "error",
+                        message: `错误: ${error}`,
+                      });
+                    }
+                  }}
+                  className="flex-1 h-7 flex items-center justify-center gap-1 px-2 rounded text-[10px] font-medium bg-violet-600/20 text-violet-400 border border-violet-500/20 hover:bg-violet-600/30 transition-colors"
+                >
+                  <span>🔗</span>
+                  <span>新标签页打开</span>
+                </button>
+              </div>
+            </>
+          ) : action.elementAnalysis ? (
+            <>
+              {/* Input Value (if applicable) */}
+              {action.value && (
+                <div className="flex items-center gap-2 text-[10px] p-2 rounded bg-violet-500/5 border border-violet-500/10">
+                  <span className="text-zinc-500">输入值:</span>
+                  <code className="text-violet-400 font-mono">
+                    "{action.value}"
+                  </code>
+                </div>
+              )}
 
-          {/* Selector Logic Editor */}
-          <SelectorEditor 
-            analysis={action.elementAnalysis}
-            draft={action.selectorDraft}
-            unifiedSelector={action.unifiedSelector}
-            onChange={(draft) => onUpdate({ selectorDraft: draft })}
-          />
+              {/* Quick Action Panel - Test recorded action */}
+              <QuickActionPanel
+                analysis={action.elementAnalysis}
+                selectorDraft={action.selectorDraft}
+                unifiedSelector={action.unifiedSelector}
+                onLog={onLog}
+                compact
+              />
+
+              {/* Selector Logic Editor */}
+              <SelectorEditor
+                analysis={action.elementAnalysis}
+                draft={action.selectorDraft}
+                unifiedSelector={action.unifiedSelector}
+                onChange={(draft) => onUpdate({ selectorDraft: draft })}
+              />
+            </>
+          ) : null}
         </div>
       )}
     </div>
@@ -591,68 +855,81 @@ interface SelectorEditorProps {
   onChange: (draft: SelectorDraft) => void;
 }
 
-function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: SelectorEditorProps) {
+function SelectorEditor({
+  analysis,
+  draft,
+  unifiedSelector,
+  onChange,
+}: SelectorEditorProps) {
   // Initialize draft from UnifiedSelector, existing draft, or analysis
   const [localDraft, setLocalDraft] = React.useState<SelectorDraft>(() => {
     if (draft) return draft;
-    
+
     // If we have a UnifiedSelector with structureData, use it
     if (unifiedSelector?.structureData) {
       const { scope, anchor, target } = unifiedSelector.structureData;
       return {
         scope: {
           selector: scope.selector,
-          type: 'container_list',
+          type: "container_list",
           matchCount: 0,
         },
-        anchor: anchor ? {
-          selector: anchor.selector,
-          type: 'text_match' as const, // Use SelectorDraft anchor type
-          value: anchor.value || '',
-          matchMode: anchor.matchMode || 'contains',
-        } : undefined,
+        anchor: anchor
+          ? {
+              selector: anchor.selector,
+              type: "text_match" as const, // Use SelectorDraft anchor type
+              value: anchor.value || "",
+              matchMode: anchor.matchMode || "contains",
+            }
+          : undefined,
         target: {
           selector: target.selector,
-          action: 'CLICK',
+          action: "CLICK",
         },
         confidence: unifiedSelector.confidence,
         validated: false,
       };
     }
-    
+
     // If UnifiedSelector has pathData, create minimal draft
     if (unifiedSelector?.pathData) {
       return {
         target: {
           selector: unifiedSelector.fullSelector,
-          action: 'CLICK',
+          action: "CLICK",
         },
         confidence: unifiedSelector.confidence,
         validated: false,
       };
     }
-    
+
     // Build initial draft from element analysis
-    // Note: Use serializable fields (containerSelector, containerTagName) 
+    // Note: Use serializable fields (containerSelector, containerTagName)
     // because HTMLElement objects cannot be serialized through Chrome messaging
     const firstAnchor = analysis.anchorCandidates?.[0];
-    const hasContainer = analysis.containerSelector || analysis.containerTagName;
-    
+    const hasContainer =
+      analysis.containerSelector || analysis.containerTagName;
+
     return {
-      scope: hasContainer ? {
-        selector: analysis.containerSelector || analysis.containerTagName || '',
-        type: 'container_list',
-        matchCount: 0,
-      } : undefined,
-      anchor: firstAnchor ? {
-        selector: firstAnchor.selector,
-        type: firstAnchor.type,
-        value: firstAnchor.text || firstAnchor.attribute?.value || '',
-        matchMode: 'contains' as const,
-      } : undefined,
+      scope: hasContainer
+        ? {
+            selector:
+              analysis.containerSelector || analysis.containerTagName || "",
+            type: "container_list",
+            matchCount: 0,
+          }
+        : undefined,
+      anchor: firstAnchor
+        ? {
+            selector: firstAnchor.selector,
+            type: firstAnchor.type,
+            value: firstAnchor.text || firstAnchor.attribute?.value || "",
+            matchMode: "contains" as const,
+          }
+        : undefined,
       target: {
         selector: analysis.relativeSelector || analysis.minimalSelector,
-        action: 'CLICK',
+        action: "CLICK",
       },
       confidence: 0.8,
       validated: false,
@@ -660,10 +937,13 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
   });
 
   // Notify parent of changes
-  const handleDraftChange = React.useCallback((newDraft: SelectorDraft) => {
-    setLocalDraft(newDraft);
-    onChange(newDraft);
-  }, [onChange]);
+  const handleDraftChange = React.useCallback(
+    (newDraft: SelectorDraft) => {
+      setLocalDraft(newDraft);
+      onChange(newDraft);
+    },
+    [onChange],
+  );
 
   const handleApplyAnchor = (candidate: AnchorCandidate) => {
     handleDraftChange({
@@ -671,8 +951,8 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
       anchor: {
         selector: candidate.selector,
         type: candidate.type,
-        value: candidate.text || candidate.attribute?.value || '',
-        matchMode: 'contains' as const,
+        value: candidate.text || candidate.attribute?.value || "",
+        matchMode: "contains" as const,
       },
     });
   };
@@ -686,10 +966,12 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
           sublabel="容器作用域"
           color="blue"
           value={localDraft.scope.selector}
-          onChange={(value) => handleDraftChange({
-            ...localDraft,
-            scope: { ...localDraft.scope!, selector: value },
-          })}
+          onChange={(value) =>
+            handleDraftChange({
+              ...localDraft,
+              scope: { ...localDraft.scope!, selector: value },
+            })
+          }
         />
       )}
 
@@ -697,7 +979,9 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
       {localDraft.anchor && (
         <div className="p-2 rounded bg-zinc-900/80 border border-emerald-500/20">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[9px] font-medium text-emerald-400">ANCHOR</span>
+            <span className="text-[9px] font-medium text-emerald-400">
+              ANCHOR
+            </span>
             <span className="text-[8px] text-zinc-600">定位锚点</span>
           </div>
           <div className="space-y-1.5">
@@ -705,10 +989,12 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
             <input
               type="text"
               value={localDraft.anchor.selector}
-              onChange={(e) => handleDraftChange({
-                ...localDraft,
-                anchor: { ...localDraft.anchor!, selector: e.target.value },
-              })}
+              onChange={(e) =>
+                handleDraftChange({
+                  ...localDraft,
+                  anchor: { ...localDraft.anchor!, selector: e.target.value },
+                })
+              }
               placeholder="选择器"
               className="
                 w-full h-6 px-1.5 text-[10px] font-mono
@@ -723,10 +1009,12 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
               <input
                 type="text"
                 value={localDraft.anchor.value}
-                onChange={(e) => handleDraftChange({
-                  ...localDraft,
-                  anchor: { ...localDraft.anchor!, value: e.target.value },
-                })}
+                onChange={(e) =>
+                  handleDraftChange({
+                    ...localDraft,
+                    anchor: { ...localDraft.anchor!, value: e.target.value },
+                  })
+                }
                 placeholder="匹配值 (支持 {{变量}})"
                 className="
                   flex-1 h-6 px-1.5 text-[10px] font-mono
@@ -738,10 +1026,19 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
               />
               <select
                 value={localDraft.anchor.matchMode}
-                onChange={(e) => handleDraftChange({
-                  ...localDraft,
-                  anchor: { ...localDraft.anchor!, matchMode: e.target.value as 'contains' | 'exact' | 'startsWith' | 'endsWith' },
-                })}
+                onChange={(e) =>
+                  handleDraftChange({
+                    ...localDraft,
+                    anchor: {
+                      ...localDraft.anchor!,
+                      matchMode: e.target.value as
+                        | "contains"
+                        | "exact"
+                        | "startsWith"
+                        | "endsWith",
+                    },
+                  })
+                }
                 className="
                   w-16 h-6 px-1 text-[9px]
                   bg-black/40 border border-zinc-800 rounded
@@ -766,10 +1063,12 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
         sublabel="操作目标"
         color="violet"
         value={localDraft.target.selector}
-        onChange={(value) => handleDraftChange({
-          ...localDraft,
-          target: { ...localDraft.target, selector: value },
-        })}
+        onChange={(value) =>
+          handleDraftChange({
+            ...localDraft,
+            target: { ...localDraft.target, selector: value },
+          })
+        }
       />
 
       {/* Anchor Candidates */}
@@ -778,9 +1077,13 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
           <p className="text-[9px] text-zinc-600 mb-1.5">可用锚点候选:</p>
           <div className="flex flex-wrap gap-1">
             {analysis.anchorCandidates.slice(0, 4).map((candidate, i) => {
-              const displayText = candidate.text || candidate.attribute?.value || '';
-              const truncated = displayText.length > 15 ? displayText.slice(0, 15) + '...' : displayText;
-              
+              const displayText =
+                candidate.text || candidate.attribute?.value || "";
+              const truncated =
+                displayText.length > 15
+                  ? displayText.slice(0, 15) + "..."
+                  : displayText;
+
               return (
                 <button
                   key={i}
@@ -811,22 +1114,28 @@ function SelectorEditor({ analysis, draft, unifiedSelector, onChange }: Selector
 interface SelectorSectionProps {
   label: string;
   sublabel: string;
-  color: 'blue' | 'violet';
+  color: "blue" | "violet";
   value: string;
   onChange: (value: string) => void;
 }
 
-function SelectorSection({ label, sublabel, color, value, onChange }: SelectorSectionProps) {
+function SelectorSection({
+  label,
+  sublabel,
+  color,
+  value,
+  onChange,
+}: SelectorSectionProps) {
   const colorStyles = {
     blue: {
-      border: 'border-blue-500/20',
-      text: 'text-blue-400',
-      focus: 'focus:border-blue-500/50',
+      border: "border-blue-500/20",
+      text: "text-blue-400",
+      focus: "focus:border-blue-500/50",
     },
     violet: {
-      border: 'border-violet-500/20',
-      text: 'text-violet-400',
-      focus: 'focus:border-violet-500/50',
+      border: "border-violet-500/20",
+      text: "text-violet-400",
+      focus: "focus:border-violet-500/50",
     },
   };
 
@@ -854,7 +1163,6 @@ function SelectorSection({ label, sublabel, color, value, onChange }: SelectorSe
   );
 }
 
-
 // =============================================================================
 // EMPTY STATE
 // =============================================================================
@@ -862,27 +1170,40 @@ function SelectorSection({ label, sublabel, color, value, onChange }: SelectorSe
 function EmptyState({ isRecording }: { isRecording: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center py-8">
-      <div className={`
+      <div
+        className={`
         w-12 h-12 rounded-full border flex items-center justify-center mb-3
         transition-colors duration-300
-        ${isRecording 
-          ? 'bg-rose-500/10 border-rose-500/30' 
-          : 'bg-zinc-900 border-white/5'
+        ${
+          isRecording
+            ? "bg-rose-500/10 border-rose-500/30"
+            : "bg-zinc-900 border-white/5"
         }
-      `}>
+      `}
+      >
         {isRecording ? (
           <div className="w-4 h-4 rounded-full bg-rose-500 animate-pulse" />
         ) : (
-          <svg className="w-6 h-6 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <svg
+            className="w-6 h-6 text-zinc-600"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
           </svg>
         )}
       </div>
       <p className="text-xs text-zinc-500">
-        {isRecording ? '正在录制操作...' : '点击"开始录制"'}
+        {isRecording ? "正在录制操作..." : '点击"开始录制"'}
       </p>
       <p className="text-[10px] text-zinc-600 mt-1">
-        {isRecording ? '在页面上执行操作' : '录制你的页面操作'}
+        {isRecording ? "在页面上执行操作" : "录制你的页面操作"}
       </p>
     </div>
   );

@@ -1,21 +1,16 @@
 /**
  * =============================================================================
- * Homura Constants (Compatibility Layer)
+ * Homura Extension-Specific Constants
  * =============================================================================
  *
- * This file now re-exports constants from @homura/sdk for backward compatibility.
- * New code should import directly from @homura/sdk.
+ * This file contains constants that are specific to the Chrome Extension.
+ * For SDK constants, import directly from @homura/sdk/constants.
+ *
+ * Constants previously here have been moved to the SDK:
+ * - HIGHLIGHT_COLORS -> @homura/sdk/constants
+ * - Selector constants -> @homura/sdk/constants
+ * =============================================================================
  */
-
-// Re-export all constants from SDK
-export * from "@homura/sdk/constants";
-
-// =============================================================================
-// EXTENSION-SPECIFIC CONSTANTS
-// =============================================================================
-//
-// Constants that are specific to the Chrome Extension and not part of the SDK.
-// =============================================================================
 
 /** Storage keys for extension state */
 export const STORAGE_KEYS = {

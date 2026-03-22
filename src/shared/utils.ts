@@ -1,21 +1,17 @@
 /**
  * =============================================================================
- * Homura Utility Functions (Compatibility Layer)
+ * Homura Extension-Specific Utility Functions
  * =============================================================================
  *
- * This file now re-exports utilities from @homura/sdk for backward compatibility.
- * New code should import directly from @homura/sdk/utils.
+ * This file contains utility functions that are specific to the Chrome Extension.
+ * For SDK utilities, import directly from @homura/sdk/utils.
+ *
+ * Utilities previously here have been moved to the SDK:
+ * - Text utilities -> @homura/sdk/utils
+ * - DOM utilities -> @homura/sdk/utils
+ * - Async utilities -> @homura/sdk/utils
+ * =============================================================================
  */
-
-// Re-export all utilities from SDK
-export * from "@homura/sdk/utils";
-
-// =============================================================================
-// EXTENSION-SPECIFIC UTILITIES
-// =============================================================================
-//
-// Utilities that are specific to the Chrome Extension and not part of the SDK.
-// =============================================================================
 
 /**
  * Chrome Extension message passing utility

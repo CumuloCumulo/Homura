@@ -2,12 +2,17 @@
  * =============================================================================
  * Homura - AI Service Types
  * =============================================================================
- * 
+ *
  * Type definitions for AI service integration (通义 API)
  */
 
-import type { AtomicTool, SelectorLogic } from '@shared/types';
-import type { AncestorInfo, AnchorCandidate, ContainerType, PathSelector } from '@shared/selectorBuilder';
+import type { AtomicTool, SelectorLogic } from "@homura/sdk/types";
+import type {
+  AncestorInfo,
+  AnchorCandidate,
+  ContainerType,
+  PathSelector,
+} from "@shared/selectorBuilder/types";
 
 // =============================================================================
 // AI CLIENT TYPES
@@ -23,7 +28,7 @@ export interface AIClientConfig {
 }
 
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: "system" | "user" | "assistant";
   content: string;
 }
 
@@ -128,7 +133,7 @@ export interface SmartSelectorContext {
  */
 export interface SmartSelectorResult {
   /** Strategy used for generation */
-  strategy: 'path_selector' | 'scope_anchor_target';
+  strategy: "path_selector" | "scope_anchor_target";
   /** Path selector result (if strategy is 'path_selector') */
   pathSelector?: PathSelector;
   /** Selector logic result (if strategy is 'scope_anchor_target') */
@@ -145,7 +150,7 @@ export interface SmartSelectorResult {
 
 export interface RecordingAction {
   /** Action type */
-  type: 'click' | 'input' | 'navigate' | 'scroll';
+  type: "click" | "input" | "navigate" | "scroll";
   /** Target element selector */
   selector: string;
   /** Target element HTML */

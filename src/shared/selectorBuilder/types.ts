@@ -2,11 +2,15 @@
  * =============================================================================
  * Homura - Selector Builder Types
  * =============================================================================
- * 
+ *
  * Type definitions for the selector builder module
  */
 
-import type { SelectorScope, SelectorAnchor, UnifiedSelector } from '@shared/types';
+import type {
+  SelectorScope,
+  SelectorAnchor,
+  UnifiedSelector,
+} from "@homura/sdk/types";
 
 // =============================================================================
 // ELEMENT ANALYSIS
@@ -25,12 +29,12 @@ export interface ElementAnalysis {
   anchorCandidates: AnchorCandidate[];
   /** Target selector relative to container */
   relativeSelector: string;
-  /** 
+  /**
    * Minimal selector for target (now includes container prefix when available)
    * @example ".search-bar button" instead of just "button"
    */
   minimalSelector: string;
-  /** 
+  /**
    * Target-only selector (without container prefix)
    * @example "button"
    */
@@ -45,17 +49,17 @@ export interface ElementAnalysis {
   containerSelector?: string;
   /** Container tag name (serializable) */
   containerTagName?: string;
-  
+
   // =========================================================================
   // PATH-BASED SELECTOR (New)
   // =========================================================================
-  
+
   /**
    * Ancestor path from target element upward to semantic root
    * Used for AI-assisted selector generation
    */
   ancestorPath?: AncestorInfo[];
-  
+
   /**
    * Path-based selector generated from ancestor analysis
    * @example ".official-header .section input.input-inner"
@@ -90,18 +94,18 @@ export interface AncestorInfo {
   isSemanticRoot: boolean;
 }
 
-export type ContainerType = 
-  | 'table'    // Table row (tr)
-  | 'list'     // List item (li, ol, ul)
-  | 'grid'     // Grid/flex item
-  | 'card'     // Card container
-  | 'single';  // No repeating container
+export type ContainerType =
+  | "table" // Table row (tr)
+  | "list" // List item (li, ol, ul)
+  | "grid" // Grid/flex item
+  | "card" // Card container
+  | "single"; // No repeating container
 
 export interface AnchorCandidate {
   /** CSS selector within container */
   selector: string;
   /** Anchor type */
-  type: 'text_match' | 'attribute_match';
+  type: "text_match" | "attribute_match";
   /** Text content (for text_match) */
   text?: string;
   /** Attribute info (for attribute_match) */
@@ -109,12 +113,12 @@ export interface AnchorCandidate {
     name: string;
     value: string;
   };
-  /** 
+  /**
    * Confidence score (0-1)
    * Adjusted by entropy analysis: unique values get boosted, repeated values get penalized
    */
   confidence: number;
-  /** 
+  /**
    * Is this anchor unique across all sibling containers?
    * true = appears only in current row (HIGH entropy, BEST anchor)
    * false = appears in multiple rows (LOW entropy, POOR anchor)
@@ -163,15 +167,15 @@ export interface SelectorDraft {
   /** Scope configuration */
   scope?: {
     selector: string;
-    type: SelectorScope['type'];
+    type: SelectorScope["type"];
     matchCount: number;
   };
   /** Anchor configuration */
   anchor?: {
     selector: string;
-    type: SelectorAnchor['type'];
+    type: SelectorAnchor["type"];
     value: string;
-    matchMode: SelectorAnchor['matchMode'];
+    matchMode: SelectorAnchor["matchMode"];
   };
   /** Target configuration */
   target: {
@@ -222,26 +226,35 @@ export interface RecordingState {
   recordedActions: RecordedAction[];
 }
 
+/**
+ * Navigation type for recorded actions
+ */
+export type NavigationType = "link" | "form" | "direct" | "reload" | "typed";
+
 export interface RecordedAction {
   /** Unique identifier */
   id: string;
   /** User-defined name for this action */
   name?: string;
   /** Action type */
-  type: 'click' | 'input' | 'select' | 'scroll';
+  type: "click" | "input" | "select" | "scroll" | "navigate";
   /** Timestamp */
   timestamp: number;
-  /** Target element analysis */
-  elementAnalysis: ElementAnalysis;
+  /** Target element analysis (not present for navigate actions) */
+  elementAnalysis?: ElementAnalysis;
   /** Input value (for input actions) */
   value?: string;
   /** Screenshot data URL (optional) */
   screenshot?: string;
   /** User-edited selector draft @deprecated Use unifiedSelector instead */
   selectorDraft?: SelectorDraft;
-  /** 
+  /**
    * Unified selector - automatically generated during recording
    * Contains both Path and Structure strategy data for execution
    */
   unifiedSelector?: UnifiedSelector;
+  /** Navigate action: target URL */
+  url?: string;
+  /** Navigate action: navigation type */
+  navigationType?: NavigationType;
 }

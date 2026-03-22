@@ -2,13 +2,14 @@
  * =============================================================================
  * Homura Dashboard - Tool Store
  * =============================================================================
- * 
+ *
  * State management for tool library
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { AtomicTool, LogEntry, Mission } from '@shared/types';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { AtomicTool } from "@homura/sdk/types";
+import type { LogEntry, Mission } from "@shared/types";
 
 interface ToolStore {
   /** All tools in the library */
@@ -23,7 +24,7 @@ interface ToolStore {
   logs: LogEntry[];
   /** Is mission running */
   isRunning: boolean;
-  
+
   // Actions
   addTool: (tool: AtomicTool) => void;
   updateTool: (toolId: string, updates: Partial<AtomicTool>) => void;
@@ -61,20 +62,24 @@ export const useToolStore = create<ToolStore>()(
       logs: [],
       isRunning: false,
 
-      addTool: (tool) => set((state) => ({
-        tools: [...state.tools, tool],
-      })),
+      addTool: (tool) =>
+        set((state) => ({
+          tools: [...state.tools, tool],
+        })),
 
-      updateTool: (toolId, updates) => set((state) => ({
-        tools: state.tools.map(t => 
-          t.tool_id === toolId ? { ...t, ...updates } : t
-        ),
-      })),
+      updateTool: (toolId, updates) =>
+        set((state) => ({
+          tools: state.tools.map((t) =>
+            t.tool_id === toolId ? { ...t, ...updates } : t,
+          ),
+        })),
 
-      removeTool: (toolId) => set((state) => ({
-        tools: state.tools.filter(t => t.tool_id !== toolId),
-        selectedTool: state.selectedTool?.tool_id === toolId ? null : state.selectedTool,
-      })),
+      removeTool: (toolId) =>
+        set((state) => ({
+          tools: state.tools.filter((t) => t.tool_id !== toolId),
+          selectedTool:
+            state.selectedTool?.tool_id === toolId ? null : state.selectedTool,
+        })),
 
       selectTool: (tool) => set({ selectedTool: tool }),
 
@@ -82,20 +87,21 @@ export const useToolStore = create<ToolStore>()(
 
       setMission: (mission) => set({ currentMission: mission }),
 
-      addLog: (log) => set((state) => ({
-        logs: [...state.logs, log],
-      })),
+      addLog: (log) =>
+        set((state) => ({
+          logs: [...state.logs, log],
+        })),
 
       clearLogs: () => set({ logs: [] }),
 
       setRunning: (running) => set({ isRunning: running }),
     }),
     {
-      name: 'homura-tool-store',
+      name: "homura-tool-store",
       partialize: (state) => ({
         tools: state.tools,
         ruleBook: state.ruleBook,
       }),
-    }
-  )
+    },
+  ),
 );

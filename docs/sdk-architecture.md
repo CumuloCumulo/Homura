@@ -2,7 +2,7 @@
 
 > 🎯 **Goal**: Extract Homura's core capabilities into a reusable SDK for building browser automation tools.
 
-> ✅ **Status**: Phase 1 Complete — SDK extracted and functional
+> ✅ **Status**: Phase 2 Complete — SDK extracted, compatibility layer removed, migration complete
 
 ---
 
@@ -225,23 +225,89 @@ const result = await executeTool(tool, { student_name: '张三' });
 
 ---
 
-## 🚀 Usage in Extension
+## 🔄 Import Architecture (v2.0)
 
-The Homura extension uses a **compatibility layer** to maintain backward compatibility:
+### SDK Types/Functions — Direct Import from SDK
 
 ```typescript
-// src/shared/selectorBuilder/index.ts
-export * from '@homura/sdk/selector';
+// Types
+import type {
+  PrimitiveAction,
+  UnifiedSelector,
+  SelectorLogic,
+  AtomicTool,
+  ExecuteToolRequest,
+  ExecuteToolResult
+} from '@homura/sdk/types';
 
-// Extension-specific types remain here
-export interface RecordingState { ... }
-export interface RecordedAction { ... }
+// Selector functions
+import {
+  analyzeElement,
+  createUnifiedSelector,
+  validateSelectorDraft,
+  determineStrategy
+} from '@homura/sdk/selector';
+
+// Primitives
+import {
+  executeClick,
+  executeInput,
+  executeExtractText
+} from '@homura/sdk/primitives';
+
+// Executor
+import { executeTool } from '@homura/sdk/executor';
+
+// Utils
+import {
+  generateMessageId,
+  sleep,
+  substituteVariables
+} from '@homura/sdk/utils';
+
+// Constants
+import { HIGHLIGHT_COLORS, TIMEOUTS } from '@homura/sdk/constants';
 ```
 
-This means:
-- Existing code continues to work with old imports
-- New code can import directly from `@homura/sdk`
-- Extension-specific features stay in the extension
+### Extension-Specific Types — Import from @shared
+
+```typescript
+// Messaging types (Chrome extension specific)
+import type {
+  MessageType,
+  Message,
+  HomuraMessage,
+  ExecuteToolMessage,
+  ExecutionResultMessage
+} from '@shared/types';
+
+// Chrome extension utilities
+import {
+  sendMessageToContent,
+  getActiveTab
+} from '@shared/utils';
+
+// Extension constants
+import {
+  STORAGE_KEYS,
+  EXTENSION_IDS
+} from '@shared/constants';
+
+// Recording state types
+import type {
+  RecordingState,
+  RecordedAction
+} from '@shared/selectorBuilder';
+```
+
+### Why This Architecture?
+
+| Aspect | SDK (`@homura/sdk`) | Shared (`@shared/*`) |
+|--------|---------------------|---------------------|
+| **Purpose** | Reusable automation logic | Chrome Extension specifics |
+| **Environment** | Any browser | Chrome Extension API |
+| **Dependencies** | Zero runtime deps | Chrome types, messaging |
+| **Use Case** | Custom plugins, standalone scripts | Main extension only |
 
 ---
 
@@ -259,17 +325,59 @@ This means:
 - [x] Create compatibility layer in main extension
 - [x] Update build scripts
 
-### 📋 Phase 2: AI Agent (Planned)
+### ✅ Phase 2: Compatibility Layer Removal (Complete)
+
+- [x] Refactor `src/shared/types.ts` — remove SDK re-exports
+- [x] Refactor `src/shared/utils.ts` — remove SDK re-exports
+- [x] Refactor `src/shared/constants.ts` — remove SDK re-exports
+- [x] Refactor `src/shared/selectorBuilder/index.ts` — remove SDK re-exports
+- [x] Update 23+ files to import directly from SDK
+- [x] Fix `src/shared/index.ts` to re-export from SDK for convenience
+- [x] Add helper exports to SDK selector module
+- [x] TypeScript compilation passes
+- [x] Build succeeds
+
+### 📋 Phase 3: AI Agent (Planned)
 
 - [ ] Implement `AIAgent` class
 - [ ] Implement Rule Book parser
 - [ ] Implement LLM dispatcher
 
-### 📋 Phase 3: Advanced Features (Planned)
+### 📋 Phase 4: Advanced Features (Planned)
 
 - [ ] Self-healing selectors
 - [ ] Automatic selector repair
 - [ ] Blueprint export/import
+
+---
+
+## 🛠️ Development Workflow
+
+### Building the SDK
+
+```bash
+# From packages/sdk/
+npm run build          # Compile TypeScript
+npm run dev            # Watch mode
+npm run typecheck      # Type check only
+npm run clean          # Remove dist/
+```
+
+### Building the Extension
+
+```bash
+# From root
+npm run build:sdk          # Build SDK only
+npm run build:extension    # Build extension (includes SDK)
+npm run build              # Full build
+```
+
+### Testing
+
+After building, load the extension:
+1. Open `chrome://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked" → Select `dist` folder
 
 ---
 

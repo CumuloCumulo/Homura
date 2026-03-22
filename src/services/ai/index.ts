@@ -2,17 +2,17 @@
  * =============================================================================
  * Homura - AI Service Module
  * =============================================================================
- * 
+ *
  * Unified export for AI service functionality
  */
 
 // Client
-export { 
-  TongyiClient, 
-  initAIClient, 
-  getAIClient, 
-  isAIClientInitialized 
-} from './client';
+export {
+  TongyiClient,
+  initAIClient,
+  getAIClient,
+  isAIClientInitialized,
+} from "./client";
 
 // Types
 export type {
@@ -31,7 +31,7 @@ export type {
   // Smart selector types (unified entry point)
   SmartSelectorContext,
   SmartSelectorResult,
-} from './types';
+} from "./types";
 
 // Re-export shared types for convenience
 export type {
@@ -39,7 +39,7 @@ export type {
   PathSelector,
   ContainerType,
   AnchorCandidate,
-} from '@shared/selectorBuilder';
+} from "@shared/selectorBuilder/types";
 
 // Prompts (for customization)
 export {
@@ -49,22 +49,19 @@ export {
   // Path selector prompt (new)
   PATH_SELECTOR_SYSTEM_PROMPT,
   buildPathSelectorPrompt,
-} from './prompts';
+} from "./prompts";
 
 // Tools (new)
 export {
   PATH_SELECTOR_TOOL,
   SCOPE_ANCHOR_TARGET_TOOL,
   AI_TOOLS,
-} from './tools';
+} from "./tools";
 
 export type {
   PathSelectorToolResult,
   ScopeAnchorTargetToolResult,
-} from './tools';
+} from "./tools";
 
 // Smart Router
-export {
-  shouldUseScopeAnchorTarget,
-  getDecisionReason,
-} from './smartRouter';
+export { shouldUseScopeAnchorTarget, getDecisionReason } from "./smartRouter";

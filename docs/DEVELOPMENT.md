@@ -93,6 +93,15 @@ homura/
 | Utils | `@homura/sdk/utils` | 工具函数 |
 | Constants | `@homura/sdk/constants` | 共享常量 |
 
+### Shared 模块说明（扩展特定）
+
+| 模块 | 路径 | 说明 |
+|------|------|------|
+| Types | `@shared/types` | Chrome 扩展消息类型 |
+| Utils | `@shared/utils` | Chrome 扩展工具函数（sendMessageToContent, getActiveTab） |
+| Constants | `@shared/constants` | 扩展常量（STORAGE_KEYS, EXTENSION_IDS） |
+| SelectorBuilder | `@shared/selectorBuilder` | 录制状态类型（RecordingState, RecordedAction） |
+
 ---
 
 ## 🚀 构建与开发
@@ -129,6 +138,255 @@ npm run typecheck
 
 # 清理构建产物
 npm run clean
+```
+
+---
+
+## 📖 SDK 使用规范
+
+### 导入规则
+
+**核心原则**: SDK 导入与扩展特定导入分离
+
+```typescript
+// ✅ 正确：SDK 功能直接从 @homura/sdk 导入
+import type { UnifiedSelector, AtomicTool } from '@homura/sdk/types';
+import { analyzeElement, createUnifiedSelector } from '@homura/sdk/selector';
+import { executeClick } from '@homura/sdk/primitives';
+import { executeTool } from '@homura/sdk/executor';
+import { generateMessageId } from '@homura/sdk/utils';
+import { HIGHLIGHT_COLORS } from '@homura/sdk/constants';
+
+// ✅ 正确：扩展特定功能从 @shared 导入
+import type { HomuraMessage, MessageType } from '@shared/types';
+import { sendMessageToContent, getActiveTab } from '@shared/utils';
+import { STORAGE_KEYS, EXTENSION_IDS } from '@shared/constants';
+import type { RecordingState, RecordedAction } from '@shared/selectorBuilder';
+
+// ❌ 错误：不要从 @shared 导入 SDK 功能
+import type { UnifiedSelector } from '@shared/types'; // 已废弃
+```
+
+### 常用 SDK 函数
+
+#### 元素分析
+
+```typescript
+import { analyzeElement } from '@homura/sdk/selector';
+
+const element = document.querySelector('button');
+const analysis = analyzeElement(element);
+
+// analysis 包含：
+// - minimalSelector: 最简选择器
+// - targetSelector: 目标选择器
+// - containerType: 'table' | 'list' | 'grid' | 'card' | 'single'
+// - anchorCandidates: 锚点候选数组
+// - ancestorPath: 祖先路径（带语义评分）
+```
+
+#### 选择器生成
+
+```typescript
+import { createUnifiedSelector, determineStrategy } from '@homura/sdk/selector';
+
+// 自动检测最佳策略
+const strategy = determineStrategy(analysis);
+// 返回: 'path' | 'scope_anchor_target' | 'direct'
+
+// 创建统一选择器
+const unified = createUnifiedSelector(analysis, 'CLICK');
+// unified.strategy: 'path' | 'scope_anchor_target'
+// unified.pathData: 路径策略数据
+// unified.structureData: 结构策略数据（scope + anchor + target）
+```
+
+#### 选择器验证
+
+```typescript
+import { validateSelectorDraft, countMatches } from '@homura/sdk/selector';
+
+// 验证选择器
+const result = validateSelectorDraft(draft);
+// { valid: boolean, matchCount: number, error?: string }
+
+// 计算匹配数量
+const count = countMatches('button.submit');
+```
+
+#### 执行原子操作
+
+```typescript
+import { executeClick, executeInput } from '@homura/sdk/primitives';
+
+// 点击元素
+await executeClick(element, { delay: 100 });
+
+// 输入文本
+await executeInput(element, {
+  value: 'Hello World',
+  clearFirst: true,
+  delay: 50
+});
+```
+
+#### 工具执行
+
+```typescript
+import { executeTool } from '@homura/sdk/executor';
+import type { AtomicTool } from '@homura/sdk/types';
+
+const tool: AtomicTool = {
+  tool_id: 'submit_form',
+  name: 'Submit Form',
+  parameters: { username: { type: 'string', required: true } },
+  selector_logic: {
+    target: { selector: 'button[type="submit"]', action: 'CLICK' }
+  }
+};
+
+const result = await executeTool(tool, { username: 'alice' });
+```
+
+### 扩展特定功能
+
+#### Chrome 消息传递
+
+```typescript
+import { sendMessageToContent } from '@shared/utils';
+import type { HomuraMessage } from '@shared/types';
+
+const message: HomuraMessage = {
+  type: 'START_INSPECT',
+  timestamp: Date.now()
+};
+
+await sendMessageToContent(message);
+```
+
+#### 获取当前标签页
+
+```typescript
+import { getActiveTab } from '@shared/utils';
+
+const tab = await getActiveTab();
+if (tab?.id) {
+  await chrome.tabs.sendMessage(tab.id, { type: 'PING' });
+}
+```
+
+---
+
+## 🛠️ 项目工具链
+
+### 构建系统
+
+```bash
+# 项目根目录
+homura/
+├── package.json          # 主项目构建脚本
+├── tsconfig.json         # TypeScript 配置
+├── vite.config.ts        # Vite 打包配置
+└── pnpm-workspace.yaml   # Monorepo 工作区配置
+
+# SDK 目录
+packages/sdk/
+├── package.json          # SDK 包配置
+└── tsconfig.json         # SDK TypeScript 配置
+```
+
+### 可用脚本
+
+```bash
+# 从项目根目录运行
+
+# 构建 SDK
+npm run build:sdk
+# → cd packages/sdk && tsc
+
+# 构建扩展（包含 SDK）
+npm run build:extension
+# → npm run build:sdk && tsc && vite build
+
+# 完整构建
+npm run build
+# → npm run build:sdk && tsc && vite build
+
+# 开发模式（Vite dev server）
+npm run dev
+
+# 预览构建产物
+npm run preview
+
+# 代码检查
+npm run lint
+```
+
+### TypeScript 配置
+
+**项目根 tsconfig.json**:
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@shared/*": ["./src/shared/*"],
+      "@homura/sdk": ["./packages/sdk/src"],
+      "@homura/sdk/*": ["./packages/sdk/src/*"]
+    }
+  }
+}
+```
+
+**SDK tsconfig.json**:
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "./dist",
+    "rootDir": "./src"
+  }
+}
+```
+
+### Vite 配置要点
+
+```typescript
+// vite.config.ts
+{
+  build: {
+    outDir: 'dist',
+    rollupOptions: {
+      input: {
+        'service-worker-loader': 'src/background/index.ts',
+        'sidepanel': 'src/sidepanel/index.html',
+        'dashboard': 'src/dashboard/index.html'
+      }
+    }
+  }
+}
+```
+
+### Monorepo 工作区
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - 'packages/sdk'
+```
+
+这允许在开发时直接从源码引用 SDK：
+```json
+// package.json
+{
+  "dependencies": {
+    "@homura/sdk": "workspace:*"
+  }
+}
 ```
 
 ---
@@ -324,6 +582,7 @@ div.section (score: 0.6) ← 保留
 
 ## 📋 开发检查清单
 
+### 通用检查
 - [ ] 新功能是否遵循 Scope+Anchor+Target 模式？
 - [ ] UI 组件是否保持紧凑（p-2/p-3，text-xs）？
 - [ ] 是否实现了渐进式披露（默认收起）？
@@ -333,6 +592,14 @@ div.section (score: 0.6) ← 保留
 - [ ] AI 调用是否有重试机制？
 - [ ] 录制功能是否支持跨页面/跨 Tab？
 - [ ] 是否使用 `chrome.storage.session` 持久化关键状态？
+
+### SDK 使用检查
+- [ ] SDK 类型是否从 `@homura/sdk/types` 导入？
+- [ ] SDK 函数是否从对应模块（`@homura/sdk/selector` 等）导入？
+- [ ] 扩展特定类型是否从 `@shared/*` 导入？
+- [ ] 是否误从 `@shared/types` 导入 SDK 类型（已废弃）？
+- [ ] 修改 SDK 后是否运行了 `npm run build:sdk`？
+- [ ] 新增的通用功能是否考虑添加到 SDK？
 
 ---
 
@@ -393,7 +660,8 @@ div.section (score: 0.6) ← 保留
 ├── ✅ v0.7: UnifiedSelector + 双模式 UI
 ├── ✅ v0.7.1: 熵感知锚点 + 分割表格支持
 ├── ✅ v0.7.2: 跨页面/跨 Tab 录制
-└── ✅ v1.0: SDK 抽离完成
+├── ✅ v1.0: SDK 抽离完成
+└── ✅ v1.1: 兼容层移除，统一使用 SDK
 
 计划中：
 ├── 📋 v1.5: AI Agent + Rule Book 解析执行
@@ -404,7 +672,7 @@ div.section (score: 0.6) ← 保留
 
 ## 🔧 SDK 抽离与定制插件开发
 
-> ✅ **v1.0 已完成**：SDK 基础抽离和主插件迁移
+> ✅ **v1.1 已完成**：SDK 抽离 + 兼容层移除，统一使用 @homura/sdk
 
 ### 架构转型
 
@@ -426,12 +694,13 @@ Homura 主插件
 |--------|------|------|
 | P0 | SDK 基础抽离 | ✅ 完成 |
 | P0 | 主插件迁移到 SDK | ✅ 完成 |
+| P0 | 兼容层移除 | ✅ 完成 |
 | P1 | AI Agent 实现 | 📋 计划中 (v1.5) |
 | P1 | Blueprint 导出功能 | 📋 计划中 (v1.5) |
 | P2 | 自愈机制 | 📋 计划中 (v2.0) |
 | P2 | CLI 工具 | 📋 计划中 (v2.0) |
 
-### SDK v1.0 已完成模块
+### SDK v1.1 已完成模块
 
 #### Phase 1: SDK 基础抽离 ✅
 - [x] 创建 Monorepo 结构 (`packages/sdk/`)
@@ -448,7 +717,34 @@ Homura 主插件
 - [x] 移除冗余代码
 - [x] 验证功能完整性
 
-### 当前可用：使用 SDK 开发
+#### Phase 3: 兼容层移除 ✅
+- [x] 重构 `src/shared/types.ts` — 移除 SDK re-export
+- [x] 重构 `src/shared/utils.ts` — 移除 SDK re-export
+- [x] 重构 `src/shared/constants.ts` — 移除 SDK re-export
+- [x] 重构 `src/shared/selectorBuilder/index.ts` — 移除 SDK re-export
+- [x] 更新 23+ 文件直接从 SDK 导入
+- [x] 更新 `src/shared/index.ts` 为 SDK 重新导出
+- [x] 增强 SDK selector 模块导出辅助函数
+- [x] TypeScript 编译通过
+- [x] 构建成功
+
+### 导入架构（v1.1）
+
+```typescript
+// SDK 功能 — 直接从 @homura/sdk 导入
+import { analyzeElement, createUnifiedSelector } from '@homura/sdk/selector';
+import { executeClick } from '@homura/sdk/primitives';
+import { executeTool } from '@homura/sdk/executor';
+import type { UnifiedSelector, AtomicTool } from '@homura/sdk/types';
+
+// 扩展特定功能 — 从 @shared 导入
+import type { HomuraMessage, MessageType } from '@shared/types';
+import { sendMessageToContent, getActiveTab } from '@shared/utils';
+import { STORAGE_KEYS } from '@shared/constants';
+import type { RecordingState } from '@shared/selectorBuilder';
+```
+
+### 使用 SDK 开发定制插件
 
 ```bash
 # 安装 SDK

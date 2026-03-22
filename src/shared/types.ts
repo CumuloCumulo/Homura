@@ -1,22 +1,17 @@
 /**
  * =============================================================================
- * Homura - Core Type Definitions (Compatibility Layer)
+ * Homura - Extension-Specific Type Definitions
  * =============================================================================
  *
- * This file now re-exports types from @homura/sdk for backward compatibility.
- * New code should import directly from @homura/sdk/types.
+ * This file contains types that are specific to the Chrome Extension and NOT part of the SDK.
+ * For SDK types, import directly from @homura/sdk/types.
+ *
+ * Types previously here have been moved to the SDK:
+ * - AtomicTool, ExecuteToolRequest, ExecuteToolResult -> @homura/sdk/types
+ * - Selector types -> @homura/sdk/selector
+ * - Primitive types -> @homura/sdk/primitives
+ * =============================================================================
  */
-
-// Re-export all types from SDK
-export * from "@homura/sdk/types";
-
-// =============================================================================
-// EXTENSION-SPECIFIC TYPES
-// =============================================================================
-//
-// Types that are specific to the Chrome Extension and not part of the SDK.
-// These should NOT be moved to the SDK.
-// =============================================================================
 
 // =============================================================================
 // MESSAGING TYPES - Communication between Background and Content Script

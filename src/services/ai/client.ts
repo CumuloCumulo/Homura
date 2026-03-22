@@ -2,12 +2,12 @@
  * =============================================================================
  * Homura - AI Client (通义 API)
  * =============================================================================
- * 
+ *
  * Client for interacting with Alibaba's Tongyi (通义) API
  * Uses OpenAI-compatible endpoint
  */
 
-import type { SelectorLogic, AtomicTool } from '@shared/types';
+import type { SelectorLogic, AtomicTool } from "@homura/sdk/types";
 import type {
   AIClientConfig,
   ChatMessage,
@@ -22,7 +22,7 @@ import type {
   PathSelectorResult,
   SmartSelectorContext,
   SmartSelectorResult,
-} from './types';
+} from "./types";
 import {
   SELECTOR_SYSTEM_PROMPT,
   TOOL_BUILDER_SYSTEM_PROMPT,
@@ -32,14 +32,14 @@ import {
   buildToolPrompt,
   buildSelfHealingPrompt,
   buildPathSelectorPrompt,
-} from './prompts';
-import { PATH_SELECTOR_TOOL } from './tools';
-import type { PathSelectorToolResult } from './tools';
-import { shouldUseScopeAnchorTarget, getDecisionReason } from './smartRouter';
+} from "./prompts";
+import { PATH_SELECTOR_TOOL } from "./tools";
+import type { PathSelectorToolResult } from "./tools";
+import { shouldUseScopeAnchorTarget, getDecisionReason } from "./smartRouter";
 
 // Default configuration
-const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-const DEFAULT_MODEL = 'qwen-plus';
+const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+const DEFAULT_MODEL = "qwen-plus";
 
 /**
  * Tongyi AI Client
@@ -60,10 +60,10 @@ export class TongyiClient {
    */
   async chat(messages: ChatMessage[]): Promise<string> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
         model: this.model,
@@ -78,7 +78,7 @@ export class TongyiClient {
     }
 
     const data: ChatCompletionResponse = await response.json();
-    return data.choices[0]?.message?.content || '';
+    return data.choices[0]?.message?.content || "";
   }
 
   /**
@@ -86,20 +86,26 @@ export class TongyiClient {
    */
   async chatWithTools<T>(
     messages: ChatMessage[],
-    tools: Array<{ type: string; function: { name: string; description: string; parameters: unknown } }>,
-    toolChoice?: string | { type: string; function: { name: string } }
-  ): Promise<{ content?: string; toolCalls?: Array<{ name: string; arguments: T }> }> {
+    tools: Array<{
+      type: string;
+      function: { name: string; description: string; parameters: unknown };
+    }>,
+    toolChoice?: string | { type: string; function: { name: string } },
+  ): Promise<{
+    content?: string;
+    toolCalls?: Array<{ name: string; arguments: T }>;
+  }> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
         model: this.model,
         messages,
         tools,
-        tool_choice: toolChoice || 'auto',
+        tool_choice: toolChoice || "auto",
         temperature: 0.3,
       }),
     });
@@ -111,22 +117,24 @@ export class TongyiClient {
 
     const data = await response.json();
     const choice = data.choices?.[0];
-    
+
     if (!choice) {
-      throw new Error('No response from AI');
+      throw new Error("No response from AI");
     }
 
     // Check for tool calls
     if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
-      const toolCalls = choice.message.tool_calls.map((tc: { function: { name: string; arguments: string } }) => ({
-        name: tc.function.name,
-        arguments: JSON.parse(tc.function.arguments) as T,
-      }));
+      const toolCalls = choice.message.tool_calls.map(
+        (tc: { function: { name: string; arguments: string } }) => ({
+          name: tc.function.name,
+          arguments: JSON.parse(tc.function.arguments) as T,
+        }),
+      );
       return { toolCalls };
     }
 
     // Regular text response
-    return { content: choice.message?.content || '' };
+    return { content: choice.message?.content || "" };
   }
 
   /**
@@ -145,22 +153,24 @@ export class TongyiClient {
   /**
    * Generate selector logic from context
    */
-  async generateSelector(context: SelectorGenerationContext): Promise<SelectorSuggestion> {
+  async generateSelector(
+    context: SelectorGenerationContext,
+  ): Promise<SelectorSuggestion> {
     const prompt = buildSelectorPrompt(context);
-    
+
     const response = await this.chat([
-      { role: 'system', content: SELECTOR_SYSTEM_PROMPT },
-      { role: 'user', content: prompt },
+      { role: "system", content: SELECTOR_SYSTEM_PROMPT },
+      { role: "user", content: prompt },
     ]);
 
     try {
       const jsonStr = this.extractJson(response);
       const selectorLogic = JSON.parse(jsonStr) as SelectorLogic;
-      
+
       return {
         selectorLogic,
         confidence: 0.8, // Default confidence
-        explanation: 'AI-generated selector based on DOM analysis',
+        explanation: "AI-generated selector based on DOM analysis",
       };
     } catch (error) {
       throw new Error(`Failed to parse selector response: ${error}`);
@@ -172,27 +182,29 @@ export class TongyiClient {
    */
   async generateTool(recording: RecordingTrace): Promise<ToolGenerationResult> {
     const prompt = buildToolPrompt(recording);
-    
+
     const response = await this.chat([
-      { role: 'system', content: TOOL_BUILDER_SYSTEM_PROMPT },
-      { role: 'user', content: prompt },
+      { role: "system", content: TOOL_BUILDER_SYSTEM_PROMPT },
+      { role: "user", content: prompt },
     ]);
 
     try {
       const jsonStr = this.extractJson(response);
       const tool = JSON.parse(jsonStr) as AtomicTool;
-      
+
       // Extract identified parameters
-      const parameters = Object.entries(tool.parameters).map(([name, param]) => ({
-        name,
-        value: '', // To be filled by user
-        description: param.description,
-      }));
+      const parameters = Object.entries(tool.parameters).map(
+        ([name, param]) => ({
+          name,
+          value: "", // To be filled by user
+          description: param.description,
+        }),
+      );
 
       return {
         tool,
         parameters,
-        explanation: 'AI-generated tool from recording',
+        explanation: "AI-generated tool from recording",
       };
     } catch (error) {
       throw new Error(`Failed to parse tool response: ${error}`);
@@ -204,10 +216,10 @@ export class TongyiClient {
    */
   async healSelector(context: SelfHealingContext): Promise<SelfHealingResult> {
     const prompt = buildSelfHealingPrompt(context);
-    
+
     const response = await this.chat([
-      { role: 'system', content: SELF_HEALING_SYSTEM_PROMPT },
-      { role: 'user', content: prompt },
+      { role: "system", content: SELF_HEALING_SYSTEM_PROMPT },
+      { role: "user", content: prompt },
     ]);
 
     try {
@@ -220,20 +232,22 @@ export class TongyiClient {
 
   /**
    * Generate path-based selector using tool calling
-   * 
+   *
    * This method uses the generate_path_selector tool to get structured output
    * from the AI, based on the ancestor path of the target element.
    */
-  async generatePathSelector(context: PathSelectorContext): Promise<PathSelectorResult> {
+  async generatePathSelector(
+    context: PathSelectorContext,
+  ): Promise<PathSelectorResult> {
     const prompt = buildPathSelectorPrompt(context);
-    
+
     const result = await this.chatWithTools<PathSelectorToolResult>(
       [
-        { role: 'system', content: PATH_SELECTOR_SYSTEM_PROMPT },
-        { role: 'user', content: prompt },
+        { role: "system", content: PATH_SELECTOR_SYSTEM_PROMPT },
+        { role: "user", content: prompt },
       ],
       [PATH_SELECTOR_TOOL],
-      { type: 'function', function: { name: 'generate_path_selector' } }
+      { type: "function", function: { name: "generate_path_selector" } },
     );
 
     // If tool was called, use the structured result
@@ -259,34 +273,36 @@ export class TongyiClient {
       }
     }
 
-    throw new Error('No valid response from AI for path selector generation');
+    throw new Error("No valid response from AI for path selector generation");
   }
 
   /**
    * Generate smart selector using the appropriate strategy
-   * 
+   *
    * This method analyzes the structure info and decides whether to use:
    * - Path Selector (for non-repeating or complex nested structures)
    * - Scope+Anchor+Target (for table/list structures with anchors)
    */
-  async generateSmartSelector(context: SmartSelectorContext): Promise<SmartSelectorResult> {
+  async generateSmartSelector(
+    context: SmartSelectorContext,
+  ): Promise<SmartSelectorResult> {
     const timestamp = new Date().toISOString();
-    
+
     console.log(`[SmartSelector ${timestamp}] Received request:`, {
       containerType: context.structureInfo.containerType,
       hasRepeating: context.structureInfo.hasRepeatingStructure,
       anchorCount: context.structureInfo.anchorCandidates.length,
       ancestorPathLength: context.ancestorPath.length,
     });
-    
+
     const useScopeAnchorTarget = shouldUseScopeAnchorTarget(context);
     const reasoning = getDecisionReason(context);
-    
+
     console.log(`[SmartSelector ${timestamp}] Strategy decision:`, {
-      strategy: useScopeAnchorTarget ? 'SCOPE_ANCHOR_TARGET' : 'PATH_SELECTOR',
+      strategy: useScopeAnchorTarget ? "SCOPE_ANCHOR_TARGET" : "PATH_SELECTOR",
       reasoning,
     });
-    
+
     if (useScopeAnchorTarget) {
       return this.generateScopeAnchorTargetFromContext(context, reasoning);
     } else {
@@ -296,45 +312,57 @@ export class TongyiClient {
 
   /**
    * Generate Scope+Anchor+Target selector from SmartSelectorContext
-   * 
+   *
    * This activates the previously idle Scope+Anchor+Target branch,
    * using the existing generateSelector method.
    */
   private async generateScopeAnchorTargetFromContext(
     context: SmartSelectorContext,
-    baseReasoning: string
+    baseReasoning: string,
   ): Promise<SmartSelectorResult> {
     const timestamp = new Date().toISOString();
-    
+
     // Build the context for the existing generateSelector method
     const topAnchor = context.structureInfo.anchorCandidates[0];
     const selectorContext: SelectorGenerationContext = {
       intent: context.intent,
       targetHtml: context.targetHtml,
       containerHtml: `<!-- Container: ${context.structureInfo.containerSelector || context.structureInfo.containerType} -->
-<!-- Anchor candidates: ${context.structureInfo.anchorCandidates.map(a => `${a.selector}="${a.text || a.attribute?.value}"`).join(', ')} -->`,
+<!-- Anchor candidates: ${context.structureInfo.anchorCandidates.map((a) => `${a.selector}="${a.text || a.attribute?.value}"`).join(", ")} -->`,
       anchorValue: topAnchor?.text || topAnchor?.attribute?.value,
     };
-    
-    console.log(`[SmartSelector ${timestamp}] Building Scope+Anchor+Target prompt...`);
-    
+
+    console.log(
+      `[SmartSelector ${timestamp}] Building Scope+Anchor+Target prompt...`,
+    );
+
     try {
       const result = await this.generateSelector(selectorContext);
-      
-      console.log(`[SmartSelector ${timestamp}] AI response parsed: confidence=${result.confidence}`);
-      
+
+      console.log(
+        `[SmartSelector ${timestamp}] AI response parsed: confidence=${result.confidence}`,
+      );
+
       return {
-        strategy: 'scope_anchor_target',
+        strategy: "scope_anchor_target",
         selectorLogic: result.selectorLogic,
         confidence: result.confidence,
         reasoning: `${baseReasoning}. ${result.explanation}`,
       };
     } catch (error) {
-      console.error(`[SmartSelector ${timestamp}] Scope+Anchor+Target generation failed:`, error);
-      
+      console.error(
+        `[SmartSelector ${timestamp}] Scope+Anchor+Target generation failed:`,
+        error,
+      );
+
       // Fallback to Path Selector if Scope+Anchor+Target fails
-      console.log(`[SmartSelector ${timestamp}] Falling back to Path Selector...`);
-      return this.generatePathSelectorFromContext(context, `${baseReasoning} (fallback due to error)`);
+      console.log(
+        `[SmartSelector ${timestamp}] Falling back to Path Selector...`,
+      );
+      return this.generatePathSelectorFromContext(
+        context,
+        `${baseReasoning} (fallback due to error)`,
+      );
     }
   }
 
@@ -343,12 +371,14 @@ export class TongyiClient {
    */
   private async generatePathSelectorFromContext(
     context: SmartSelectorContext,
-    baseReasoning: string
+    baseReasoning: string,
   ): Promise<SmartSelectorResult> {
     const timestamp = new Date().toISOString();
-    
-    console.log(`[SmartSelector ${timestamp}] Building Path Selector prompt...`);
-    
+
+    console.log(
+      `[SmartSelector ${timestamp}] Building Path Selector prompt...`,
+    );
+
     try {
       const pathResult = await this.generatePathSelector({
         intent: context.intent,
@@ -356,17 +386,22 @@ export class TongyiClient {
         targetHtml: context.targetHtml,
         ancestorPath: context.ancestorPath,
       });
-      
-      console.log(`[SmartSelector ${timestamp}] AI response parsed: confidence=${pathResult.confidence}`);
-      
+
+      console.log(
+        `[SmartSelector ${timestamp}] AI response parsed: confidence=${pathResult.confidence}`,
+      );
+
       return {
-        strategy: 'path_selector',
+        strategy: "path_selector",
         pathSelector: pathResult,
         confidence: pathResult.confidence,
         reasoning: pathResult.reasoning || baseReasoning,
       };
     } catch (error) {
-      console.error(`[SmartSelector ${timestamp}] Path Selector generation failed:`, error);
+      console.error(
+        `[SmartSelector ${timestamp}] Path Selector generation failed:`,
+        error,
+      );
       throw error;
     }
   }
@@ -391,7 +426,7 @@ export function initAIClient(config: AIClientConfig): TongyiClient {
  */
 export function getAIClient(): TongyiClient {
   if (!clientInstance) {
-    throw new Error('AI client not initialized. Call initAIClient first.');
+    throw new Error("AI client not initialized. Call initAIClient first.");
   }
   return clientInstance;
 }

@@ -2,29 +2,30 @@
  * =============================================================================
  * Homura - Content Script Message Handler
  * =============================================================================
- * 
+ *
  * Handles messages from Background Script and SidePanel.
  * This is the bridge between the orchestration layer and the execution engine.
  */
 
-import type { 
-  HomuraMessage, 
-  ExecuteToolRequest, 
-  ExecuteToolResult 
-} from '@shared/types';
-import { executeTool } from './engine';
-import { clearAllHighlights } from './engine';
-import { executeClick, executeInput, executeExtractText } from './engine/primitives';
-import { 
-  analyzeElement, 
+import type { HomuraMessage } from "@shared/types";
+import type { ExecuteToolRequest, ExecuteToolResult } from "@homura/sdk/types";
+import { executeTool } from "./engine";
+import { clearAllHighlights } from "./engine";
+import {
+  executeClick,
+  executeInput,
+  executeExtractText,
+} from "./engine/primitives";
+import {
+  analyzeElement,
   validateSelectorDraft,
   buildPathData,
   createUnifiedSelector,
   type SelectorDraft,
   type ElementAnalysis,
   type AncestorInfo,
-} from '@shared/selectorBuilder';
-import { buildFullSelectorFromPath } from '@shared/types';
+} from "@homura/sdk/selector";
+import { buildFullSelectorFromPath } from "@homura/sdk/selector";
 
 // =============================================================================
 // STATE FOR INSPECT/RECORD MODE
@@ -43,93 +44,114 @@ let validationHighlight: HTMLElement | null = null;
  * Initialize message listener
  */
 export function initMessageHandler(): void {
-  chrome.runtime.onMessage.addListener((
-    message: HomuraMessage | { type: string; payload?: unknown }, 
-    _sender: chrome.runtime.MessageSender, 
-    sendResponse: (response: unknown) => void
-  ) => {
-    handleMessage(message as { type: string; payload?: unknown })
-      .then(sendResponse)
-      .catch((error) => {
-        console.error('[Homura] Message handling error:', error);
-        sendResponse({ success: false, error: { code: 'UNKNOWN', message: String(error) } });
-      });
-    
-    // Return true to indicate async response
-    return true;
-  });
+  chrome.runtime.onMessage.addListener(
+    (
+      message: HomuraMessage | { type: string; payload?: unknown },
+      _sender: chrome.runtime.MessageSender,
+      sendResponse: (response: unknown) => void,
+    ) => {
+      handleMessage(message as { type: string; payload?: unknown })
+        .then(sendResponse)
+        .catch((error) => {
+          console.error("[Homura] Message handling error:", error);
+          sendResponse({
+            success: false,
+            error: { code: "UNKNOWN", message: String(error) },
+          });
+        });
 
-  console.log('[Homura] Content script message handler initialized');
+      // Return true to indicate async response
+      return true;
+    },
+  );
+
+  console.log("[Homura] Content script message handler initialized");
 }
 
 /**
  * Route and handle incoming messages
  */
-async function handleMessage(message: { type: string; payload?: unknown }): Promise<unknown> {
-  console.log('[Homura] Received message:', message.type);
+async function handleMessage(message: {
+  type: string;
+  payload?: unknown;
+}): Promise<unknown> {
+  console.log("[Homura] Received message:", message.type);
 
   switch (message.type) {
     // Health check
-    case 'PING':
-      return { success: true, message: 'pong' };
+    case "PING":
+      return { success: true, message: "pong" };
 
-    case 'EXECUTE_TOOL':
+    case "EXECUTE_TOOL":
       return handleExecuteTool(message.payload as ExecuteToolRequest);
 
-    case 'HIGHLIGHT_ELEMENT':
-      return handleHighlightElement(message.payload as { selector: string; color?: string });
+    case "HIGHLIGHT_ELEMENT":
+      return handleHighlightElement(
+        message.payload as { selector: string; color?: string },
+      );
 
-    case 'CLEAR_HIGHLIGHTS':
+    case "CLEAR_HIGHLIGHTS":
       return handleClearHighlights();
 
     // Inspect Mode
-    case 'START_INSPECT':
+    case "START_INSPECT":
       return handleStartInspect();
 
-    case 'STOP_INSPECT':
+    case "STOP_INSPECT":
       return handleStopInspect();
 
     // Record Mode
-    case 'START_RECORDING':
+    case "START_RECORDING":
       return handleStartRecording();
 
-    case 'STOP_RECORDING':
+    case "STOP_RECORDING":
       return handleStopRecording();
 
     // Selector Validation
-    case 'VALIDATE_SELECTOR':
+    case "VALIDATE_SELECTOR":
       return handleValidateSelector(message.payload as SelectorDraft);
 
     // AI Operations (placeholder - actual AI calls happen in background)
-    case 'AI_GENERATE_SELECTOR':
-      return handleAIGenerateSelector(message.payload as { intent: string; analysis: ElementAnalysis });
+    case "AI_GENERATE_SELECTOR":
+      return handleAIGenerateSelector(
+        message.payload as { intent: string; analysis: ElementAnalysis },
+      );
 
-    case 'AI_GENERATE_PATH_SELECTOR':
-      return handleAIGeneratePathSelector(message.payload as AIGeneratePathSelectorPayload);
+    case "AI_GENERATE_PATH_SELECTOR":
+      return handleAIGeneratePathSelector(
+        message.payload as AIGeneratePathSelectorPayload,
+      );
 
-    case 'AI_GENERATE_SMART_SELECTOR':
-      return handleAIGenerateSmartSelector(message.payload as SmartSelectorPayload);
+    case "AI_GENERATE_SMART_SELECTOR":
+      return handleAIGenerateSmartSelector(
+        message.payload as SmartSelectorPayload,
+      );
 
-    case 'AI_GENERATE_TOOL':
+    case "AI_GENERATE_TOOL":
       return handleAIGenerateTool(message.payload as { actions: unknown[] });
 
     // Direct Element Operations (for Inspect Mode quick actions)
-    case 'EXECUTE_CLICK':
+    case "EXECUTE_CLICK":
       return handleExecuteClick(message.payload as { selector: string });
 
-    case 'EXECUTE_INPUT':
-      return handleExecuteInput(message.payload as { selector: string; value: string });
+    case "EXECUTE_INPUT":
+      return handleExecuteInput(
+        message.payload as { selector: string; value: string },
+      );
 
-    case 'EXECUTE_EXTRACT':
+    case "EXECUTE_EXTRACT":
       return handleExecuteExtract(message.payload as { selector: string });
 
     // Execute with full Scope + Anchor + Target logic
-    case 'EXECUTE_WITH_LOGIC':
+    case "EXECUTE_WITH_LOGIC":
       return handleExecuteWithLogic(message.payload as ExecuteWithLogicPayload);
 
     default:
-      console.warn('[Homura] Unknown message type:', message.type);
-      return { success: false, error: { code: 'UNKNOWN', message: 'Unknown message type' } };
+      console.warn("[Homura] Unknown message type:", message.type);
+      return {
+        success: false,
+        error: { code: "UNKNOWN", message: "Unknown message type" },
+      };
   }
 }
 
@@ -137,13 +159,15 @@ async function handleMessage(message: { type: string; payload?: unknown }): Prom
 // EXECUTE TOOL
 // =============================================================================
 
-async function handleExecuteTool(payload: ExecuteToolRequest): Promise<ExecuteToolResult> {
+async function handleExecuteTool(
+  payload: ExecuteToolRequest,
+): Promise<ExecuteToolResult> {
   const { tool, params, debug } = payload;
-  
+
   console.log(`[Homura] Executing tool: ${tool.name}`);
-  
+
   const result = await executeTool(tool, params, { debug });
-  
+
   return result;
 }
 
@@ -151,48 +175,51 @@ async function handleExecuteTool(payload: ExecuteToolRequest): Promise<ExecuteTo
 // HIGHLIGHT
 // =============================================================================
 
-function handleHighlightElement(payload: { selector: string; color?: string }): { success: boolean } {
-  const { selector, color = 'rgba(249, 115, 22, 0.5)' } = payload;
-  
+function handleHighlightElement(payload: {
+  selector: string;
+  color?: string;
+}): { success: boolean } {
+  const { selector, color = "rgba(249, 115, 22, 0.5)" } = payload;
+
   const element = document.querySelector(selector);
   if (!element) {
     return { success: false };
   }
-  
+
   const rect = element.getBoundingClientRect();
-  const overlay = document.createElement('div');
-  overlay.id = 'homura-manual-highlight';
-  
+  const overlay = document.createElement("div");
+  overlay.id = "homura-manual-highlight";
+
   Object.assign(overlay.style, {
-    position: 'fixed',
+    position: "fixed",
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
     backgroundColor: color,
-    border: `2px solid ${color.replace('0.5', '1')}`,
-    borderRadius: '4px',
-    pointerEvents: 'none',
-    zIndex: '2147483647',
+    border: `2px solid ${color.replace("0.5", "1")}`,
+    borderRadius: "4px",
+    pointerEvents: "none",
+    zIndex: "2147483647",
   });
-  
+
   document.body.appendChild(overlay);
-  
+
   return { success: true };
 }
 
 function handleClearHighlights(): { success: boolean } {
   clearAllHighlights();
-  
-  const manual = document.getElementById('homura-manual-highlight');
+
+  const manual = document.getElementById("homura-manual-highlight");
   if (manual) {
     manual.remove();
   }
-  
+
   removeInspectHighlight();
   removeSelectedHighlight();
   removeValidationHighlight();
-  
+
   return { success: true };
 }
 
@@ -202,47 +229,52 @@ function handleClearHighlights(): { success: boolean } {
 
 function handleStartInspect(): { success: boolean } {
   if (isInspectMode) return { success: true };
-  
+
   isInspectMode = true;
-  document.addEventListener('mouseover', onInspectMouseOver, true);
-  document.addEventListener('mouseout', onInspectMouseOut, true);
-  document.addEventListener('click', onInspectClick, true);
-  document.body.style.cursor = 'crosshair';
-  
-  console.log('[Homura] Inspect mode started');
+  document.addEventListener("mouseover", onInspectMouseOver, true);
+  document.addEventListener("mouseout", onInspectMouseOut, true);
+  document.addEventListener("click", onInspectClick, true);
+  document.body.style.cursor = "crosshair";
+
+  console.log("[Homura] Inspect mode started");
   return { success: true };
 }
 
 function handleStopInspect(): { success: boolean } {
   if (!isInspectMode) return { success: true };
-  
+
   isInspectMode = false;
-  document.removeEventListener('mouseover', onInspectMouseOver, true);
-  document.removeEventListener('mouseout', onInspectMouseOut, true);
-  document.removeEventListener('click', onInspectClick, true);
-  document.body.style.cursor = '';
+  document.removeEventListener("mouseover", onInspectMouseOver, true);
+  document.removeEventListener("mouseout", onInspectMouseOut, true);
+  document.removeEventListener("click", onInspectClick, true);
+  document.body.style.cursor = "";
   removeInspectHighlight();
   removeSelectedHighlight();
-  
-  console.log('[Homura] Inspect mode stopped');
+
+  console.log("[Homura] Inspect mode stopped");
   return { success: true };
 }
 
 function onInspectMouseOver(e: MouseEvent): void {
   if (!isInspectMode) return;
-  
+
   const target = e.target as HTMLElement;
-  if (!target || target === document.body || target === document.documentElement) return;
-  
+  if (
+    !target ||
+    target === document.body ||
+    target === document.documentElement
+  )
+    return;
+
   showInspectHighlight(target);
 }
 
 function onInspectMouseOut(e: MouseEvent): void {
   if (!isInspectMode) return;
-  
+
   // Check if mouse is leaving the document (going to browser chrome, sidepanel, etc.)
   const relatedTarget = e.relatedTarget as Node | null;
-  
+
   // If relatedTarget is null or outside the document, mouse left the page
   if (!relatedTarget || !document.body.contains(relatedTarget)) {
     removeInspectHighlight();
@@ -251,52 +283,52 @@ function onInspectMouseOut(e: MouseEvent): void {
 
 function onInspectClick(e: MouseEvent): void {
   if (!isInspectMode) return;
-  
+
   e.preventDefault();
   e.stopPropagation();
-  
+
   const target = e.target as HTMLElement;
   if (!target || target === document.body) return;
-  
+
   // Clear previous validation highlight when selecting a new element
   removeValidationHighlight();
-  
+
   // Show persistent selected highlight (different from hover highlight)
   showSelectedHighlight(target);
-  
+
   // Analyze the element
   const analysis = analyzeElement(target);
-  
+
   // Send to SidePanel
   chrome.runtime.sendMessage({
-    type: 'ELEMENT_SELECTED',
+    type: "ELEMENT_SELECTED",
     payload: analysis,
   });
-  
-  console.log('[Homura] Element selected:', analysis);
+
+  console.log("[Homura] Element selected:", analysis);
 }
 
 function showInspectHighlight(element: HTMLElement): void {
   removeInspectHighlight();
-  
+
   const rect = element.getBoundingClientRect();
-  const overlay = document.createElement('div');
-  overlay.id = 'homura-inspect-highlight';
-  
+  const overlay = document.createElement("div");
+  overlay.id = "homura-inspect-highlight";
+
   Object.assign(overlay.style, {
-    position: 'fixed',
+    position: "fixed",
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    border: '2px solid rgba(139, 92, 246, 0.8)',
-    borderRadius: '2px',
-    pointerEvents: 'none',
-    zIndex: '2147483646',
-    transition: 'all 0.1s ease-out',
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
+    border: "2px solid rgba(139, 92, 246, 0.8)",
+    borderRadius: "2px",
+    pointerEvents: "none",
+    zIndex: "2147483646",
+    transition: "all 0.1s ease-out",
   });
-  
+
   document.body.appendChild(overlay);
   currentHighlight = overlay;
 }
@@ -306,7 +338,7 @@ function removeInspectHighlight(): void {
     currentHighlight.remove();
     currentHighlight = null;
   }
-  const existing = document.getElementById('homura-inspect-highlight');
+  const existing = document.getElementById("homura-inspect-highlight");
   if (existing) {
     existing.remove();
   }
@@ -318,25 +350,26 @@ function removeInspectHighlight(): void {
  */
 function showSelectedHighlight(element: HTMLElement): void {
   removeSelectedHighlight();
-  
+
   const rect = element.getBoundingClientRect();
-  const overlay = document.createElement('div');
-  overlay.id = 'homura-selected-highlight';
-  
+  const overlay = document.createElement("div");
+  overlay.id = "homura-selected-highlight";
+
   Object.assign(overlay.style, {
-    position: 'fixed',
+    position: "fixed",
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',  // Emerald with low opacity
-    border: '2px solid rgba(16, 185, 129, 0.9)',  // Emerald solid border
-    borderRadius: '3px',
-    pointerEvents: 'none',
-    zIndex: '2147483645',  // Below hover highlight
-    boxShadow: '0 0 0 1px rgba(16, 185, 129, 0.3), 0 0 12px rgba(16, 185, 129, 0.2)',
+    backgroundColor: "rgba(16, 185, 129, 0.15)", // Emerald with low opacity
+    border: "2px solid rgba(16, 185, 129, 0.9)", // Emerald solid border
+    borderRadius: "3px",
+    pointerEvents: "none",
+    zIndex: "2147483645", // Below hover highlight
+    boxShadow:
+      "0 0 0 1px rgba(16, 185, 129, 0.3), 0 0 12px rgba(16, 185, 129, 0.2)",
   });
-  
+
   document.body.appendChild(overlay);
   selectedHighlight = overlay;
 }
@@ -346,7 +379,7 @@ function removeSelectedHighlight(): void {
     selectedHighlight.remove();
     selectedHighlight = null;
   }
-  const existing = document.getElementById('homura-selected-highlight');
+  const existing = document.getElementById("homura-selected-highlight");
   if (existing) {
     existing.remove();
   }
@@ -358,23 +391,23 @@ function removeSelectedHighlight(): void {
 
 function handleStartRecording(): { success: boolean } {
   if (isRecordMode) return { success: true };
-  
+
   isRecordMode = true;
-  document.addEventListener('click', onRecordClick, true);
-  document.addEventListener('input', onRecordInput, true);
-  
-  console.log('[Homura] Recording started');
+  document.addEventListener("click", onRecordClick, true);
+  document.addEventListener("input", onRecordInput, true);
+
+  console.log("[Homura] Recording started");
   return { success: true };
 }
 
 function handleStopRecording(): { success: boolean } {
   if (!isRecordMode) return { success: true };
-  
+
   isRecordMode = false;
-  document.removeEventListener('click', onRecordClick, true);
-  document.removeEventListener('input', onRecordInput, true);
-  
-  console.log('[Homura] Recording stopped');
+  document.removeEventListener("click", onRecordClick, true);
+  document.removeEventListener("input", onRecordInput, true);
+
+  console.log("[Homura] Recording stopped");
   return { success: true };
 }
 
@@ -383,61 +416,158 @@ function generateActionId(): string {
   return `action_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * Generate action name from anchor candidates or associated labels
+ * Uses the best anchor (highest confidence, unique if possible) to name the action
+ */
+function generateActionName(
+  analysis: ElementAnalysis,
+  targetElement: HTMLElement,
+  defaultName: string,
+): string {
+  // Try to find a good anchor candidate to use as the action name
+  if (analysis.anchorCandidates && analysis.anchorCandidates.length > 0) {
+    // Prioritize unique anchors with high confidence
+    const bestAnchor = analysis.anchorCandidates.find(
+      (a) => a.isUnique && a.confidence > 0.7,
+    );
+
+    if (bestAnchor?.text) {
+      return bestAnchor.text.trim();
+    }
+
+    // Fallback to any anchor with text
+    const anchorWithText = analysis.anchorCandidates.find((a) => a.text);
+    if (anchorWithText?.text) {
+      return anchorWithText.text.trim();
+    }
+  }
+
+  // Try to find associated label element (for inputs, etc.)
+  const id = targetElement.id;
+  if (id) {
+    const label = document.querySelector(`label[for="${id}"]`);
+    if (label?.textContent?.trim()) {
+      return label.textContent.trim();
+    }
+  }
+
+  // Check if element has a placeholder attribute
+  const placeholder = (targetElement as HTMLInputElement).placeholder;
+  if (placeholder?.trim()) {
+    return placeholder.trim();
+  }
+
+  // Check aria-label
+  const ariaLabel = targetElement.getAttribute("aria-label");
+  if (ariaLabel?.trim()) {
+    return ariaLabel.trim();
+  }
+
+  // Look for text in previous sibling (common pattern: label + input)
+  const prevSibling = targetElement.previousElementSibling;
+  if (
+    prevSibling?.textContent?.trim() &&
+    prevSibling.textContent.trim().length < 30
+  ) {
+    const text = prevSibling.textContent.trim();
+    // Exclude common action text
+    if (
+      !["编辑", "删除", "保存", "取消", "提交", "确认", "查看"].includes(text)
+    ) {
+      return text;
+    }
+  }
+
+  // Check parent for label-like structure
+  const parent = targetElement.parentElement;
+  if (parent) {
+    // Look for a label or span with text before the input
+    const labelChild = parent.querySelector("label, span");
+    if (
+      labelChild?.textContent?.trim() &&
+      labelChild.textContent.trim().length < 30
+    ) {
+      const text = labelChild.textContent.trim();
+      if (
+        !["编辑", "删除", "保存", "取消", "提交", "确认", "查看"].includes(text)
+      ) {
+        return text;
+      }
+    }
+  }
+
+  // Fallback to element's own text content
+  const ownText = targetElement.textContent?.trim();
+  if (ownText && ownText.length > 0 && ownText.length < 30) {
+    return ownText;
+  }
+
+  return defaultName;
+}
+
 function onRecordClick(e: MouseEvent): void {
   if (!isRecordMode) return;
-  
+
   const target = e.target as HTMLElement;
   if (!target || target === document.body) return;
-  
+
   const analysis = analyzeElement(target);
-  
+
   // Auto-generate UnifiedSelector for recorded action
-  const unifiedSelector = createUnifiedSelector(analysis, 'CLICK');
-  
+  const unifiedSelector = createUnifiedSelector(analysis, "CLICK");
+
+  // Generate name from anchor candidates or associated labels
+  const actionName = generateActionName(analysis, target, "点击");
+
   chrome.runtime.sendMessage({
-    type: 'ACTION_RECORDED',
+    type: "ACTION_RECORDED",
     payload: {
       id: generateActionId(),
-      name: '点击',
-      type: 'click',
+      name: actionName,
+      type: "click",
       timestamp: Date.now(),
       elementAnalysis: analysis,
       unifiedSelector,
     },
   });
-  
-  console.log('[Homura] Recorded click with UnifiedSelector:', {
+
+  console.log("[Homura] Recorded click with UnifiedSelector:", {
     strategy: unifiedSelector.strategy,
     fullSelector: unifiedSelector.fullSelector,
     confidence: unifiedSelector.confidence,
+    actionName,
   });
 }
 
 function onRecordInput(e: Event): void {
   if (!isRecordMode) return;
-  
+
   const target = e.target as HTMLInputElement;
   if (!target) return;
-  
+
   const analysis = analyzeElement(target);
-  
+
   // Auto-generate UnifiedSelector for recorded action
-  const unifiedSelector = createUnifiedSelector(analysis, 'INPUT');
-  
+  const unifiedSelector = createUnifiedSelector(analysis, "INPUT");
+
+  // Generate name from anchor candidates or associated labels
+  const actionName = generateActionName(analysis, target, "输入");
+
   chrome.runtime.sendMessage({
-    type: 'ACTION_RECORDED',
+    type: "ACTION_RECORDED",
     payload: {
       id: generateActionId(),
-      name: '输入',
-      type: 'input',
+      name: actionName,
+      type: "input",
       timestamp: Date.now(),
       elementAnalysis: analysis,
       value: target.value,
       unifiedSelector,
     },
   });
-  
-  console.log('[Homura] Recorded input with UnifiedSelector:', {
+
+  console.log("[Homura] Recorded input with UnifiedSelector:", {
     strategy: unifiedSelector.strategy,
     fullSelector: unifiedSelector.fullSelector,
     confidence: unifiedSelector.confidence,
@@ -462,26 +592,28 @@ interface ExecuteWithLogicPayload {
   scopeSelector?: string;
   anchorSelector?: string;
   anchorValue?: string;
-  anchorMatchMode?: 'exact' | 'contains' | 'startsWith';
+  anchorMatchMode?: "exact" | "contains" | "startsWith";
   targetSelector: string;
-  action: 'highlight' | 'click' | 'input' | 'extract';
+  action: "highlight" | "click" | "input" | "extract";
   inputValue?: string;
 }
 
 /**
  * Execute a click on element by selector
  */
-async function handleExecuteClick(payload: { selector: string }): Promise<DirectOperationResult> {
+async function handleExecuteClick(payload: {
+  selector: string;
+}): Promise<DirectOperationResult> {
   const { selector } = payload;
-  
+
   try {
     const element = document.querySelector(selector) as HTMLElement;
     if (!element) {
       return { success: false, error: `元素未找到: ${selector}` };
     }
-    
+
     await executeClick(element);
-    console.log('[Homura] Click executed on:', selector);
+    console.log("[Homura] Click executed on:", selector);
     return { success: true };
   } catch (error) {
     return { success: false, error: `点击失败: ${error}` };
@@ -491,17 +623,20 @@ async function handleExecuteClick(payload: { selector: string }): Promise<Direct
 /**
  * Execute input on element by selector
  */
-async function handleExecuteInput(payload: { selector: string; value: string }): Promise<DirectOperationResult> {
+async function handleExecuteInput(payload: {
+  selector: string;
+  value: string;
+}): Promise<DirectOperationResult> {
   const { selector, value } = payload;
-  
+
   try {
     const element = document.querySelector(selector) as HTMLElement;
     if (!element) {
       return { success: false, error: `元素未找到: ${selector}` };
     }
-    
+
     await executeInput(element, { value, clearFirst: true, typeDelay: 0 });
-    console.log('[Homura] Input executed on:', selector, 'value:', value);
+    console.log("[Homura] Input executed on:", selector, "value:", value);
     return { success: true };
   } catch (error) {
     return { success: false, error: `输入失败: ${error}` };
@@ -511,17 +646,19 @@ async function handleExecuteInput(payload: { selector: string; value: string }):
 /**
  * Extract text from element by selector
  */
-function handleExecuteExtract(payload: { selector: string }): DirectOperationResult {
+function handleExecuteExtract(payload: {
+  selector: string;
+}): DirectOperationResult {
   const { selector } = payload;
-  
+
   try {
     const element = document.querySelector(selector);
     if (!element) {
       return { success: false, error: `元素未找到: ${selector}` };
     }
-    
+
     const text = executeExtractText(element);
-    console.log('[Homura] Text extracted from:', selector, 'text:', text);
+    console.log("[Homura] Text extracted from:", selector, "text:", text);
     return { success: true, data: text as string };
   } catch (error) {
     return { success: false, error: `读取失败: ${error}` };
@@ -534,27 +671,29 @@ function handleExecuteExtract(payload: { selector: string }): DirectOperationRes
 
 /**
  * Execute action using full Scope + Anchor + Target logic
- * 
+ *
  * This is the "WYSIWYG" executor - what you test here is exactly what automation will do.
- * 
+ *
  * Logic:
  * 1. If scopeSelector exists: find all scope containers
  * 2. If anchorValue exists: filter scopes by matching anchor text/attribute
  * 3. Find target within the matched scope
  * 4. Execute action on target
  */
-async function handleExecuteWithLogic(payload: ExecuteWithLogicPayload): Promise<DirectOperationResult> {
-  const { 
-    scopeSelector, 
-    anchorSelector, 
-    anchorValue, 
-    anchorMatchMode = 'contains',
-    targetSelector, 
-    action, 
-    inputValue 
+async function handleExecuteWithLogic(
+  payload: ExecuteWithLogicPayload,
+): Promise<DirectOperationResult> {
+  const {
+    scopeSelector,
+    anchorSelector,
+    anchorValue,
+    anchorMatchMode = "contains",
+    targetSelector,
+    action,
+    inputValue,
   } = payload;
 
-  console.log('[Homura] EXECUTE_WITH_LOGIC payload:', {
+  console.log("[Homura] EXECUTE_WITH_LOGIC payload:", {
     scopeSelector,
     anchorSelector,
     anchorValue,
@@ -569,76 +708,85 @@ async function handleExecuteWithLogic(payload: ExecuteWithLogicPayload): Promise
 
     // Case 1: Has scope (repeating structure)
     if (scopeSelector) {
-      console.log('[Homura] Has scope, querying:', scopeSelector);
+      console.log("[Homura] Has scope, querying:", scopeSelector);
       const scopeElements = document.querySelectorAll(scopeSelector);
-      console.log('[Homura] Found', scopeElements.length, 'scope elements');
-      
+      console.log("[Homura] Found", scopeElements.length, "scope elements");
+
       if (scopeElements.length === 0) {
         return { success: false, error: `未找到容器: ${scopeSelector}` };
       }
 
       // Find the right scope element
       let matchedScope: Element | null = null;
-      
+
       if (anchorValue && anchorSelector) {
         // Filter by anchor - FIX: use querySelectorAll to check ALL matching elements
         // This fixes the bug where "安排教室" couldn't be found when preceded by "详情"
         // in the same cell: <a>详情</a> | <a>安排教室</a>
-        console.log('[Homura] Filtering by anchor:', anchorSelector, '=', anchorValue);
-        
+        console.log(
+          "[Homura] Filtering by anchor:",
+          anchorSelector,
+          "=",
+          anchorValue,
+        );
+
         scopeLoop: for (const scope of scopeElements) {
           // FIX: Get ALL anchor candidates, not just the first one
           const anchorCandidates = scope.querySelectorAll(anchorSelector);
-          
+
           if (anchorCandidates.length === 0) {
-            console.log('[Homura] No anchor found in scope');
+            console.log("[Homura] No anchor found in scope");
             continue;
           }
-          
+
           // Iterate through ALL candidates to find a match
           for (const anchor of anchorCandidates) {
-            const anchorText = anchor.textContent?.trim() || 
-                             anchor.getAttribute('value') || 
-                             anchor.getAttribute('data-value') || '';
-            
-            console.log('[Homura] Checking anchor candidate:', anchorText);
+            const anchorText =
+              anchor.textContent?.trim() ||
+              anchor.getAttribute("value") ||
+              anchor.getAttribute("data-value") ||
+              "";
+
+            console.log("[Homura] Checking anchor candidate:", anchorText);
             const matches = matchText(anchorText, anchorValue, anchorMatchMode);
             if (matches) {
-              console.log('[Homura] Anchor matched!', anchorText);
+              console.log("[Homura] Anchor matched!", anchorText);
               matchedScope = scope;
               break scopeLoop; // Found a match, exit both loops
             }
           }
         }
-        
+
         if (!matchedScope) {
-          console.log('[Homura] No matching scope found');
-          return { 
-            success: false, 
-            error: `未找到匹配锚点 "${anchorValue}" 的容器` 
+          console.log("[Homura] No matching scope found");
+          return {
+            success: false,
+            error: `未找到匹配锚点 "${anchorValue}" 的容器`,
           };
         }
       } else {
         // No anchor - use first scope (or could be improved to use selected element's scope)
-        console.log('[Homura] No anchor filter, using first scope');
+        console.log("[Homura] No anchor filter, using first scope");
         matchedScope = scopeElements[0];
       }
 
       // Find target within scope
-      console.log('[Homura] Finding target in scope:', targetSelector);
-      
+      console.log("[Homura] Finding target in scope:", targetSelector);
+
       // CRITICAL: Handle self-targeting (empty targetSelector means scope IS the target)
-      if (!targetSelector || targetSelector === '') {
-        console.log('[Homura] Self-targeting: scope element is the target');
+      if (!targetSelector || targetSelector === "") {
+        console.log("[Homura] Self-targeting: scope element is the target");
         targetElement = matchedScope as HTMLElement;
       } else {
-        targetElement = matchedScope.querySelector(targetSelector) as HTMLElement;
-        
+        targetElement = matchedScope.querySelector(
+          targetSelector,
+        ) as HTMLElement;
+
         // Fallback: if not found as descendant, check if scope itself matches
         if (!targetElement) {
           try {
             if (matchedScope.matches(targetSelector)) {
-              console.log('[Homura] Target selector matches scope itself');
+              console.log("[Homura] Target selector matches scope itself");
               targetElement = matchedScope as HTMLElement;
             }
           } catch {
@@ -646,61 +794,69 @@ async function handleExecuteWithLogic(payload: ExecuteWithLogicPayload): Promise
           }
         }
       }
-      
-      usedSelector = `${scopeSelector} >> ${anchorSelector || '(无锚点)'} = "${anchorValue}" >> ${targetSelector || '(self)'}`;
-      console.log('[Homura] Target found:', !!targetElement);
-      
+
+      usedSelector = `${scopeSelector} >> ${anchorSelector || "(无锚点)"} = "${anchorValue}" >> ${targetSelector || "(self)"}`;
+      console.log("[Homura] Target found:", !!targetElement);
     } else {
       // Case 2: No scope - use target selector directly
-      console.log('[Homura] No scope, using target directly:', targetSelector);
+      console.log("[Homura] No scope, using target directly:", targetSelector);
       targetElement = document.querySelector(targetSelector) as HTMLElement;
       usedSelector = targetSelector;
-      console.log('[Homura] Target found:', !!targetElement);
+      console.log("[Homura] Target found:", !!targetElement);
     }
 
     if (!targetElement) {
-      console.log('[Homura] Target not found!');
+      console.log("[Homura] Target not found!");
       return { success: false, error: `目标元素未找到: ${targetSelector}` };
     }
-    
-    console.log('[Homura] Executing action:', action, 'on element:', targetElement.tagName);
+
+    console.log(
+      "[Homura] Executing action:",
+      action,
+      "on element:",
+      targetElement.tagName,
+    );
 
     // Execute the action
     switch (action) {
-      case 'highlight':
+      case "highlight":
         showValidationHighlight(targetElement);
-        console.log('[Homura] Highlighted:', usedSelector);
+        console.log("[Homura] Highlighted:", usedSelector);
         return { success: true, usedSelector };
 
-      case 'click':
+      case "click":
         // Temporarily disable inspect mode listeners to prevent interference
         // The onInspectClick handler calls preventDefault() which blocks native onclick
         const wasInspectMode = isInspectMode;
         if (wasInspectMode) {
-          document.removeEventListener('click', onInspectClick, true);
+          document.removeEventListener("click", onInspectClick, true);
         }
         try {
           await executeClick(targetElement);
-          console.log('[Homura] Clicked:', usedSelector);
+          console.log("[Homura] Clicked:", usedSelector);
           return { success: true, usedSelector };
         } finally {
           // Restore inspect mode listeners
           if (wasInspectMode) {
-            document.addEventListener('click', onInspectClick, true);
+            document.addEventListener("click", onInspectClick, true);
           }
         }
 
-      case 'input':
+      case "input":
         if (!inputValue) {
-          return { success: false, error: '输入值不能为空' };
+          return { success: false, error: "输入值不能为空" };
         }
-        await executeInput(targetElement, { value: inputValue, clearFirst: true, typeDelay: 0 });
-        console.log('[Homura] Input:', usedSelector, 'value:', inputValue);
+        await executeInput(targetElement, {
+          value: inputValue,
+          clearFirst: true,
+          typeDelay: 0,
+        });
+        console.log("[Homura] Input:", usedSelector, "value:", inputValue);
         return { success: true, usedSelector };
 
-      case 'extract':
+      case "extract":
         const text = executeExtractText(targetElement);
-        console.log('[Homura] Extracted from:', usedSelector, 'text:', text);
+        console.log("[Homura] Extracted from:", usedSelector, "text:", text);
         return { success: true, data: text as string, usedSelector };
 
       default:
@@ -714,16 +870,20 @@ async function handleExecuteWithLogic(payload: ExecuteWithLogicPayload): Promise
 /**
  * Match text with different modes
  */
-function matchText(text: string, pattern: string, mode: 'exact' | 'contains' | 'startsWith'): boolean {
+function matchText(
+  text: string,
+  pattern: string,
+  mode: "exact" | "contains" | "startsWith",
+): boolean {
   const normalizedText = text.toLowerCase();
   const normalizedPattern = pattern.toLowerCase();
-  
+
   switch (mode) {
-    case 'exact':
+    case "exact":
       return normalizedText === normalizedPattern;
-    case 'startsWith':
+    case "startsWith":
       return normalizedText.startsWith(normalizedPattern);
-    case 'contains':
+    case "contains":
     default:
       return normalizedText.includes(normalizedPattern);
   }
@@ -746,7 +906,7 @@ interface ValidationResponse {
 
 /**
  * Validate a selector draft and highlight the found element
- * 
+ *
  * This function uses the scoped selector logic:
  * 1. If scope exists: find container first, then find target within container
  * 2. If no scope but we have a minimalSelector with container prefix: use it directly
@@ -755,9 +915,9 @@ interface ValidationResponse {
 function handleValidateSelector(draft: SelectorDraft): ValidationResponse {
   // Remove previous validation highlight
   removeValidationHighlight();
-  
+
   const result = validateSelectorDraft(draft);
-  
+
   // If validation passed, find and highlight the actual element
   if (result.valid && result.targetFound) {
     const element = findValidatedElement(draft, result.anchorMatchIndex);
@@ -765,11 +925,11 @@ function handleValidateSelector(draft: SelectorDraft): ValidationResponse {
       showValidationHighlight(element);
     }
   }
-  
-  return { 
-    success: true, 
+
+  return {
+    success: true,
     ...result,
-    usedSelector: draft.scope 
+    usedSelector: draft.scope
       ? `${draft.scope.selector} ${draft.target.selector}`
       : draft.target.selector,
   };
@@ -778,20 +938,23 @@ function handleValidateSelector(draft: SelectorDraft): ValidationResponse {
 /**
  * Find the element that was validated
  */
-function findValidatedElement(draft: SelectorDraft, anchorMatchIndex: number): HTMLElement | null {
+function findValidatedElement(
+  draft: SelectorDraft,
+  anchorMatchIndex: number,
+): HTMLElement | null {
   try {
     // No scope - use target directly (which may include container prefix)
     if (!draft.scope) {
       return document.querySelector(draft.target.selector) as HTMLElement;
     }
-    
+
     // With scope - find the correct scope element and then target
     const scopeElements = document.querySelectorAll(draft.scope.selector);
     const scopeIndex = anchorMatchIndex >= 0 ? anchorMatchIndex : 0;
     const scopeElement = scopeElements[scopeIndex];
-    
+
     if (!scopeElement) return null;
-    
+
     return scopeElement.querySelector(draft.target.selector) as HTMLElement;
   } catch {
     return null;
@@ -803,30 +966,31 @@ function findValidatedElement(draft: SelectorDraft, anchorMatchIndex: number): H
  */
 function showValidationHighlight(element: HTMLElement): void {
   removeValidationHighlight();
-  
+
   const rect = element.getBoundingClientRect();
-  const overlay = document.createElement('div');
-  overlay.id = 'homura-validation-highlight';
-  
+  const overlay = document.createElement("div");
+  overlay.id = "homura-validation-highlight";
+
   Object.assign(overlay.style, {
-    position: 'fixed',
+    position: "fixed",
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',   // Blue
-    border: '2px solid rgba(59, 130, 246, 0.9)',  // Blue solid border
-    borderRadius: '3px',
-    pointerEvents: 'none',
-    zIndex: '2147483644',  // Below selected and hover highlights
-    boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.3), 0 0 15px rgba(59, 130, 246, 0.3)',
-    animation: 'homura-pulse 1.5s ease-in-out infinite',
+    backgroundColor: "rgba(59, 130, 246, 0.2)", // Blue
+    border: "2px solid rgba(59, 130, 246, 0.9)", // Blue solid border
+    borderRadius: "3px",
+    pointerEvents: "none",
+    zIndex: "2147483644", // Below selected and hover highlights
+    boxShadow:
+      "0 0 0 1px rgba(59, 130, 246, 0.3), 0 0 15px rgba(59, 130, 246, 0.3)",
+    animation: "homura-pulse 1.5s ease-in-out infinite",
   });
-  
+
   // Add pulse animation style if not exists
-  if (!document.getElementById('homura-validation-style')) {
-    const style = document.createElement('style');
-    style.id = 'homura-validation-style';
+  if (!document.getElementById("homura-validation-style")) {
+    const style = document.createElement("style");
+    style.id = "homura-validation-style";
     style.textContent = `
       @keyframes homura-pulse {
         0%, 100% { box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3), 0 0 15px rgba(59, 130, 246, 0.3); }
@@ -835,13 +999,13 @@ function showValidationHighlight(element: HTMLElement): void {
     `;
     document.head.appendChild(style);
   }
-  
+
   document.body.appendChild(overlay);
   validationHighlight = overlay;
-  
+
   // Scroll element into view if not visible
   if (!isElementInViewport(element)) {
-    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
 
@@ -850,7 +1014,7 @@ function removeValidationHighlight(): void {
     validationHighlight.remove();
     validationHighlight = null;
   }
-  const existing = document.getElementById('homura-validation-highlight');
+  const existing = document.getElementById("homura-validation-highlight");
   if (existing) {
     existing.remove();
   }
@@ -873,12 +1037,16 @@ function isElementInViewport(element: HTMLElement): boolean {
 // AI OPERATIONS (Placeholder - actual implementation via background)
 // =============================================================================
 
-async function handleAIGenerateSelector(_payload: { intent: string; analysis: ElementAnalysis }): Promise<{ success: boolean; draft?: SelectorDraft; error?: string }> {
+async function handleAIGenerateSelector(_payload: {
+  intent: string;
+  analysis: ElementAnalysis;
+}): Promise<{ success: boolean; draft?: SelectorDraft; error?: string }> {
   // TODO: Forward to background script for AI processing
   // For now, return a placeholder
-  return { 
-    success: false, 
-    error: 'AI generation not yet implemented. Please use manual selector building.' 
+  return {
+    success: false,
+    error:
+      "AI generation not yet implemented. Please use manual selector building.",
   };
 }
 
@@ -903,21 +1071,23 @@ interface SmartSelectorPayload {
   targetHtml: string;
   ancestorPath: AncestorInfo[];
   structureInfo: {
-    containerType: ElementAnalysis['containerType'];
+    containerType: ElementAnalysis["containerType"];
     hasRepeatingStructure: boolean;
     containerSelector?: string;
-    anchorCandidates: ElementAnalysis['anchorCandidates'];
+    anchorCandidates: ElementAnalysis["anchorCandidates"];
   };
 }
 
 /**
  * Handle AI path selector generation
- * 
+ *
  * This forwards the request to the background script which has access to the AI client.
  * The background script will call the AI with the ancestor path and return a structured
  * path-based selector.
  */
-async function handleAIGeneratePathSelector(payload: AIGeneratePathSelectorPayload): Promise<{
+async function handleAIGeneratePathSelector(
+  payload: AIGeneratePathSelectorPayload,
+): Promise<{
   success: boolean;
   pathSelector?: {
     root: string;
@@ -932,50 +1102,55 @@ async function handleAIGeneratePathSelector(payload: AIGeneratePathSelectorPaylo
   try {
     // Forward to background script for AI processing
     const response = await chrome.runtime.sendMessage({
-      type: 'AI_GENERATE_PATH_SELECTOR',
+      type: "AI_GENERATE_PATH_SELECTOR",
       payload,
     });
-    
+
     if (response && response.success) {
-      console.log('[Homura] AI path selector generated:', response.pathSelector);
+      console.log(
+        "[Homura] AI path selector generated:",
+        response.pathSelector,
+      );
       return {
         success: true,
         pathSelector: response.pathSelector,
       };
     } else {
       // If AI is not available, use the programmatic path selector
-      const pathSelector = payload.ancestorPath.length > 0
-        ? buildFallbackPathSelector(payload)
-        : null;
-      
+      const pathSelector =
+        payload.ancestorPath.length > 0
+          ? buildFallbackPathSelector(payload)
+          : null;
+
       if (pathSelector) {
-        console.log('[Homura] Using fallback path selector:', pathSelector);
+        console.log("[Homura] Using fallback path selector:", pathSelector);
         return {
           success: true,
           pathSelector,
         };
       }
-      
+
       return {
         success: false,
-        error: response?.error || 'AI path selector generation failed',
+        error: response?.error || "AI path selector generation failed",
       };
     }
   } catch (error) {
-    console.error('[Homura] AI path selector error:', error);
-    
+    console.error("[Homura] AI path selector error:", error);
+
     // Fallback to programmatic generation
-    const pathSelector = payload.ancestorPath.length > 0
-      ? buildFallbackPathSelector(payload)
-      : null;
-    
+    const pathSelector =
+      payload.ancestorPath.length > 0
+        ? buildFallbackPathSelector(payload)
+        : null;
+
     if (pathSelector) {
       return {
         success: true,
         pathSelector,
       };
     }
-    
+
     return {
       success: false,
       error: String(error),
@@ -985,7 +1160,7 @@ async function handleAIGeneratePathSelector(payload: AIGeneratePathSelectorPaylo
 
 /**
  * Build a fallback path selector when AI is not available
- * 
+ *
  * This function delegates to buildPathData from @shared/selectorBuilder
  * to avoid code duplication.
  */
@@ -998,31 +1173,32 @@ function buildFallbackPathSelector(payload: AIGeneratePathSelectorPayload): {
   reasoning: string;
 } | null {
   const { ancestorPath, targetSelector } = payload;
-  
+
   if (ancestorPath.length === 0) {
     return null;
   }
-  
+
   // Create a minimal ElementAnalysis-like object for buildPathData
-  const analysisLike: Pick<ElementAnalysis, 'ancestorPath' | 'targetSelector' | 'minimalSelector'> = {
+  const analysisLike: Pick<
+    ElementAnalysis,
+    "ancestorPath" | "targetSelector" | "minimalSelector"
+  > = {
     ancestorPath: ancestorPath as AncestorInfo[],
     targetSelector,
     minimalSelector: targetSelector,
   };
-  
+
   // Use the unified buildPathData function from generator.ts
   const pathData = buildPathData(analysisLike as ElementAnalysis);
-  
+
   if (!pathData) {
     return null;
   }
-  
+
   // Find the semantic root's score for confidence calculation
-  const semanticRoot = ancestorPath.find(a => a.isSemanticRoot);
-  const confidence = semanticRoot 
-    ? semanticRoot.semanticScore * 0.9 
-    : 0.6;
-  
+  const semanticRoot = ancestorPath.find((a) => a.isSemanticRoot);
+  const confidence = semanticRoot ? semanticRoot.semanticScore * 0.9 : 0.6;
+
   return {
     root: pathData.root,
     path: pathData.intermediates,
@@ -1033,25 +1209,29 @@ function buildFallbackPathSelector(payload: AIGeneratePathSelectorPayload): {
   };
 }
 
-async function handleAIGenerateTool(_payload: { actions: unknown[] }): Promise<{ success: boolean; tool?: unknown; error?: string }> {
+async function handleAIGenerateTool(_payload: {
+  actions: unknown[];
+}): Promise<{ success: boolean; tool?: unknown; error?: string }> {
   // TODO: Forward to background script for AI processing
-  return { 
-    success: false, 
-    error: 'AI tool generation not yet implemented.' 
+  return {
+    success: false,
+    error: "AI tool generation not yet implemented.",
   };
 }
 
 /**
  * Handle smart selector generation (unified entry point)
- * 
+ *
  * This forwards the request to the background script which will:
  * 1. Analyze the structureInfo to decide which strategy to use
  * 2. Call the appropriate AI method (PathSelector or Scope+Anchor+Target)
  * 3. Return the result
  */
-async function handleAIGenerateSmartSelector(payload: SmartSelectorPayload): Promise<{
+async function handleAIGenerateSmartSelector(
+  payload: SmartSelectorPayload,
+): Promise<{
   success: boolean;
-  strategy?: 'path_selector' | 'scope_anchor_target';
+  strategy?: "path_selector" | "scope_anchor_target";
   pathSelector?: {
     root: string;
     path: string[];
@@ -1062,14 +1242,19 @@ async function handleAIGenerateSmartSelector(payload: SmartSelectorPayload): Pro
   };
   selectorLogic?: {
     scope?: { type: string; selector: string };
-    anchor?: { type: string; selector: string; value: string; matchMode: string };
+    anchor?: {
+      type: string;
+      selector: string;
+      value: string;
+      matchMode: string;
+    };
     target: { selector: string; action: string };
   };
   confidence?: number;
   reasoning?: string;
   error?: string;
 }> {
-  console.log('[MessageHandler] Received SmartSelector request:', {
+  console.log("[MessageHandler] Received SmartSelector request:", {
     containerType: payload.structureInfo.containerType,
     hasRepeating: payload.structureInfo.hasRepeatingStructure,
     anchorCount: payload.structureInfo.anchorCandidates.length,
@@ -1078,12 +1263,12 @@ async function handleAIGenerateSmartSelector(payload: SmartSelectorPayload): Pro
   try {
     // Forward to background script for AI processing
     const response = await chrome.runtime.sendMessage({
-      type: 'AI_GENERATE_SMART_SELECTOR',
+      type: "AI_GENERATE_SMART_SELECTOR",
       payload,
     });
-    
+
     if (response && response.success) {
-      console.log('[MessageHandler] SmartSelector result:', response);
+      console.log("[MessageHandler] SmartSelector result:", response);
       return {
         success: true,
         strategy: response.strategy,
@@ -1094,54 +1279,63 @@ async function handleAIGenerateSmartSelector(payload: SmartSelectorPayload): Pro
       };
     } else {
       // If AI is not available, try fallback for path selector
-      if (!payload.structureInfo.hasRepeatingStructure && payload.ancestorPath.length > 0) {
+      if (
+        !payload.structureInfo.hasRepeatingStructure &&
+        payload.ancestorPath.length > 0
+      ) {
         const pathSelector = buildFallbackPathSelector({
           intent: payload.intent,
           targetSelector: payload.targetSelector,
           targetHtml: payload.targetHtml,
           ancestorPath: payload.ancestorPath,
         });
-        
+
         if (pathSelector) {
-          console.log('[MessageHandler] Using fallback path selector:', pathSelector);
+          console.log(
+            "[MessageHandler] Using fallback path selector:",
+            pathSelector,
+          );
           return {
             success: true,
-            strategy: 'path_selector',
+            strategy: "path_selector",
             pathSelector,
             confidence: pathSelector.confidence,
             reasoning: pathSelector.reasoning,
           };
         }
       }
-      
+
       return {
         success: false,
-        error: response?.error || 'Smart selector generation failed',
+        error: response?.error || "Smart selector generation failed",
       };
     }
   } catch (error) {
-    console.error('[MessageHandler] SmartSelector error:', error);
-    
+    console.error("[MessageHandler] SmartSelector error:", error);
+
     // Fallback to programmatic generation for non-repeating structures
-    if (!payload.structureInfo.hasRepeatingStructure && payload.ancestorPath.length > 0) {
+    if (
+      !payload.structureInfo.hasRepeatingStructure &&
+      payload.ancestorPath.length > 0
+    ) {
       const pathSelector = buildFallbackPathSelector({
         intent: payload.intent,
         targetSelector: payload.targetSelector,
         targetHtml: payload.targetHtml,
         ancestorPath: payload.ancestorPath,
       });
-      
+
       if (pathSelector) {
         return {
           success: true,
-          strategy: 'path_selector',
+          strategy: "path_selector",
           pathSelector,
           confidence: pathSelector.confidence,
           reasoning: pathSelector.reasoning,
         };
       }
     }
-    
+
     return {
       success: false,
       error: String(error),

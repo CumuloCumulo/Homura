@@ -1,8 +1,14 @@
 /**
  * Homura Shared Module - Public API
+ *
+ * This file provides a unified export point for both SDK types/functions
+ * (re-exported from @homura/sdk) and extension-specific types/functions.
  */
 
-// Types
+// =============================================================================
+// SDK TYPES - Re-exported from @homura/sdk for convenience
+// =============================================================================
+
 export type {
   // Primitives
   PrimitiveAction,
@@ -11,40 +17,37 @@ export type {
   ExtractTextParams,
   WaitForParams,
   NavigateParams,
-  
-  // Selector Logic
+
+  // Selector
   SelectorScope,
   SelectorAnchor,
   SelectorTarget,
   SelectorLogic,
-  
+  UnifiedSelector,
+  SelectorStrategy,
+  PathStrategyData,
+  StructureStrategyData,
+
   // Atomic Tool
   ToolParameter,
   AtomicTool,
-  
+
   // Execution
   ExecuteToolRequest,
   ExecuteToolResult,
   ExecutionError,
-  
-  // Messaging
-  MessageType,
-  Message,
-  ExecuteToolMessage,
-  ExecutionResultMessage,
-  HighlightElementMessage,
-  ClearHighlightsMessage,
-  HomuraMessage,
-  
-  // Mission
-  Mission,
-  LogEntry,
-} from './types';
+} from '@homura/sdk/types';
 
-// Constants
-export { HIGHLIGHT_COLORS, TIMEOUTS, CSS_CLASSES } from './constants';
+// =============================================================================
+// SDK CONSTANTS - Re-exported from @homura/sdk
+// =============================================================================
 
-// Utilities
+export { HIGHLIGHT_COLORS, TIMEOUTS, CSS_CLASSES } from '@homura/sdk/constants';
+
+// =============================================================================
+// SDK UTILITIES - Re-exported from @homura/sdk
+// =============================================================================
+
 export {
   generateMessageId,
   sleep,
@@ -54,4 +57,50 @@ export {
   getDOMSnapshot,
   safeQuerySelector,
   safeQuerySelectorAll,
+} from '@homura/sdk/utils';
+
+// =============================================================================
+// EXTENSION-SPECIFIC TYPES
+// =============================================================================
+
+export type {
+  // Messaging types (Chrome extension specific)
+  MessageType,
+  Message,
+  ExecuteToolMessage,
+  ExecutionResultMessage,
+  HighlightElementMessage,
+  ClearHighlightsMessage,
+  HomuraMessage,
+
+  // Mission types (extension orchestration)
+  Mission,
+  LogEntry,
+} from './types';
+
+// =============================================================================
+// EXTENSION-SPECIFIC UTILITIES
+// =============================================================================
+
+export {
+  sendMessageToContent,
+  getActiveTab,
 } from './utils';
+
+// =============================================================================
+// EXTENSION-SPECIFIC CONSTANTS
+// =============================================================================
+
+export {
+  STORAGE_KEYS,
+  EXTENSION_IDS,
+} from './constants';
+
+// =============================================================================
+// EXTENSION-SPECIFIC SELECTOR BUILDER
+// =============================================================================
+
+export type {
+  RecordingState,
+  RecordedAction,
+} from './selectorBuilder';

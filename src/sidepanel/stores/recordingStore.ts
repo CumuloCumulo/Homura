@@ -2,25 +2,26 @@
  * =============================================================================
  * Homura SidePanel - Recording Store
  * =============================================================================
- * 
+ *
  * State management for the recording/inspection functionality
  */
 
-import { create } from 'zustand';
-import type { 
-  ElementAnalysis, 
-  SelectorDraft, 
+import { create } from "zustand";
+import type {
+  ElementAnalysis,
+  SelectorDraft,
   RecordedAction,
   PathSelector,
-} from '@shared/selectorBuilder';
-import type { LogEntry, UnifiedSelector } from '@shared/types';
+} from "@shared/selectorBuilder/types";
+import type { LogEntry } from "@shared/types";
+import type { UnifiedSelector } from "@homura/sdk/types";
 
-export type RecordingMode = 'inspect' | 'record';
+export type RecordingMode = "inspect" | "record";
 
 // AI Strategy Types
-export type AIStatus = 'idle' | 'analyzing' | 'decided';
-export type AIStrategy = 'path_selector' | 'scope_anchor_target' | null;
-export type ViewMode = 'path' | 'structure';
+export type AIStatus = "idle" | "analyzing" | "decided";
+export type AIStrategy = "path_selector" | "scope_anchor_target" | null;
+export type ViewMode = "path" | "structure";
 
 interface RecordingStore {
   /** Current mode */
@@ -37,7 +38,7 @@ interface RecordingStore {
   analysis: ElementAnalysis | null;
   /** Draft selector being built - @deprecated Use unifiedSelector instead */
   selectorDraft: SelectorDraft | null;
-  /** 
+  /**
    * Unified selector - the single source of truth for selector data
    * Replaces fragmented selectorDraft + pathSelectorResult
    */
@@ -48,11 +49,11 @@ interface RecordingStore {
   logs: LogEntry[];
   /** AI is processing */
   isProcessing: boolean;
-  
+
   // ==========================================================================
   // AI Strategy State
   // ==========================================================================
-  
+
   /** AI decision status */
   aiStatus: AIStatus;
   /** AI chosen strategy */
@@ -88,7 +89,7 @@ interface RecordingStore {
   clearLogs: () => void;
   setProcessing: (processing: boolean) => void;
   reset: () => void;
-  
+
   // AI Strategy Actions
   setAIStatus: (status: AIStatus) => void;
   setAIStrategy: (strategy: AIStrategy, reasoning?: string) => void;
@@ -100,7 +101,7 @@ interface RecordingStore {
 }
 
 export const useRecordingStore = create<RecordingStore>((set) => ({
-  mode: 'inspect',
+  mode: "inspect",
   isInspecting: false,
   isRecording: false,
   hoveredElement: null,
@@ -111,9 +112,9 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   recordedActions: [],
   logs: [],
   isProcessing: false,
-  
+
   // AI Strategy State - Initial values
-  aiStatus: 'idle',
+  aiStatus: "idle",
   aiStrategy: null,
   aiReasoning: undefined,
   userModeOverride: undefined,
@@ -125,82 +126,98 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   setRecording: (active) => set({ isRecording: active }),
   setHoveredElement: (element) => set({ hoveredElement: element }),
   setSelectedElement: (element) => set({ selectedElement: element }),
-  setAnalysis: (analysis) => set({ 
-    analysis, 
-    selectorDraft: null,
-    unifiedSelector: null,
-    // Reset AI state when analysis changes
-    aiStatus: 'idle',
-    aiStrategy: null,
-    aiReasoning: undefined,
-    userModeOverride: undefined,
-    pathSelectorResult: undefined,
-  }),
+  setAnalysis: (analysis) =>
+    set({
+      analysis,
+      selectorDraft: null,
+      unifiedSelector: null,
+      // Reset AI state when analysis changes
+      aiStatus: "idle",
+      aiStrategy: null,
+      aiReasoning: undefined,
+      userModeOverride: undefined,
+      pathSelectorResult: undefined,
+    }),
   setSelectorDraft: (draft) => set({ selectorDraft: draft }),
-  setUnifiedSelector: (selector) => set({ 
-    unifiedSelector: selector,
-    // Keep selectorDraft in sync for backward compatibility
-    // This can be removed once all components migrate to UnifiedSelector
-    aiStrategy: selector?.strategy === 'path' ? 'path_selector' : 
-                selector?.strategy === 'scope_anchor_target' ? 'scope_anchor_target' : null,
-  }),
-  updateUnifiedSelector: (updates) => set((state) => ({
-    unifiedSelector: state.unifiedSelector 
-      ? { ...state.unifiedSelector, ...updates }
-      : null,
-  })),
-  addRecordedAction: (action) => set((state) => ({
-    recordedActions: [...state.recordedActions, action],
-  })),
+  setUnifiedSelector: (selector) =>
+    set({
+      unifiedSelector: selector,
+      // Keep selectorDraft in sync for backward compatibility
+      // This can be removed once all components migrate to UnifiedSelector
+      aiStrategy:
+        selector?.strategy === "path"
+          ? "path_selector"
+          : selector?.strategy === "scope_anchor_target"
+            ? "scope_anchor_target"
+            : null,
+    }),
+  updateUnifiedSelector: (updates) =>
+    set((state) => ({
+      unifiedSelector: state.unifiedSelector
+        ? { ...state.unifiedSelector, ...updates }
+        : null,
+    })),
+  addRecordedAction: (action) =>
+    set((state) => ({
+      recordedActions: [...state.recordedActions, action],
+    })),
   setRecordedActions: (actions) => set({ recordedActions: actions }),
-  deleteRecordedAction: (id) => set((state) => ({
-    recordedActions: state.recordedActions.filter((action) => action.id !== id),
-  })),
-  updateRecordedAction: (id, updates) => set((state) => ({
-    recordedActions: state.recordedActions.map((action) =>
-      action.id === id ? { ...action, ...updates } : action
-    ),
-  })),
+  deleteRecordedAction: (id) =>
+    set((state) => ({
+      recordedActions: state.recordedActions.filter(
+        (action) => action.id !== id,
+      ),
+    })),
+  updateRecordedAction: (id, updates) =>
+    set((state) => ({
+      recordedActions: state.recordedActions.map((action) =>
+        action.id === id ? { ...action, ...updates } : action,
+      ),
+    })),
   clearRecordedActions: () => set({ recordedActions: [] }),
-  addLog: (log) => set((state) => ({
-    logs: [...state.logs, log],
-  })),
+  addLog: (log) =>
+    set((state) => ({
+      logs: [...state.logs, log],
+    })),
   clearLogs: () => set({ logs: [] }),
   setProcessing: (processing) => set({ isProcessing: processing }),
-  reset: () => set({
-    isInspecting: false,
-    isRecording: false,
-    hoveredElement: null,
-    selectedElement: null,
-    analysis: null,
-    selectorDraft: null,
-    unifiedSelector: null,
-    recordedActions: [],
-    // Reset AI state
-    aiStatus: 'idle',
-    aiStrategy: null,
-    aiReasoning: undefined,
-    userModeOverride: undefined,
-    pathSelectorResult: undefined,
-    containerType: undefined,
-  }),
-  
+  reset: () =>
+    set({
+      isInspecting: false,
+      isRecording: false,
+      hoveredElement: null,
+      selectedElement: null,
+      analysis: null,
+      selectorDraft: null,
+      unifiedSelector: null,
+      recordedActions: [],
+      // Reset AI state
+      aiStatus: "idle",
+      aiStrategy: null,
+      aiReasoning: undefined,
+      userModeOverride: undefined,
+      pathSelectorResult: undefined,
+      containerType: undefined,
+    }),
+
   // AI Strategy Actions
   setAIStatus: (status) => set({ aiStatus: status }),
-  setAIStrategy: (strategy, reasoning) => set({ 
-    aiStrategy: strategy, 
-    aiReasoning: reasoning,
-    aiStatus: 'decided',
-  }),
+  setAIStrategy: (strategy, reasoning) =>
+    set({
+      aiStrategy: strategy,
+      aiReasoning: reasoning,
+      aiStatus: "decided",
+    }),
   setUserModeOverride: (mode) => set({ userModeOverride: mode }),
   setPathSelectorResult: (result) => set({ pathSelectorResult: result }),
   setContainerType: (type) => set({ containerType: type }),
-  resetAIState: () => set({
-    aiStatus: 'idle',
-    aiStrategy: null,
-    aiReasoning: undefined,
-    userModeOverride: undefined,
-    pathSelectorResult: undefined,
-    unifiedSelector: null,
-  }),
+  resetAIState: () =>
+    set({
+      aiStatus: "idle",
+      aiStrategy: null,
+      aiReasoning: undefined,
+      userModeOverride: undefined,
+      pathSelectorResult: undefined,
+      unifiedSelector: null,
+    }),
 }));

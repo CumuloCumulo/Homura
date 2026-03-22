@@ -2,16 +2,20 @@
  * =============================================================================
  * Homura SidePanel - StructureView Component
  * =============================================================================
- * 
+ *
  * Scope + Anchor + Target View - Displays the structured selector configuration
  * with visual color coding for each component
  */
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import type { ElementAnalysis, AnchorCandidate, SelectorDraft } from '@shared/selectorBuilder';
-import type { UnifiedSelector } from '@shared/types';
-import { QuickActionPanel } from './QuickActionPanel';
+import React from "react";
+import { motion } from "framer-motion";
+import type {
+  ElementAnalysis,
+  AnchorCandidate,
+  SelectorDraft,
+} from "@shared/selectorBuilder/types";
+import type { UnifiedSelector } from "@homura/sdk/types";
+import { QuickActionPanel } from "./QuickActionPanel";
 
 // =============================================================================
 // TYPES
@@ -20,9 +24,13 @@ import { QuickActionPanel } from './QuickActionPanel';
 interface StructureViewProps {
   analysis: ElementAnalysis;
   selectorDraft: SelectorDraft | null;
-  unifiedSelector?: UnifiedSelector | null;  // New prop for unified selector
+  unifiedSelector?: UnifiedSelector | null; // New prop for unified selector
   onDraftChange: (draft: SelectorDraft) => void;
-  onLog: (log: { timestamp: number; level: 'info' | 'error'; message: string }) => void;
+  onLog: (log: {
+    timestamp: number;
+    level: "info" | "error";
+    message: string;
+  }) => void;
 }
 
 // =============================================================================
@@ -31,8 +39,18 @@ interface StructureViewProps {
 
 function LayersIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6.429 9.75L2.25 12l4.179 2.25m0-4.5l5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0l4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0l-5.571 3-5.571-3" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6.429 9.75L2.25 12l4.179 2.25m0-4.5l5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0l4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0l-5.571 3-5.571-3"
+      />
     </svg>
   );
 }
@@ -43,7 +61,7 @@ function LayersIcon({ className }: { className?: string }) {
 
 interface SelectorSectionProps {
   title: string;
-  color: 'blue' | 'emerald' | 'violet';
+  color: "blue" | "emerald" | "violet";
   value: string;
   onChange: (value: string) => void;
   info?: string;
@@ -51,27 +69,34 @@ interface SelectorSectionProps {
 }
 
 const colorStyles = {
-  blue: { 
-    border: 'border-blue-500/20', 
-    text: 'text-blue-400', 
-    focus: 'focus:border-blue-500/50',
-    bg: 'bg-blue-500/5'
+  blue: {
+    border: "border-blue-500/20",
+    text: "text-blue-400",
+    focus: "focus:border-blue-500/50",
+    bg: "bg-blue-500/5",
   },
-  emerald: { 
-    border: 'border-emerald-500/20', 
-    text: 'text-emerald-400', 
-    focus: 'focus:border-emerald-500/50',
-    bg: 'bg-emerald-500/5'
+  emerald: {
+    border: "border-emerald-500/20",
+    text: "text-emerald-400",
+    focus: "focus:border-emerald-500/50",
+    bg: "bg-emerald-500/5",
   },
-  violet: { 
-    border: 'border-violet-500/20', 
-    text: 'text-violet-400', 
-    focus: 'focus:border-violet-500/50',
-    bg: 'bg-violet-500/5'
+  violet: {
+    border: "border-violet-500/20",
+    text: "text-violet-400",
+    focus: "focus:border-violet-500/50",
+    bg: "bg-violet-500/5",
   },
 };
 
-function SelectorSection({ title, color, value, onChange, info, children }: SelectorSectionProps) {
+function SelectorSection({
+  title,
+  color,
+  value,
+  onChange,
+  info,
+  children,
+}: SelectorSectionProps) {
   const styles = colorStyles[color];
 
   return (
@@ -108,38 +133,53 @@ interface AnchorCandidateItemProps {
   onSelect: () => void;
 }
 
-function AnchorCandidateItem({ candidate, index, isSelected, onSelect }: AnchorCandidateItemProps) {
+function AnchorCandidateItem({
+  candidate,
+  index,
+  isSelected,
+  onSelect,
+}: AnchorCandidateItemProps) {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
       onClick={onSelect}
       className={`
         flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-all
-        ${isSelected 
-          ? 'bg-emerald-500/10 border border-emerald-500/30' 
-          : 'bg-black/30 border border-transparent hover:border-zinc-700'}
+        ${
+          isSelected
+            ? "bg-emerald-500/10 border border-emerald-500/30"
+            : "bg-black/30 border border-transparent hover:border-zinc-700"
+        }
       `}
     >
-      <span className={`
+      <span
+        className={`
         shrink-0 w-4 h-4 flex items-center justify-center rounded-full text-[9px]
-        ${isSelected ? 'bg-emerald-500/30 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}
-      `}>
+        ${isSelected ? "bg-emerald-500/30 text-emerald-400" : "bg-zinc-800 text-zinc-500"}
+      `}
+      >
         {index + 1}
       </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className={`text-[10px] font-mono ${isSelected ? 'text-emerald-400' : 'text-zinc-400'}`}>
+          <span
+            className={`text-[10px] font-mono ${isSelected ? "text-emerald-400" : "text-zinc-400"}`}
+          >
             {candidate.selector}
           </span>
-          <span className={`
+          <span
+            className={`
             px-1 py-0.5 text-[8px] rounded
-            ${candidate.isUnique 
-              ? 'bg-emerald-500/20 text-emerald-400' 
-              : 'bg-zinc-700 text-zinc-400'}
-          `}>
-            {candidate.type === 'text_match' ? 'text' : 'attr'}
+            ${
+              candidate.isUnique
+                ? "bg-emerald-500/20 text-emerald-400"
+                : "bg-zinc-700 text-zinc-400"
+            }
+          `}
+          >
+            {candidate.type === "text_match" ? "text" : "attr"}
           </span>
         </div>
         {candidate.text && (
@@ -155,16 +195,22 @@ function AnchorCandidateItem({ candidate, index, isSelected, onSelect }: AnchorC
   );
 }
 
-
 // =============================================================================
 // MAIN STRUCTURE VIEW COMPONENT
 // =============================================================================
 
-export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraftChange, onLog }: StructureViewProps) {
-  const { containerType, anchorCandidates, relativeSelector, minimalSelector } = analysis;
+export function StructureView({
+  analysis,
+  selectorDraft,
+  unifiedSelector,
+  onDraftChange,
+  onLog,
+}: StructureViewProps) {
+  const { containerType, anchorCandidates, relativeSelector, minimalSelector } =
+    analysis;
   const [showAllAnchors, setShowAllAnchors] = React.useState(false);
   const [selectedAnchorIndex, setSelectedAnchorIndex] = React.useState(0);
-  
+
   // ========== FIX Issue 2: Reset anchor index when analysis changes ==========
   // Use targetSelector as a stable identity for the selected element
   const analysisId = analysis.targetSelector || analysis.minimalSelector;
@@ -173,9 +219,11 @@ export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraf
     setSelectedAnchorIndex(0);
     setShowAllAnchors(false);
   }, [analysisId]);
-  
-  const visibleAnchors = showAllAnchors ? anchorCandidates : anchorCandidates.slice(0, 3);
-  
+
+  const visibleAnchors = showAllAnchors
+    ? anchorCandidates
+    : anchorCandidates.slice(0, 3);
+
   const handleSelectAnchor = (index: number) => {
     setSelectedAnchorIndex(index);
     const candidate = anchorCandidates[index];
@@ -185,13 +233,13 @@ export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraf
         anchor: {
           selector: candidate.selector,
           type: candidate.type,
-          value: candidate.text || candidate.attribute?.value || '',
-          matchMode: 'contains',
+          value: candidate.text || candidate.attribute?.value || "",
+          matchMode: "contains",
         },
       });
     }
   };
-  
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -207,36 +255,43 @@ export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraf
           Scope + Anchor + Target
         </span>
       </div>
-      
+
       {/* Target Element Info */}
       <div className="p-2.5 rounded-lg bg-zinc-900/50 border border-white/5">
         <div className="flex items-center gap-2 mb-1.5">
           <span className="text-[9px] text-violet-400 font-medium">TARGET</span>
-          <span className={`
+          <span
+            className={`
             px-1.5 py-0.5 text-[8px] rounded
-            ${containerType === 'table' ? 'bg-blue-500/20 text-blue-400' : 
-              containerType === 'list' ? 'bg-emerald-500/20 text-emerald-400' : 
-              'bg-zinc-700 text-zinc-400'}
-          `}>
+            ${
+              containerType === "table"
+                ? "bg-blue-500/20 text-blue-400"
+                : containerType === "list"
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : "bg-zinc-700 text-zinc-400"
+            }
+          `}
+          >
             {containerType}
           </span>
         </div>
         <code className="block text-[10px] font-mono text-violet-400 break-all">
           {analysis.targetSelector || minimalSelector}
         </code>
-        {analysis.scopedSelector && analysis.scopedSelector !== minimalSelector && (
-          <code className="block text-[9px] font-mono text-zinc-500 mt-1 break-all">
-            完整: {analysis.scopedSelector}
-          </code>
-        )}
+        {analysis.scopedSelector &&
+          analysis.scopedSelector !== minimalSelector && (
+            <code className="block text-[9px] font-mono text-zinc-500 mt-1 break-all">
+              完整: {analysis.scopedSelector}
+            </code>
+          )}
       </div>
 
       {/* Quick Actions */}
-      <QuickActionPanel 
-        analysis={analysis} 
-        selectorDraft={selectorDraft} 
+      <QuickActionPanel
+        analysis={analysis}
+        selectorDraft={selectorDraft}
         unifiedSelector={unifiedSelector}
-        onLog={onLog} 
+        onLog={onLog}
       />
 
       {/* Selector Configuration */}
@@ -248,11 +303,13 @@ export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraf
               title="SCOPE (容器)"
               color="blue"
               value={selectorDraft.scope.selector}
-              onChange={(value) => onDraftChange({
-                ...selectorDraft,
-                scope: { ...selectorDraft.scope!, selector: value },
-              })}
-              info={`${selectorDraft.scope.matchCount || '?'} 个`}
+              onChange={(value) =>
+                onDraftChange({
+                  ...selectorDraft,
+                  scope: { ...selectorDraft.scope!, selector: value },
+                })
+              }
+              info={`${selectorDraft.scope.matchCount || "?"} 个`}
             />
           )}
 
@@ -262,19 +319,26 @@ export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraf
               title="ANCHOR (锚点)"
               color="emerald"
               value={selectorDraft.anchor.selector}
-              onChange={(value) => onDraftChange({
-                ...selectorDraft,
-                anchor: { ...selectorDraft.anchor!, selector: value },
-              })}
+              onChange={(value) =>
+                onDraftChange({
+                  ...selectorDraft,
+                  anchor: { ...selectorDraft.anchor!, selector: value },
+                })
+              }
             >
               <div className="mt-2 space-y-1.5">
                 <input
                   type="text"
                   value={selectorDraft.anchor.value}
-                  onChange={(e) => onDraftChange({
-                    ...selectorDraft,
-                    anchor: { ...selectorDraft.anchor!, value: e.target.value },
-                  })}
+                  onChange={(e) =>
+                    onDraftChange({
+                      ...selectorDraft,
+                      anchor: {
+                        ...selectorDraft.anchor!,
+                        value: e.target.value,
+                      },
+                    })
+                  }
                   placeholder="匹配值 (支持 {{变量}})"
                   className="
                     w-full h-6 px-1.5 text-[10px] font-mono
@@ -285,10 +349,15 @@ export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraf
                 />
                 <select
                   value={selectorDraft.anchor.matchMode}
-                  onChange={(e) => onDraftChange({
-                    ...selectorDraft,
-                    anchor: { ...selectorDraft.anchor!, matchMode: e.target.value as 'contains' | 'exact' },
-                  })}
+                  onChange={(e) =>
+                    onDraftChange({
+                      ...selectorDraft,
+                      anchor: {
+                        ...selectorDraft.anchor!,
+                        matchMode: e.target.value as "contains" | "exact",
+                      },
+                    })
+                  }
                   className="
                     w-full h-6 px-1.5 text-[9px]
                     bg-black/30 border border-zinc-800 rounded
@@ -309,17 +378,21 @@ export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraf
             title="TARGET (目标)"
             color="violet"
             value={selectorDraft.target.selector}
-            onChange={(value) => onDraftChange({
-              ...selectorDraft,
-              target: { ...selectorDraft.target, selector: value },
-            })}
+            onChange={(value) =>
+              onDraftChange({
+                ...selectorDraft,
+                target: { ...selectorDraft.target, selector: value },
+              })
+            }
           >
             <select
               value={selectorDraft.target.action}
-              onChange={(e) => onDraftChange({
-                ...selectorDraft,
-                target: { ...selectorDraft.target, action: e.target.value },
-              })}
+              onChange={(e) =>
+                onDraftChange({
+                  ...selectorDraft,
+                  target: { ...selectorDraft.target, action: e.target.value },
+                })
+              }
               className="
                 w-full h-6 mt-1.5 px-1.5 text-[9px]
                 bg-black/30 border border-zinc-800 rounded
@@ -345,7 +418,9 @@ export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraf
                 onClick={() => setShowAllAnchors(!showAllAnchors)}
                 className="text-[9px] text-violet-400 hover:text-violet-300"
               >
-                {showAllAnchors ? '收起' : `显示全部 (${anchorCandidates.length})`}
+                {showAllAnchors
+                  ? "收起"
+                  : `显示全部 (${anchorCandidates.length})`}
               </button>
             )}
           </div>
@@ -368,7 +443,9 @@ export function StructureView({ analysis, selectorDraft, unifiedSelector, onDraf
         <div className="p-2.5 rounded-lg bg-zinc-900/50 border border-white/5">
           <div className="flex items-center gap-2">
             <span className="text-[9px] text-zinc-500">容器类型:</span>
-            <span className="text-[10px] text-blue-400 font-mono">{containerType}</span>
+            <span className="text-[10px] text-blue-400 font-mono">
+              {containerType}
+            </span>
           </div>
           <code className="block text-[9px] font-mono text-zinc-500 mt-1 break-all">
             相对选择器: {relativeSelector}

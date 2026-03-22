@@ -1,14 +1,17 @@
 /**
  * =============================================================================
- * Homura - Selector Builder Module (Compatibility Layer)
+ * Homura - Extension-Specific Selector Types
  * =============================================================================
  *
- * This file now re-exports selector functionality from @homura/sdk for backward compatibility.
- * New code should import directly from @homura/sdk/selector.
+ * This file contains types that are specific to the Chrome Extension recording functionality.
+ * For SDK selector functionality, import directly from @homura/sdk/selector.
+ *
+ * SDK functionality has been moved to:
+ * - Element types -> @homura/sdk/selector
+ * - Selector building -> @homura/sdk/selector
+ * - Validation -> @homura/sdk/selector
+ * =============================================================================
  */
-
-// Re-export all selector types from SDK
-export type * from "@homura/sdk/selector";
 
 // =============================================================================
 // EXTENSION-SPECIFIC SELECTOR TYPES
@@ -64,44 +67,3 @@ export interface RecordedAction {
    */
   unifiedSelector?: import("@homura/sdk/types").UnifiedSelector;
 }
-
-// =============================================================================
-// Re-export SDK functions for backward compatibility
-// =============================================================================
-
-export {
-  analyzeElement,
-  collectAncestorPath,
-  buildPathSelector,
-  buildMinimalSelector,
-  buildRelativeSelector,
-  findRepeatingContainer,
-  findSemanticContainer,
-  findAnchorCandidates,
-  getElementHtml,
-  getContainerContext,
-} from "@homura/sdk/selector";
-
-export {
-  validateSelectorDraft,
-  validateSelectorLogic,
-  isValidCssSelector,
-  countMatches,
-  findTargetElement,
-  getScopePreview,
-} from "@homura/sdk/selector";
-
-export {
-  generateSelectorLogic,
-  createSelectorDraft,
-  draftToSelectorLogic,
-  generateSelectorStrategies,
-  determineStrategy,
-  buildPathData,
-  buildStructureData,
-  createUnifiedSelector,
-  convertPathSelectorToUnified,
-  convertSelectorLogicToUnified,
-  convertUnifiedToSelectorLogic,
-  convertUnifiedToSelectorDraft,
-} from "@homura/sdk/selector";

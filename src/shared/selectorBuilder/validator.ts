@@ -2,13 +2,17 @@
  * =============================================================================
  * Homura - Selector Validator
  * =============================================================================
- * 
+ *
  * Validates selector logic against the current DOM
  */
 
-import type { SelectorLogic } from '@shared/types';
-import type { SelectorDraft, ValidationResult } from './types';
-import { safeQuerySelectorAll, safeQuerySelector, matchText } from '@shared/utils';
+import type { SelectorLogic } from "@homura/sdk/types";
+import type { SelectorDraft, ValidationResult } from "./types";
+import {
+  safeQuerySelectorAll,
+  safeQuerySelector,
+  matchText,
+} from "@homura/sdk/utils";
 
 /**
  * Validate a selector draft against the current DOM
@@ -23,10 +27,13 @@ export function validateSelectorDraft(draft: SelectorDraft): ValidationResult {
         scopeMatches: 0,
         anchorMatchIndex: -1,
         targetFound: targets.length > 0,
-        error: targets.length === 0 ? `Target not found: ${draft.target.selector}` : undefined,
+        error:
+          targets.length === 0
+            ? `Target not found: ${draft.target.selector}`
+            : undefined,
       };
     }
-    
+
     // Validate scope
     const scopeElements = safeQuerySelectorAll(draft.scope.selector);
     if (scopeElements.length === 0) {
@@ -38,7 +45,7 @@ export function validateSelectorDraft(draft: SelectorDraft): ValidationResult {
         error: `Scope not found: ${draft.scope.selector}`,
       };
     }
-    
+
     // If no anchor, check target in first scope element
     if (!draft.anchor) {
       const target = safeQuerySelector(draft.target.selector, scopeElements[0]);
@@ -47,25 +54,28 @@ export function validateSelectorDraft(draft: SelectorDraft): ValidationResult {
         scopeMatches: scopeElements.length,
         anchorMatchIndex: 0,
         targetFound: target !== null,
-        error: target === null ? `Target not found in scope: ${draft.target.selector}` : undefined,
+        error:
+          target === null
+            ? `Target not found in scope: ${draft.target.selector}`
+            : undefined,
       };
     }
-    
+
     // Find anchor match
     let anchorMatchIndex = -1;
     for (let i = 0; i < scopeElements.length; i++) {
       const scopeEl = scopeElements[i];
       const anchorEl = safeQuerySelector(draft.anchor.selector, scopeEl);
-      
+
       if (anchorEl) {
-        const textOrAttr = anchorEl.textContent || '';
+        const textOrAttr = anchorEl.textContent || "";
         if (matchText(textOrAttr, draft.anchor.value, draft.anchor.matchMode)) {
           anchorMatchIndex = i;
           break;
         }
       }
     }
-    
+
     if (anchorMatchIndex === -1) {
       return {
         valid: false,
@@ -75,19 +85,21 @@ export function validateSelectorDraft(draft: SelectorDraft): ValidationResult {
         error: `Anchor not found: "${draft.anchor.value}" in ${draft.anchor.selector}`,
       };
     }
-    
+
     // Validate target in matched scope
     const matchedScope = scopeElements[anchorMatchIndex];
     const target = safeQuerySelector(draft.target.selector, matchedScope);
-    
+
     return {
       valid: target !== null,
       scopeMatches: scopeElements.length,
       anchorMatchIndex,
       targetFound: target !== null,
-      error: target === null ? `Target not found in matched scope: ${draft.target.selector}` : undefined,
+      error:
+        target === null
+          ? `Target not found in matched scope: ${draft.target.selector}`
+          : undefined,
     };
-    
   } catch (error) {
     return {
       valid: false,
@@ -111,7 +123,7 @@ export function validateSelectorLogic(logic: SelectorLogic): ValidationResult {
     confidence: 0,
     validated: false,
   };
-  
+
   if (logic.scope) {
     draft.scope = {
       selector: logic.scope.selector,
@@ -119,7 +131,7 @@ export function validateSelectorLogic(logic: SelectorLogic): ValidationResult {
       matchCount: 0,
     };
   }
-  
+
   if (logic.anchor) {
     draft.anchor = {
       selector: logic.anchor.selector,
@@ -128,7 +140,7 @@ export function validateSelectorLogic(logic: SelectorLogic): ValidationResult {
       matchMode: logic.anchor.matchMode,
     };
   }
-  
+
   return validateSelectorDraft(draft);
 }
 
@@ -161,37 +173,44 @@ export function countMatches(selector: string, context?: Element): number {
 /**
  * Find the element that would be targeted by the selector logic
  */
-export function findTargetElement(logic: SelectorLogic, anchorValue?: string): HTMLElement | null {
+export function findTargetElement(
+  logic: SelectorLogic,
+  anchorValue?: string,
+): HTMLElement | null {
   try {
     // No scope - direct target
     if (!logic.scope) {
       return safeQuerySelector<HTMLElement>(logic.target.selector);
     }
-    
+
     // Get scope elements
     const scopeElements = safeQuerySelectorAll(logic.scope.selector);
     if (scopeElements.length === 0) return null;
-    
+
     // No anchor - use first scope
     if (!logic.anchor) {
-      return safeQuerySelector<HTMLElement>(logic.target.selector, scopeElements[0]);
+      return safeQuerySelector<HTMLElement>(
+        logic.target.selector,
+        scopeElements[0],
+      );
     }
-    
+
     // Find anchor match
     const searchValue = anchorValue || logic.anchor.value;
     for (const scopeEl of scopeElements) {
       const anchorEl = safeQuerySelector(logic.anchor.selector, scopeEl);
       if (anchorEl) {
-        const textOrAttr = logic.anchor.type === 'attribute_match' && logic.anchor.attribute
-          ? anchorEl.getAttribute(logic.anchor.attribute) || ''
-          : anchorEl.textContent || '';
-        
+        const textOrAttr =
+          logic.anchor.type === "attribute_match" && logic.anchor.attribute
+            ? anchorEl.getAttribute(logic.anchor.attribute) || ""
+            : anchorEl.textContent || "";
+
         if (matchText(textOrAttr, searchValue, logic.anchor.matchMode)) {
           return safeQuerySelector<HTMLElement>(logic.target.selector, scopeEl);
         }
       }
     }
-    
+
     return null;
   } catch {
     return null;
@@ -207,21 +226,25 @@ export function getScopePreview(logic: SelectorLogic): {
   isMatch: boolean;
 }[] {
   if (!logic.scope) return [];
-  
+
   const scopeElements = safeQuerySelectorAll(logic.scope.selector);
-  
-  return scopeElements.map(scopeEl => {
-    let anchorText = '';
+
+  return scopeElements.map((scopeEl) => {
+    let anchorText = "";
     let isMatch = false;
-    
+
     if (logic.anchor) {
       const anchorEl = safeQuerySelector(logic.anchor.selector, scopeEl);
       if (anchorEl) {
-        anchorText = anchorEl.textContent?.trim().slice(0, 50) || '';
-        isMatch = matchText(anchorText, logic.anchor.value, logic.anchor.matchMode);
+        anchorText = anchorEl.textContent?.trim().slice(0, 50) || "";
+        isMatch = matchText(
+          anchorText,
+          logic.anchor.value,
+          logic.anchor.matchMode,
+        );
       }
     }
-    
+
     return { element: scopeEl, anchorText, isMatch };
   });
 }
