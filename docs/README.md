@@ -1,140 +1,135 @@
-# 📚 Homura 文档中心
+# 📚 Homura Documentation
 
 > 🔥 **Next-Gen AI Browser Automation Agent**
-> 
-> 不是给工具赋能，而是给 AI 赋能
 
 ---
 
-## 📖 文档目录
+## 📖 Documentation Index
 
-### 核心设计文档
+### Getting Started
 
-| 文档 | 说明 |
-|------|------|
-| [project-vision.md](./project-vision.md) | 项目白皮书：核心哲学、架构、路线图 |
-| [naming-convention.md](./naming-convention.md) | 命名规范：Mission vs Blueprint vs Workflow |
+| Document | Description |
+|----------|-------------|
+| [Project Vision](./project-vision.md) | Core philosophy and design principles |
+| [Quick Start](../README.md) | Installation and basic usage |
 
-### 技术文档
+### Core Concepts
 
-| 文档 | 说明 |
-|------|------|
-| [selector.md](./selector.md) | **选择器系统**：UnifiedSelector、双策略路由 |
-| [DEVELOPMENT.md](./DEVELOPMENT.md) | 开发入门：项目结构、快速启动、SDK 开发路线 |
-| [UI-DESIGN.md](./UI-DESIGN.md) | UI/UX 规范：心智交互、组件规范 |
-| [ai-constraints.md](./ai-constraints.md) | AI 约束：Primitives、沙箱执行 |
-| [key-considerations.md](./key-considerations.md) | 关键开发考虑事项 |
+| Document | Description |
+|----------|-------------|
+| [Selector System](./selector.md) | UnifiedSelector schema and dual-strategy routing |
+| [AI Constraints](./ai-constraints.md) | Primitives and sandboxed execution model |
+| [Blueprint Schema](./blueprint-schema.md) | Data structures and validation rules |
 
-### SDK 与插件生态（2026-03-22 新增）
+### SDK & Extension
 
-| 文档 | 说明 |
-|------|------|
-| [sdk-architecture.md](./sdk-architecture.md) | **SDK 架构**：Monorepo 结构、模块划分、API 设计 |
-| [ai-agent-mode.md](./ai-agent-mode.md) | **AI Agent 模式**：Skills + Rules → AI 自主执行 |
-| [blueprint-schema.md](./blueprint-schema.md) | **Blueprint Schema**：数据结构定义、验证规则 |
-| [plugin-maintenance.md](./plugin-maintenance.md) | **插件维护**：运行时自愈、开发时维护、热更新 |
+| Document | Description |
+|----------|-------------|
+| [SDK Architecture](./sdk-architecture.md) | **@homura/sdk** module structure and API |
+| [AI Agent Mode](./ai-agent-mode.md) | Skills + Rules → Autonomous execution |
+| [Plugin Maintenance](./plugin-maintenance.md) | Runtime self-healing and hot-reload |
+
+### Development
+
+| Document | Description |
+|----------|-------------|
+| [Development Guide](./DEVELOPMENT.md) | Project structure and development workflow |
+| [UI Design](./UI-DESIGN.md) | Component specs and UX guidelines |
+| [Key Considerations](./key-considerations.md) | Important development notes |
 
 ---
 
-## 🏗️ 架构概览
+## 🏗️ Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      表现层 (Presentation)                       │
-├────────────────────────────┬────────────────────────────────────┤
-│  SidePanel (录制器)         │  Dashboard (管理中心)              │
-│  ├── Inspect Mode          │  ├── Tool Library 工具库          │
-│  │   ├── Path 路径模式     │  └── Rule Book 规则书             │
-│  │   └── Structure 结构模式│                                    │
-│  └── Quick Actions 快速操作│                                    │
-├────────────────────────────┴────────────────────────────────────┤
-│                      智能层 (Intelligence)                       │
-│  ├── Smart Router          智能策略路由 (Path vs Structure)    │
-│  ├── UnifiedSelector       统一选择器 Schema                   │
-│  └── Tool Builder          录制 → JSON 工具                    │
-├─────────────────────────────────────────────────────────────────┤
-│                      执行层 (Execution)                          │
-│  ├── Atomic Tool Engine    UnifiedSelector 执行器              │
-│  ├── Selector Builder      DOM 分析 + 双策略生成               │
-│  └── Primitives            CLICK/INPUT/EXTRACT/WAIT/NAVIGATE   │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    Presentation Layer                   │
+│  ┌─────────────┐  ┌─────────────┐                      │
+│  │  SidePanel  │  │  Dashboard  │                      │
+│  │  Inspector  │  │  Tool Lib   │                      │
+│  │  Recorder   │  │  Rule Book  │                      │
+│  └─────────────┘  └─────────────┘                      │
+├─────────────────────────────────────────────────────────┤
+│                   Intelligence Layer                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐   │
+│  │ AI Service  │  │ Smart Route │  │ Tool Builder │   │
+│  └─────────────┘  └─────────────┘  └──────────────┘   │
+├─────────────────────────────────────────────────────────┤
+│                    Execution Layer                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐   │
+│  │   Selector  │  │   Executor  │  │  Primitives  │   │
+│  │    Engine   │  │    Engine   │  │  (5 actions) │   │
+│  └─────────────┘  └─────────────┘  └──────────────┘   │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🔑 核心概念
+## 🔑 Core Concepts
 
-### UnifiedSelector (统一选择器)
+### UnifiedSelector
+
+Homura uses a unified selector schema that supports multiple strategies:
 
 ```typescript
 interface UnifiedSelector {
+  id: string;                    // Unique ID
   strategy: 'path' | 'scope_anchor_target' | 'direct';
-  fullSelector: string;
-  pathData?: { root, intermediates, target };      // Path 策略
-  structureData?: { scope, anchor, target };       // Structure 策略
-  action: { type: 'CLICK' | 'INPUT' | ... };
+  fullSelector: string;          // Final CSS selector
+  confidence: number;            // 0-1 confidence score
+
+  // Path Strategy Data
+  pathData?: {
+    root: string;                // Semantic root
+    intermediates: string[];     // Path nodes
+    target: string;              // Target selector
+  };
+
+  // Structure Strategy Data
+  structureData?: {
+    scope: { selector: string; type: 'container_list' | 'single_container' };
+    anchor?: { selector: string; type: 'text_match' | 'attribute_match'; value: string };
+    target: { selector: string };
+  };
+
+  action: { type: 'CLICK' | 'INPUT' | 'EXTRACT_TEXT' | 'WAIT_FOR' | 'NAVIGATE'; params?: object };
 }
 ```
 
-### 双策略路由
+### Strategy Selection
 
-| 场景 | 策略 |
-|------|------|
-| 表格/列表中的元素 | Scope + Anchor + Target |
-| 单一嵌套元素 | Path Selector |
+| Scenario | Strategy | Example |
+|----------|----------|---------|
+| Repeating elements (tables, lists) | `scope_anchor_target` | Click button in specific table row |
+| Single nested element | `path` | Click submit button in form |
+| Simple unique element | `direct` | Click element with unique ID |
 
-### 五大基元 (Primitives)
+### Five Primitives
 
-| 基元 | 说明 |
-|------|------|
-| `CLICK` | 模拟点击 |
-| `INPUT` | 表单输入 |
-| `EXTRACT_TEXT` | 提取文本 |
-| `WAIT_FOR` | 等待元素 |
-| `NAVIGATE` | 页面导航 |
-
----
-
-## 🚀 快速开始
-
-```bash
-pnpm install && pnpm dev
-```
-
-1. 打开 `chrome://extensions/` → 启用开发者模式
-2. 加载 `dist` 文件夹
-3. 点击扩展图标打开 SidePanel
+| Primitive | Description | Modifiable |
+|-----------|-------------|------------|
+| `CLICK` | Click an element | ❌ |
+| `INPUT` | Input text | ❌ |
+| `EXTRACT_TEXT` | Extract text content | ❌ |
+| `WAIT_FOR` | Wait for element | ❌ |
+| `NAVIGATE` | Navigate to URL | ❌ |
 
 ---
 
-## 🗺️ 开发路线
+## 🗺️ Roadmap
 
-| 版本 | 目标 | 状态 |
-|------|------|------|
-| MVP | 执行引擎 + Scope/Anchor/Target | ✅ |
-| v0.5 | 选择器生成 + DOM 分析 | ✅ |
-| v0.6 | 路径选择器 + AI 路由 | ✅ |
-| v0.7 | UnifiedSelector + 双模式 UI | ✅ |
-| v0.7.1 | 高熵值锚点 + Split Table 支持 | ✅ |
-| v0.7.2 | 跨页面/跨 Tab 录制 | ✅ |
-| **v1.0** | **SDK 抽离 + AI Agent** | 🚧 进行中 |
-| **v1.5** | **Blueprint 导出 + 插件生态** | 📋 计划中 |
-| v2.0 | Self-Healing 自动修复 | 📋 |
-
-### SDK 开发优先级
-
-| 优先级 | 任务 | 预估时间 |
-|--------|------|----------|
-| P0 | SDK 基础抽离（types, selector, primitives, executor） | 1 周 |
-| P0 | 主插件迁移到 SDK | 3 天 |
-| P1 | AI Agent 实现 | 1 周 |
-| P1 | Blueprint 导出功能 | 2 天 |
-| P2 | 自愈机制 | 3 天 |
-
-详见 [DEVELOPMENT.md](./DEVELOPMENT.md)
+| Version | Goal | Status |
+|---------|------|--------|
+| MVP | Execution engine + Scope/Anchor/Target | ✅ |
+| v0.5 | Selector generation + DOM analysis | ✅ |
+| v0.6 | Path selector + AI routing | ✅ |
+| v0.7 | UnifiedSelector + dual-mode UI | ✅ |
+| v0.7.1 | High-entropy anchors + split tables | ✅ |
+| v0.7.2 | Cross-page + cross-tab recording | ✅ |
+| **v1.0** | **SDK extraction + AI Agent** | ✅ |
+| v1.5 | Blueprint export + plugin ecosystem | 📋 Planned |
+| v2.0 | Self-healing selectors | 📋 Planned |
 
 ---
 
-*🔥 Built with Mindful Interaction Design Philosophy*
-
-*最后更新: 2026-03-22*
+*Last updated: 2026-03-22*

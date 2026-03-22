@@ -309,9 +309,15 @@ if (Date.now() - context.state.startTime > timeout) {
 
 ## 🧪 使用示例
 
-### 在定制插件中使用
+> ⚠️ **当前状态**：AI Agent 模式设计完成，**待实现**
+>
+> SDK v1.0 已完成核心引擎抽离（types, selector, primitives, executor）。
+> AI Agent 计划在 v1.5 版本实现。
+
+### 计划中的 API（未来版本）
 
 ```javascript
+// v1.5 计划实现
 import { AIAgent } from '@homura/sdk/agent';
 import blueprint from './blueprint.json';
 
@@ -319,16 +325,30 @@ import blueprint from './blueprint.json';
 const agent = new AIAgent(blueprint);
 
 // 执行
-try {
-  const result = await agent.execute({
-    // 可选的初始参数
-    autoApproveColleges: ['艺术学院']
-  });
-  
-  console.log('执行成功', result);
-} catch (error) {
-  console.error('执行失败', error);
-}
+const result = await agent.execute({
+  autoApproveColleges: ['艺术学院']
+});
+```
+
+### 当前可用：直接执行 AtomicTool
+
+```javascript
+// v1.0 当前可用
+import { executeTool } from '@homura/sdk/executor';
+
+// 直接执行工具
+const tool = {
+  tool_id: 'click_approve',
+  name: '点击审批按钮',
+  parameters: { student_name: { type: 'string', required: true } },
+  selector_logic: {
+    scope: { type: 'container_list', selector: 'tr' },
+    anchor: { type: 'text_match', selector: '.name', value: '{{student_name}}' },
+    target: { selector: '.btn-approve', action: 'CLICK' }
+  }
+};
+
+const result = await executeTool(tool, { student_name: '张三' });
 ```
 
 ### 监听执行进度

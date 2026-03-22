@@ -1,24 +1,32 @@
 /**
- * Homura Constants
+ * =============================================================================
+ * Homura Constants (Compatibility Layer)
+ * =============================================================================
+ *
+ * This file now re-exports constants from @homura/sdk for backward compatibility.
+ * New code should import directly from @homura/sdk.
  */
 
-/** Debug highlight colors */
-export const HIGHLIGHT_COLORS = {
-  scope: 'rgba(59, 130, 246, 0.5)',    // Blue for scope
-  anchor: 'rgba(34, 197, 94, 0.5)',    // Green for anchor
-  target: 'rgba(249, 115, 22, 0.5)',   // Orange for target
-  error: 'rgba(239, 68, 68, 0.5)',     // Red for errors
+// Re-export all constants from SDK
+export * from "@homura/sdk/constants";
+
+// =============================================================================
+// EXTENSION-SPECIFIC CONSTANTS
+// =============================================================================
+//
+// Constants that are specific to the Chrome Extension and not part of the SDK.
+// =============================================================================
+
+/** Storage keys for extension state */
+export const STORAGE_KEYS = {
+  RECORDING_STATE: "homura_recording_state",
+  TOOL_LIBRARY: "homura_tool_library",
+  RULE_BOOK: "homura_rule_book",
+  SELECTOR_DRAFT: "homura_selector_draft",
 } as const;
 
-/** Default timeouts */
-export const TIMEOUTS = {
-  waitForElement: 5000,
-  actionDelay: 100,
-  typeDelay: 50,
-} as const;
-
-/** CSS class names for injected elements */
-export const CSS_CLASSES = {
-  highlightOverlay: 'homura-highlight-overlay',
-  debugPanel: 'homura-debug-panel',
+/** Chrome extension IDs */
+export const EXTENSION_IDS = {
+  SIDEPANEL: "homura-sidepanel",
+  DASHBOARD: "homura-dashboard",
 } as const;

@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run build:sdk && tsc && vite build",
+    "build:extension": "tsc && vite build",
+    "build:sdk": "cd packages/sdk && tsc",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@homura/sdk": "file:./packages/sdk",
     "framer-motion": "^12.29.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

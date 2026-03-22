@@ -8,13 +8,24 @@
 
 ```
 homura/
+├── packages/                   # SDK 模块 (Monorepo)
+│   └── sdk/                    # @homura/sdk - 核心引擎
+│       ├── src/
+│       │   ├── types/          # 类型定义
+│       │   ├── selector/       # 选择器引擎
+│       │   ├── primitives/     # 原子操作
+│       │   ├── executor/       # 工具执行
+│       │   ├── utils/          # 工具函数
+│       │   └── constants.ts
+│       ├── dist/               # 编译输出
+│       └── package.json
+│
 ├── docs/                        # 开发文档
 ├── public/
 │   ├── icons/                  # 扩展图标
 │   └── test-pages/             # 测试页面
-│       └── audit-table.html
 │
-└── src/
+└── src/                         # Chrome Extension (依赖 SDK)
     ├── background/             # Service Worker（智能层）
     │   ├── index.ts           # 入口 + 消息路由 + AI 初始化 + 录制状态管理
     │   └── orchestrator.ts    # 任务编排逻辑
@@ -22,9 +33,9 @@ homura/
     ├── content/               # Content Script（执行层）
     │   ├── index.tsx          # 入口
     │   ├── messageHandler.ts  # 消息处理（检查/录制/执行）
-    │   └── engine/            # 🔥 核心引擎
-    │       ├── executor.ts       # Atomic Tool 执行器
-    │       ├── primitives.ts     # 底层基元 (CLICK/INPUT/...)
+    │   └── engine/            # 🔥 核心引擎（包装 SDK）
+    │       ├── executor.ts       # 包装 SDK executor
+    │       ├── primitives.ts     # Re-export SDK primitives
     │       └── highlighter.ts    # 调试高亮
     │
     ├── sidepanel/             # 录制器 UI (React + Framer Motion)
@@ -61,33 +72,70 @@ homura/
     │       ├── tools.ts          # AI Tool Schema 定义
     │       └── types.ts          # 含 SmartSelectorContext/Result
     │
-    ├── shared/                # 共享模块
-    │   ├── types.ts           # 核心类型定义
-    │   ├── constants.ts       # 常量
-    │   ├── utils.ts           # 工具函数
-    │   └── selectorBuilder/   # 选择器生成模块
-    │       ├── index.ts          # 统一导出
-    │       ├── types.ts          # 类型（含 AncestorInfo, PathSelector）
-    │       ├── analyzer.ts       # DOM 分析（含路径收集、语义评分）
-    │       ├── generator.ts      # 选择器生成
-    │       └── validator.ts      # 选择器验证
+    ├── shared/                # 共享模块（兼容层）
+    │   ├── types.ts           # Re-export @homura/sdk/types
+    │   ├── constants.ts       # Re-export @homura/sdk/constants
+    │   ├── utils.ts           # Re-export @homura/sdk/utils
+    │   └── selectorBuilder/   # Re-export @homura/sdk/selector
     │
     └── styles/
         └── global.css         # 全局样式
+```
+
+### SDK 模块说明
+
+| 模块 | 路径 | 说明 |
+|------|------|------|
+| Types | `@homura/sdk/types` | 核心类型定义 |
+| Selector | `@homura/sdk/selector` | 选择器生成与验证 |
+| Primitives | `@homura/sdk/primitives` | 原子操作（CLICK/INPUT/EXTRACT/WAIT/NAVIGATE） |
+| Executor | `@homura/sdk/executor` | 工具执行引擎 |
+| Utils | `@homura/sdk/utils` | 工具函数 |
+| Constants | `@homura/sdk/constants` | 共享常量 |
+
+---
+
+## 🚀 构建与开发
+
+### 安装依赖
+
+```bash
+npm install
+```
+
+### 构建命令
+
+```bash
+# 仅构建 SDK
+npm run build:sdk
+
+# 构建扩展（包含 SDK）
+npm run build:extension
+
+# 完整构建
+npm run build
+```
+
+### SDK 开发
+
+```bash
+cd packages/sdk
+
+# 监听模式（开发时使用）
+npm run dev
+
+# 仅类型检查
+npm run typecheck
+
+# 清理构建产物
+npm run clean
 ```
 
 ---
 
 ## 🧪 如何测试
 
-### 1. 启动开发服务器
-
-```bash
-pnpm install
-pnpm dev
-```
-
-### 2. 加载扩展
+### 1. 加载扩展
 
 1. 打开 `chrome://extensions/`
 2. 启用"开发者模式"
@@ -344,110 +392,71 @@ div.section (score: 0.6) ← 保留
 ├── ✅ v0.6: 路径选择器 + AI Tool Calling
 ├── ✅ v0.7: UnifiedSelector + 双模式 UI
 ├── ✅ v0.7.1: 熵感知锚点 + 分割表格支持
-└── ✅ v0.7.2: 跨页面/跨 Tab 录制
-
-进行中：
-└── 🚧 v1.0: AI 完整工具生成
+├── ✅ v0.7.2: 跨页面/跨 Tab 录制
+└── ✅ v1.0: SDK 抽离完成
 
 计划中：
-├── 📋 v1.5: Rule Book 解析执行
+├── 📋 v1.5: AI Agent + Rule Book 解析执行
 └── 📋 v2.0: Self-Healing 自动修复
 ```
 
 ---
 
-## 🔧 SDK 抽离与定制插件开发 (2026-03-22 新增)
+## 🔧 SDK 抽离与定制插件开发
+
+> ✅ **v1.0 已完成**：SDK 基础抽离和主插件迁移
 
 ### 架构转型
 
 从单一的 Chrome Extension 转变为 **SDK + 插件生态系统**：
 
 ```
+定制插件 A
+    ↓ 依赖 SDK
+@homura/sdk (核心引擎)
+    ↓ 依赖 SDK
 Homura 主插件
     ↓ 依赖 SDK
-@homura/sdk
-    ↓ 依赖 SDK
-定制插件 (你开发的插件)
+定制插件 B
 ```
 
 ### 开发优先级
 
-| 优先级 | 任务 | 预估时间 | 状态 |
-|--------|------|----------|------|
-| P0 | SDK 基础抽离 | 1 周 | 🚧 进行中 |
-| P0 | 主插件迁移到 SDK | 3 天 | 📋 待开始 |
-| P1 | AI Agent 实现 | 1 周 | 📋 待开始 |
-| P1 | Blueprint 导出功能 | 2 天 | 📋 待开始 |
-| P2 | 自愈机制 | 3 天 | 📋 待开始 |
-| P2 | CLI 工具 | 2 天 | 📋 待开始 |
+| 优先级 | 任务 | 状态 |
+|--------|------|------|
+| P0 | SDK 基础抽离 | ✅ 完成 |
+| P0 | 主插件迁移到 SDK | ✅ 完成 |
+| P1 | AI Agent 实现 | 📋 计划中 (v1.5) |
+| P1 | Blueprint 导出功能 | 📋 计划中 (v1.5) |
+| P2 | 自愈机制 | 📋 计划中 (v2.0) |
+| P2 | CLI 工具 | 📋 计划中 (v2.0) |
 
-### 详细任务清单
+### SDK v1.0 已完成模块
 
-#### Phase 1: SDK 基础抽离
-- [ ] 创建 Monorepo 结构
-  ```bash
-  mkdir -p packages/sdk
-  # 配置 pnpm-workspace.yaml
-  ```
-- [ ] 抽离 types 模块
-  - `src/shared/types.ts` → `packages/sdk/src/types/`
-- [ ] 抽离 selector 模块
-  - `src/shared/selectorBuilder/*` → `packages/sdk/src/selector/`
-- [ ] 抽离 primitives 模块
-  - `src/content/engine/primitives.ts` → `packages/sdk/src/primitives/`
-- [ ] 抽离 executor 模块
-  - `src/content/engine/executor.ts` → `packages/sdk/src/executor/`
-- [ ] 配置 SDK 构建
-  - TypeScript 编译
-  - 单元测试
-  - API 文档
+#### Phase 1: SDK 基础抽离 ✅
+- [x] 创建 Monorepo 结构 (`packages/sdk/`)
+- [x] 抽离 types 模块 (`@homura/sdk/types`)
+- [x] 抽离 selector 模块 (`@homura/sdk/selector`)
+- [x] 抽离 primitives 模块 (`@homura/sdk/primitives`)
+- [x] 抽离 executor 模块 (`@homura/sdk/executor`)
+- [x] 抽离 utils 模块 (`@homura/sdk/utils`)
+- [x] 配置 SDK 构建 (TypeScript, package.json)
 
-#### Phase 2: AI Agent 实现
-- [ ] 实现 AIAgent 基础类
-- [ ] 实现 Rule Book 解析器
-- [ ] 实现 LLM 调度器
-- [ ] 实现执行上下文管理
-- [ ] 编写 Agent 测试
+#### Phase 2: 主插件迁移 ✅
+- [x] 创建兼容层 (`src/shared/`)
+- [x] 更新导入路径
+- [x] 移除冗余代码
+- [x] 验证功能完整性
 
-#### Phase 3: Blueprint 导出
-- [ ] 设计 Blueprint Schema
-- [ ] 在 Dashboard 添加导出面板
-- [ ] 实现 Blueprint 验证
-- [ ] 实现 Blueprint 下载
-
-#### Phase 4: 主插件迁移
-- [ ] 修改主插件依赖 SDK
-- [ ] 移除冗余代码
-- [ ] 验证功能完整性
-- [ ] 更新文档
-
-#### Phase 5: 维护工具
-- [ ] 实现运行时自愈
-- [ ] 实现健康检查
-- [ ] 实现 AI 批量修复
-- [ ] 实现热更新机制
-
-### 相关文档
-
-- [SDK 架构设计](./sdk-architecture.md) - SDK 模块划分和 API 设计
-- [AI Agent 模式](./ai-agent-mode.md) - Skills + Rules → AI Agent
-- [Blueprint Schema](./blueprint-schema.md) - Blueprint 数据结构定义
-- [插件维护机制](./plugin-maintenance.md) - 运行时自愈和开发时维护
-
-### 使用 SDK 开发定制插件
+### 当前可用：使用 SDK 开发
 
 ```bash
-# 未来使用 CLI 生成插件
-homura create my-plugin --blueprint ./blueprint.json
-
-# 当前手动创建
-mkdir my-plugin
-cd my-plugin
-npm init -y
+# 安装 SDK
 npm install @homura/sdk
 
-# 编写插件代码
-# 参考 AI Agent 模式文档
+# 使用 SDK
+import { analyzeElement, createUnifiedSelector } from '@homura/sdk/selector';
+import { executeTool } from '@homura/sdk/executor';
 ```
 
 ---

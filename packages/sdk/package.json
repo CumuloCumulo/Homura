@@ -8,23 +8,31 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./types": {
       "types": "./dist/types/index.d.ts",
-      "import": "./dist/types/index.js"
+      "default": "./dist/types/index.js"
     },
     "./selector": {
       "types": "./dist/selector/index.d.ts",
-      "import": "./dist/selector/index.js"
+      "default": "./dist/selector/index.js"
     },
     "./primitives": {
       "types": "./dist/primitives/index.d.ts",
-      "import": "./dist/primitives/index.js"
+      "default": "./dist/primitives/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "default": "./dist/utils/index.js"
     },
     "./executor": {
       "types": "./dist/executor/index.d.ts",
-      "import": "./dist/executor/index.js"
+      "default": "./dist/executor/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "default": "./dist/constants.js"
     }
   },
   "files": [

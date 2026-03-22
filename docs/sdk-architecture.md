@@ -1,54 +1,71 @@
-# @homura/sdk 架构设计文档
+# @homura/sdk Architecture
 
-> 🎯 **目标**：将 Homura 的核心能力抽离为独立的 SDK，支持快速开发定制化浏览器自动化插件
+> 🎯 **Goal**: Extract Homura's core capabilities into a reusable SDK for building browser automation tools.
+
+> ✅ **Status**: Phase 1 Complete — SDK extracted and functional
 
 ---
 
-## 📐 设计原则
+## 📐 Design Principles
 
-### 1. 代码复用，而非重写
-SDK 是对现有代码的**重新组织和抽离**，不是重写。Homura 主插件和定制插件都依赖同一个 SDK。
+### 1. Code Reuse, Not Rewrite
 
-### 2. Monorepo 架构
+The SDK is a **reorganization** of existing code, not a rewrite. Both the main Homura extension and future custom plugins depend on the same SDK.
+
+### 2. Monorepo Structure
+
 ```
 homura/
 ├── packages/
-│   ├── sdk/              # @homura/sdk - 核心引擎
-│   ├── extension/        # 主 Homura 插件（依赖 sdk）
-│   └── (future) cli/     # CLI 工具（依赖 sdk，可选）
-├── package.json (root)
-└── pnpm-workspace.yaml
+│   └── sdk/              # @homura/sdk - Core engine
+├── src/                  # Chrome extension (depends on sdk)
+├── package.json          # Root package.json
+└── tsconfig.json         # Root TypeScript config
 ```
 
-### 3. 零运行时依赖
-SDK 只包含纯逻辑，不依赖 React、UI 框架，确保在任何环境下都能运行。
+### 3. Zero Runtime Dependencies
+
+The SDK contains pure logic only — no React, no UI frameworks. This ensures it can run in any browser environment.
 
 ---
 
-## 📦 模块划分
-
-### 核心模块
-
-| 模块 | 来源 | 说明 |
-|------|------|------|
-| `types` | `src/shared/types.ts` | 核心 TypeScript 类型定义 |
-| `selector` | `src/shared/selectorBuilder/*` | 选择器生成、验证、执行 |
-| `primitives` | `src/content/engine/primitives.ts` | 五大基元操作 |
-| `executor` | `src/content/engine/executor.ts` | 工具执行器 |
-| `agent` | `src/background/orchestrator.ts` | AI 编排器（待实现） |
-
-### 目录结构
+## 📦 Module Structure
 
 ```
 packages/sdk/
 ├── src/
-│   ├── types/                 # 类型定义
-│   ├── selector/              # 选择器引擎
-│   ├── primitives/            # 五大基元
-│   ├── executor/              # 工具执行器
-│   ├── agent/                 # AI Agent
-│   ├── utils/                 # 工具函数
-│   └── index.ts               # SDK 主入口
+│   ├── types/              # Core type definitions
+│   │   ├── index.ts
+│   │   ├── primitives.ts   # CLICK, INPUT, EXTRACT_TEXT, etc.
+│   │   ├── selector.ts     # SelectorScope, SelectorAnchor, etc.
+│   │   └── execution.ts    # ExecuteToolResult, ExecutionError, etc.
+│   ├── selector/           # Selector generation & validation
+│   │   ├── index.ts
+│   │   ├── analyzer.ts     # DOM analysis + semantic scoring
+│   │   ├── generator.ts    # Dual-strategy generation
+│   │   ├── types.ts        # Selector-specific types
+│   │   └── validator.ts    # Real-time validation
+│   ├── primitives/         # Atomic operations
+│   │   ├── index.ts
+│   │   ├── click.ts
+│   │   ├── input.ts
+│   │   ├── extract.ts
+│   │   ├── wait.ts
+│   │   └── navigate.ts
+│   ├── executor/           # Tool execution engine
+│   │   ├── index.ts
+│   │   └── tool.ts         # executeTool implementation
+│   ├── utils/              # Utility functions
+│   │   ├── index.ts
+│   │   ├── variables.ts    # Variable substitution
+│   │   ├── text.ts         # Text matching
+│   │   ├── truncate.ts     # String truncation
+│   │   ├── sleep.ts        # Async delays
+│   │   ├── messageId.ts    # Message ID generation
+│   │   └── dom.ts          # DOM utilities
+│   ├── constants.ts        # Shared constants
+│   └── index.ts            # Main entry point
+├── dist/                   # Compiled output
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -56,68 +73,204 @@ packages/sdk/
 
 ---
 
-## 🔌 API 设计
+## 🔌 API Reference
 
-### 选择器引擎
+### Selector Analysis
+
 ```typescript
-import { SelectorEngine } from '@homura/sdk/selector';
+import { analyzeElement, collectAncestorPath } from '@homura/sdk/selector';
 
-// 从 DOM 元素生成选择器
-const selector = await SelectorEngine.fromElement(element, {
-  strategy: 'auto',
-  action: 'CLICK'
-});
+// Analyze a DOM element
+const element = document.querySelector('button');
+const analysis = analyzeElement(element);
 
-// 验证选择器
-const result = SelectorEngine.validate(selector);
-
-// 执行选择器
-const outcome = await SelectorEngine.execute(selector, params);
+// Result includes:
+// - tag, id, classes, attributes
+// - text content
+// - semantic role (button, link, input, etc.)
+// - ancestor path with semantic scoring
 ```
 
-### 工具执行
+### Selector Generation
+
+```typescript
+import {
+  buildPathSelector,
+  buildRelativeSelector,
+  createUnifiedSelector,
+  generateSelectorStrategies
+} from '@homura/sdk/selector';
+
+// Generate multiple strategies
+const strategies = await generateSelectorStrategies(analysis, context);
+
+// Create unified selector (SDK's main format)
+const unified = createUnifiedSelector(analysis, 'CLICK');
+
+// Result:
+// {
+//   id: 'sel_xxx',
+//   strategy: 'path' | 'scope_anchor_target',
+//   fullSelector: 'container button.submit',
+//   pathData?: { ... },
+//   structureData?: { ... },
+//   action: { type: 'CLICK' },
+//   confidence: 0.85
+// }
+```
+
+### Selector Validation
+
+```typescript
+import {
+  validateSelectorDraft,
+  countMatches,
+  findTargetElement
+} from '@homura/sdk/selector';
+
+// Validate selector works on current page
+const result = validateSelectorDraft(selectorDraft);
+// Returns: { valid: boolean, matchCount: number, error?: string }
+
+// Count matches
+const count = countMatches('button.submit');
+
+// Find and return target element
+const element = await findTargetElement(selectorLogic, params);
+```
+
+### Primitive Operations
+
+```typescript
+import {
+  executeClick,
+  executeInput,
+  executeExtractText,
+  executeWaitFor,
+  executeNavigate
+} from '@homura/sdk/primitives';
+
+// Click an element
+await executeClick(buttonElement, { delay: 100 });
+
+// Input text
+await executeInput(inputElement, { value: 'Hello World', clearFirst: true });
+
+// Extract text
+const text = await executeExtractText(element, { attribute: 'textContent' });
+
+// Wait for element
+await executeWaitFor(() => document.querySelector('.loaded'), { timeout: 5000 });
+
+// Navigate
+await executeNavigate('https://example.com');
+```
+
+### Tool Execution
+
 ```typescript
 import { executeTool } from '@homura/sdk/executor';
 
-const result = await executeTool(tool, {
-  student_name: '张三'
-});
+// Define an atomic tool
+const tool: AtomicTool = {
+  tool_id: 'approve_button',
+  name: 'Click Approve Button',
+  parameters: { student_name: { type: 'string', required: true } },
+  selector_logic: {
+    target: {
+      selector: '.btn-approve',
+      action: 'CLICK'
+    },
+    scope: {
+      type: 'container_list',
+      selector: 'tr'
+    },
+    anchor: {
+      type: 'text_match',
+      selector: '.name',
+      value: '{{student_name}}',
+      matchMode: 'contains'
+    }
+  }
+};
+
+// Execute with parameters
+const result = await executeTool(tool, { student_name: '张三' });
+
+// Result:
+// {
+//   success: true,
+//   data: undefined,
+//   metadata: { duration: 145 }
+// }
 ```
 
-### AI Agent
+---
+
+## 📦 Package Exports
+
+```json
+{
+  "exports": {
+    ".": "./dist/index.js",
+    "./types": "./dist/types/index.js",
+    "./selector": "./dist/selector/index.js",
+    "./primitives": "./dist/primitives/index.js",
+    "./utils": "./dist/utils/index.js",
+    "./executor": "./dist/executor/index.js",
+    "./constants": "./dist/constants.js"
+  }
+}
+```
+
+---
+
+## 🚀 Usage in Extension
+
+The Homura extension uses a **compatibility layer** to maintain backward compatibility:
+
 ```typescript
-import { AIAgent } from '@homura/sdk/agent';
+// src/shared/selectorBuilder/index.ts
+export * from '@homura/sdk/selector';
 
-const agent = new AIAgent({
-  skills: [tool1, tool2, tool3],
-  rules: '# 审批规则\n...',
-  llmProvider: 'tongyi'
-});
-
-const result = await agent.execute({ student_name: '张三' });
+// Extension-specific types remain here
+export interface RecordingState { ... }
+export interface RecordedAction { ... }
 ```
 
----
-
-## 📋 开发阶段
-
-### Phase 1: 基础抽离（P0）
-- [ ] 创建 `packages/sdk` 目录结构
-- [ ] 配置 Monorepo
-- [ ] 抽离 `types` 模块
-- [ ] 抽离 `selector` 模块
-- [ ] 抽离 `primitives` 模块
-- [ ] 抽离 `executor` 模块
-
-### Phase 2: Agent 实现（P1）
-- [ ] 实现 `AIAgent` 基础逻辑
-- [ ] 实现 Rule Book 解析器
-- [ ] 实现 LLM 调度器
-
-### Phase 3: 高级特性（P2）
-- [ ] 实现 `SelfHealingAgent`
-- [ ] 实现选择器自动修复
+This means:
+- Existing code continues to work with old imports
+- New code can import directly from `@homura/sdk`
+- Extension-specific features stay in the extension
 
 ---
 
-*本文档记录 SDK 的架构设计，随开发持续更新*
+## 📋 Completed Phases
+
+### ✅ Phase 1: SDK Extraction (Complete)
+
+- [x] Create `packages/sdk` directory structure
+- [x] Configure build system (TypeScript, package.json)
+- [x] Extract `types` module
+- [x] Extract `selector` module (analyzer, generator, validator)
+- [x] Extract `primitives` module
+- [x] Extract `executor` module
+- [x] Extract `utils` module
+- [x] Create compatibility layer in main extension
+- [x] Update build scripts
+
+### 📋 Phase 2: AI Agent (Planned)
+
+- [ ] Implement `AIAgent` class
+- [ ] Implement Rule Book parser
+- [ ] Implement LLM dispatcher
+
+### 📋 Phase 3: Advanced Features (Planned)
+
+- [ ] Self-healing selectors
+- [ ] Automatic selector repair
+- [ ] Blueprint export/import
+
+---
+
+*Last updated: 2026-03-22*
