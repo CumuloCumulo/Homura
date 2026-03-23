@@ -16,18 +16,18 @@
  * - Calm interface (gentle animations)
  */
 
-import React from "react";
-import { Reorder, useDragControls } from "framer-motion";
-import { useRecordingStore } from "../stores/recordingStore";
-import { sendToContentScript } from "../utils/ensureContentScript";
+import React from 'react';
+import { Reorder, useDragControls } from 'framer-motion';
+import { useRecordingStore } from '../stores/recordingStore';
+import { sendToContentScript } from '../utils/ensureContentScript';
 import type {
   RecordedAction,
   SelectorDraft,
   ElementAnalysis,
   AnchorCandidate,
-} from "@shared/selectorBuilder/types";
-import type { UnifiedSelector } from "@homura/sdk/types";
-import { QuickActionPanel } from "./QuickActionPanel";
+} from '@shared/selectorBuilder/types';
+import type { UnifiedSelector } from '@homura/sdk/types';
+import { QuickActionPanel } from './QuickActionPanel';
 
 // =============================================================================
 // ICONS
@@ -35,7 +35,7 @@ import { QuickActionPanel } from "./QuickActionPanel";
 
 const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
   <svg
-    className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+    className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"
@@ -113,22 +113,21 @@ export function RecordingPanel() {
     const checkRecordingState = async () => {
       try {
         const response = await chrome.runtime.sendMessage({
-          type: "GET_RECORDING_STATE",
+          type: 'GET_RECORDING_STATE',
         });
         if (response?.state?.isRecording && !isRecording) {
           setRecording(true);
           addLog({
             timestamp: Date.now(),
-            level: "info",
-            message: "已恢复录制状态",
+            level: 'info',
+            message: '已恢复录制状态',
           });
         }
       } catch (error) {
-        console.log("[Homura] Could not check recording state:", error);
+        console.log('[Homura] Could not check recording state:', error);
       }
     };
     checkRecordingState();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 
   const handleStartRecording = async () => {
@@ -138,16 +137,16 @@ export function RecordingPanel() {
         active: true,
         currentWindow: true,
       });
-      if (!tab?.id) throw new Error("No active tab");
+      if (!tab?.id) throw new Error('No active tab');
 
       // Notify background to track recording state (enables cross-page recording)
       await chrome.runtime.sendMessage({
-        type: "SET_RECORDING_STATE",
+        type: 'SET_RECORDING_STATE',
         payload: { isRecording: true, tabId: tab.id },
       });
 
       // Start recording in content script
-      await sendToContentScript({ type: "START_RECORDING" });
+      await sendToContentScript({ type: 'START_RECORDING' });
       setRecording(true);
       clearRecordedActions();
 
@@ -155,23 +154,23 @@ export function RecordingPanel() {
       if (tab.url) {
         addRecordedAction({
           id: `nav_${Date.now()}_initial`,
-          type: "navigate",
-          name: "起始页面",
+          type: 'navigate',
+          name: '起始页面',
           url: tab.url,
-          navigationType: "direct",
+          navigationType: 'direct',
           timestamp: Date.now(),
         });
       }
 
       addLog({
         timestamp: Date.now(),
-        level: "info",
-        message: "开始录制（支持跨页面）",
+        level: 'info',
+        message: '开始录制（支持跨页面）',
       });
     } catch (error) {
       addLog({
         timestamp: Date.now(),
-        level: "error",
+        level: 'error',
         message: `启动录制失败: ${error}`,
       });
     }
@@ -181,23 +180,23 @@ export function RecordingPanel() {
     try {
       // Stop tracking in background
       await chrome.runtime.sendMessage({
-        type: "SET_RECORDING_STATE",
+        type: 'SET_RECORDING_STATE',
         payload: { isRecording: false },
       });
 
-      await sendToContentScript({ type: "STOP_RECORDING" });
+      await sendToContentScript({ type: 'STOP_RECORDING' });
       setRecording(false);
       addLog({
         timestamp: Date.now(),
-        level: "info",
+        level: 'info',
         message: `录制结束，共 ${recordedActions.length} 个操作`,
       });
     } catch (error) {
-      console.error("Stop recording error:", error);
+      console.error('Stop recording error:', error);
       // Ensure background state is cleared even if content script fails
       try {
         await chrome.runtime.sendMessage({
-          type: "SET_RECORDING_STATE",
+          type: 'SET_RECORDING_STATE',
           payload: { isRecording: false },
         });
       } catch {}
@@ -209,8 +208,8 @@ export function RecordingPanel() {
     if (recordedActions.length === 0) {
       addLog({
         timestamp: Date.now(),
-        level: "error",
-        message: "没有可用的录制操作",
+        level: 'error',
+        message: '没有可用的录制操作',
       });
       return;
     }
@@ -218,8 +217,8 @@ export function RecordingPanel() {
     setProcessing(true);
     addLog({
       timestamp: Date.now(),
-      level: "info",
-      message: "正在使用 AI 生成工具...",
+      level: 'info',
+      message: '正在使用 AI 生成工具...',
     });
 
     try {
@@ -228,27 +227,27 @@ export function RecordingPanel() {
         tool?: { name: string };
         error?: string;
       }>({
-        type: "AI_GENERATE_TOOL",
+        type: 'AI_GENERATE_TOOL',
         payload: { actions: recordedActions },
       });
 
       if (result.success && result.tool) {
         addLog({
           timestamp: Date.now(),
-          level: "info",
+          level: 'info',
           message: `工具生成成功: ${result.tool.name}`,
         });
       } else {
         addLog({
           timestamp: Date.now(),
-          level: "error",
+          level: 'error',
           message: `生成失败: ${result.error}`,
         });
       }
     } catch (error) {
       addLog({
         timestamp: Date.now(),
-        level: "error",
+        level: 'error',
         message: `AI 请求失败: ${error}`,
       });
     } finally {
@@ -357,7 +356,7 @@ interface ActionListProps {
   onReorder: (actions: RecordedAction[]) => void;
   onLog: (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => void;
 }
@@ -412,7 +411,7 @@ interface ReorderableActionCardProps {
   onUpdate: (updates: Partial<RecordedAction>) => void;
   onLog: (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => void;
 }
@@ -438,15 +437,15 @@ function ReorderableActionCard({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{
-        layout: { duration: 0.2, ease: "easeOut" },
+        layout: { duration: 0.2, ease: 'easeOut' },
         opacity: { duration: 0.15 },
         scale: { duration: 0.15 },
       }}
       whileDrag={{
         scale: 1.02,
-        boxShadow: "0 10px 30px -10px rgba(139, 92, 246, 0.3)",
+        boxShadow: '0 10px 30px -10px rgba(139, 92, 246, 0.3)',
         zIndex: 50,
-        cursor: "grabbing",
+        cursor: 'grabbing',
       }}
       dragElastic={0}
     >
@@ -473,46 +472,46 @@ interface ActionCardProps {
   onUpdate: (updates: Partial<RecordedAction>) => void;
   onLog: (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => void;
   dragControls: ReturnType<typeof useDragControls>;
 }
 
 const actionIcons: Record<string, string> = {
-  click: "👆",
-  input: "⌨️",
-  select: "📋",
-  scroll: "📜",
-  navigate: "🌐",
+  click: '👆',
+  input: '⌨️',
+  select: '📋',
+  scroll: '📜',
+  navigate: '🌐',
 };
 
 /** Get default action name based on type (stable, doesn't change on reorder) */
 function getDefaultActionName(type: string): string {
   const names: Record<string, string> = {
-    click: "点击",
-    input: "输入",
-    select: "选择",
-    scroll: "滚动",
-    navigate: "导航",
+    click: '点击',
+    input: '输入',
+    select: '选择',
+    scroll: '滚动',
+    navigate: '导航',
   };
-  return names[type] || "操作";
+  return names[type] || '操作';
 }
 
 /** Truncate URL for display */
 function truncateUrl(url: string, maxLength: number = 40): string {
   if (!url || url.length <= maxLength) return url;
-  return url.slice(0, maxLength) + "...";
+  return url.slice(0, maxLength) + '...';
 }
 
 /** Get navigation type badge color */
 function getNavigationTypeColor(type: string): string {
   const colors: Record<string, string> = {
-    link: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-    form: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    direct: "text-violet-400 bg-violet-500/10 border-violet-500/20",
-    reload: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20",
-    typed: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    link: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+    form: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+    direct: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
+    reload: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20',
+    typed: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
   };
   return colors[type] || colors.direct;
 }
@@ -520,13 +519,13 @@ function getNavigationTypeColor(type: string): string {
 /** Get navigation type label */
 function getNavigationTypeLabel(type: string): string {
   const labels: Record<string, string> = {
-    link: "链接",
-    form: "表单",
-    direct: "跳转",
-    reload: "刷新",
-    typed: "输入",
+    link: '链接',
+    form: '表单',
+    direct: '跳转',
+    reload: '刷新',
+    typed: '输入',
   };
-  return labels[type] || "跳转";
+  return labels[type] || '跳转';
 }
 
 function ActionCard({
@@ -567,9 +566,9 @@ function ActionCard({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       handleNameSubmit();
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       setLocalName(action.name || defaultName);
       setIsEditingName(false);
     }
@@ -581,8 +580,8 @@ function ActionCard({
         group rounded-lg overflow-hidden
         ${
           isExpanded
-            ? "bg-zinc-800/60 border border-violet-500/20 shadow-[0_0_15px_-3px_rgba(139,92,246,0.15)]"
-            : "bg-zinc-900/50 border border-white/5 hover:border-white/10"
+            ? 'bg-zinc-800/60 border border-violet-500/20 shadow-[0_0_15px_-3px_rgba(139,92,246,0.15)]'
+            : 'bg-zinc-900/50 border border-white/5 hover:border-white/10'
         }
       `}
     >
@@ -605,15 +604,15 @@ function ActionCard({
           className={`
           shrink-0 w-6 h-6 flex items-center justify-center rounded text-xs
           transition-colors duration-200
-          ${isExpanded ? "bg-violet-500/20" : "bg-zinc-800"}
+          ${isExpanded ? 'bg-violet-500/20' : 'bg-zinc-800'}
         `}
         >
-          {actionIcons[action.type] || "•"}
+          {actionIcons[action.type] || '•'}
         </span>
 
         {/* Name - Editable */}
         <div className="flex-1 min-w-0">
-          {action.type === "navigate" ? (
+          {action.type === 'navigate' ? (
             // Navigation action: display URL instead of selector
             <div className="flex flex-col gap-0.5">
               <div
@@ -632,7 +631,7 @@ function ActionCard({
                   className="text-[9px] font-mono text-blue-300 truncate"
                   title={action.url}
                 >
-                  🌐 {truncateUrl(action.url || "", 35)}
+                  🌐 {truncateUrl(action.url || '', 35)}
                 </code>
                 {action.navigationType && (
                   <span
@@ -670,9 +669,9 @@ function ActionCard({
               </span>
             </div>
           )}
-          {action.type !== "navigate" && (
+          {action.type !== 'navigate' && (
             <code className="block text-[9px] font-mono text-zinc-600 truncate mt-0.5">
-              {action.elementAnalysis?.minimalSelector || ""}
+              {action.elementAnalysis?.minimalSelector || ''}
             </code>
           )}
         </div>
@@ -686,7 +685,7 @@ function ActionCard({
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="shrink-0 p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
-          title={isExpanded ? "收起" : "展开选择器配置"}
+          title={isExpanded ? '收起' : '展开选择器配置'}
         >
           <ChevronIcon expanded={isExpanded} />
         </button>
@@ -712,7 +711,7 @@ function ActionCard({
       {/* Expanded Content - Selector Configuration + Quick Actions */}
       {isExpanded && (
         <div className="px-3 pb-3 pt-1 space-y-2.5 animate-fade-in border-t border-white/5">
-          {action.type === "navigate" ? (
+          {action.type === 'navigate' ? (
             // Navigation action: show URL and test button
             <>
               <div className="p-2 rounded bg-zinc-900/80 border border-blue-500/20">
@@ -733,31 +732,31 @@ function ActionCard({
                     if (!action.url) return;
                     onLog({
                       timestamp: Date.now(),
-                      level: "info",
+                      level: 'info',
                       message: `正在跳转到: ${truncateUrl(action.url, 30)}`,
                     });
                     try {
                       const result = await chrome.runtime.sendMessage({
-                        type: "EXECUTE_NAVIGATE",
+                        type: 'EXECUTE_NAVIGATE',
                         payload: { url: action.url, newTab: false },
                       });
                       if (result.success) {
                         onLog({
                           timestamp: Date.now(),
-                          level: "info",
-                          message: "跳转成功",
+                          level: 'info',
+                          message: '跳转成功',
                         });
                       } else {
                         onLog({
                           timestamp: Date.now(),
-                          level: "error",
+                          level: 'error',
                           message: `跳转失败: ${result.error}`,
                         });
                       }
                     } catch (error) {
                       onLog({
                         timestamp: Date.now(),
-                        level: "error",
+                        level: 'error',
                         message: `跳转错误: ${error}`,
                       });
                     }
@@ -772,31 +771,31 @@ function ActionCard({
                     if (!action.url) return;
                     onLog({
                       timestamp: Date.now(),
-                      level: "info",
+                      level: 'info',
                       message: `正在新标签页打开: ${truncateUrl(action.url, 30)}`,
                     });
                     try {
                       const result = await chrome.runtime.sendMessage({
-                        type: "EXECUTE_NAVIGATE",
+                        type: 'EXECUTE_NAVIGATE',
                         payload: { url: action.url, newTab: true },
                       });
                       if (result.success) {
                         onLog({
                           timestamp: Date.now(),
-                          level: "info",
-                          message: "新标签页已打开",
+                          level: 'info',
+                          message: '新标签页已打开',
                         });
                       } else {
                         onLog({
                           timestamp: Date.now(),
-                          level: "error",
+                          level: 'error',
                           message: `打开失败: ${result.error}`,
                         });
                       }
                     } catch (error) {
                       onLog({
                         timestamp: Date.now(),
-                        level: "error",
+                        level: 'error',
                         message: `错误: ${error}`,
                       });
                     }
@@ -871,20 +870,20 @@ function SelectorEditor({
       return {
         scope: {
           selector: scope.selector,
-          type: "container_list",
+          type: 'container_list',
           matchCount: 0,
         },
         anchor: anchor
           ? {
               selector: anchor.selector,
-              type: "text_match" as const, // Use SelectorDraft anchor type
-              value: anchor.value || "",
-              matchMode: anchor.matchMode || "contains",
+              type: 'text_match' as const, // Use SelectorDraft anchor type
+              value: anchor.value || '',
+              matchMode: anchor.matchMode || 'contains',
             }
           : undefined,
         target: {
           selector: target.selector,
-          action: "CLICK",
+          action: 'CLICK',
         },
         confidence: unifiedSelector.confidence,
         validated: false,
@@ -896,7 +895,7 @@ function SelectorEditor({
       return {
         target: {
           selector: unifiedSelector.fullSelector,
-          action: "CLICK",
+          action: 'CLICK',
         },
         confidence: unifiedSelector.confidence,
         validated: false,
@@ -914,8 +913,8 @@ function SelectorEditor({
       scope: hasContainer
         ? {
             selector:
-              analysis.containerSelector || analysis.containerTagName || "",
-            type: "container_list",
+              analysis.containerSelector || analysis.containerTagName || '',
+            type: 'container_list',
             matchCount: 0,
           }
         : undefined,
@@ -923,13 +922,13 @@ function SelectorEditor({
         ? {
             selector: firstAnchor.selector,
             type: firstAnchor.type,
-            value: firstAnchor.text || firstAnchor.attribute?.value || "",
-            matchMode: "contains" as const,
+            value: firstAnchor.text || firstAnchor.attribute?.value || '',
+            matchMode: 'contains' as const,
           }
         : undefined,
       target: {
         selector: analysis.relativeSelector || analysis.minimalSelector,
-        action: "CLICK",
+        action: 'CLICK',
       },
       confidence: 0.8,
       validated: false,
@@ -951,8 +950,8 @@ function SelectorEditor({
       anchor: {
         selector: candidate.selector,
         type: candidate.type,
-        value: candidate.text || candidate.attribute?.value || "",
-        matchMode: "contains" as const,
+        value: candidate.text || candidate.attribute?.value || '',
+        matchMode: 'contains' as const,
       },
     });
   };
@@ -1032,10 +1031,10 @@ function SelectorEditor({
                     anchor: {
                       ...localDraft.anchor!,
                       matchMode: e.target.value as
-                        | "contains"
-                        | "exact"
-                        | "startsWith"
-                        | "endsWith",
+                        | 'contains'
+                        | 'exact'
+                        | 'startsWith'
+                        | 'endsWith',
                     },
                   })
                 }
@@ -1078,10 +1077,10 @@ function SelectorEditor({
           <div className="flex flex-wrap gap-1">
             {analysis.anchorCandidates.slice(0, 4).map((candidate, i) => {
               const displayText =
-                candidate.text || candidate.attribute?.value || "";
+                candidate.text || candidate.attribute?.value || '';
               const truncated =
                 displayText.length > 15
-                  ? displayText.slice(0, 15) + "..."
+                  ? displayText.slice(0, 15) + '...'
                   : displayText;
 
               return (
@@ -1114,7 +1113,7 @@ function SelectorEditor({
 interface SelectorSectionProps {
   label: string;
   sublabel: string;
-  color: "blue" | "violet";
+  color: 'blue' | 'violet';
   value: string;
   onChange: (value: string) => void;
 }
@@ -1128,14 +1127,14 @@ function SelectorSection({
 }: SelectorSectionProps) {
   const colorStyles = {
     blue: {
-      border: "border-blue-500/20",
-      text: "text-blue-400",
-      focus: "focus:border-blue-500/50",
+      border: 'border-blue-500/20',
+      text: 'text-blue-400',
+      focus: 'focus:border-blue-500/50',
     },
     violet: {
-      border: "border-violet-500/20",
-      text: "text-violet-400",
-      focus: "focus:border-violet-500/50",
+      border: 'border-violet-500/20',
+      text: 'text-violet-400',
+      focus: 'focus:border-violet-500/50',
     },
   };
 
@@ -1176,8 +1175,8 @@ function EmptyState({ isRecording }: { isRecording: boolean }) {
         transition-colors duration-300
         ${
           isRecording
-            ? "bg-rose-500/10 border-rose-500/30"
-            : "bg-zinc-900 border-white/5"
+            ? 'bg-rose-500/10 border-rose-500/30'
+            : 'bg-zinc-900 border-white/5'
         }
       `}
       >
@@ -1200,10 +1199,10 @@ function EmptyState({ isRecording }: { isRecording: boolean }) {
         )}
       </div>
       <p className="text-xs text-zinc-500">
-        {isRecording ? "正在录制操作..." : '点击"开始录制"'}
+        {isRecording ? '正在录制操作...' : '点击"开始录制"'}
       </p>
       <p className="text-[10px] text-zinc-600 mt-1">
-        {isRecording ? "在页面上执行操作" : "录制你的页面操作"}
+        {isRecording ? '在页面上执行操作' : '录制你的页面操作'}
       </p>
     </div>
   );

@@ -7,15 +7,15 @@
  * with visual color coding for each component
  */
 
-import React from "react";
-import { motion } from "framer-motion";
+import React from 'react';
+import { motion } from 'framer-motion';
 import type {
   ElementAnalysis,
   AnchorCandidate,
   SelectorDraft,
-} from "@shared/selectorBuilder/types";
-import type { UnifiedSelector } from "@homura/sdk/types";
-import { QuickActionPanel } from "./QuickActionPanel";
+} from '@shared/selectorBuilder/types';
+import type { UnifiedSelector } from '@homura/sdk/types';
+import { QuickActionPanel } from './QuickActionPanel';
 
 // =============================================================================
 // TYPES
@@ -28,7 +28,7 @@ interface StructureViewProps {
   onDraftChange: (draft: SelectorDraft) => void;
   onLog: (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => void;
 }
@@ -61,7 +61,7 @@ function LayersIcon({ className }: { className?: string }) {
 
 interface SelectorSectionProps {
   title: string;
-  color: "blue" | "emerald" | "violet";
+  color: 'blue' | 'emerald' | 'violet';
   value: string;
   onChange: (value: string) => void;
   info?: string;
@@ -70,22 +70,22 @@ interface SelectorSectionProps {
 
 const colorStyles = {
   blue: {
-    border: "border-blue-500/20",
-    text: "text-blue-400",
-    focus: "focus:border-blue-500/50",
-    bg: "bg-blue-500/5",
+    border: 'border-blue-500/20',
+    text: 'text-blue-400',
+    focus: 'focus:border-blue-500/50',
+    bg: 'bg-blue-500/5',
   },
   emerald: {
-    border: "border-emerald-500/20",
-    text: "text-emerald-400",
-    focus: "focus:border-emerald-500/50",
-    bg: "bg-emerald-500/5",
+    border: 'border-emerald-500/20',
+    text: 'text-emerald-400',
+    focus: 'focus:border-emerald-500/50',
+    bg: 'bg-emerald-500/5',
   },
   violet: {
-    border: "border-violet-500/20",
-    text: "text-violet-400",
-    focus: "focus:border-violet-500/50",
-    bg: "bg-violet-500/5",
+    border: 'border-violet-500/20',
+    text: 'text-violet-400',
+    focus: 'focus:border-violet-500/50',
+    bg: 'bg-violet-500/5',
   },
 };
 
@@ -149,15 +149,15 @@ function AnchorCandidateItem({
         flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-all
         ${
           isSelected
-            ? "bg-emerald-500/10 border border-emerald-500/30"
-            : "bg-black/30 border border-transparent hover:border-zinc-700"
+            ? 'bg-emerald-500/10 border border-emerald-500/30'
+            : 'bg-black/30 border border-transparent hover:border-zinc-700'
         }
       `}
     >
       <span
         className={`
         shrink-0 w-4 h-4 flex items-center justify-center rounded-full text-[9px]
-        ${isSelected ? "bg-emerald-500/30 text-emerald-400" : "bg-zinc-800 text-zinc-500"}
+        ${isSelected ? 'bg-emerald-500/30 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}
       `}
       >
         {index + 1}
@@ -165,7 +165,7 @@ function AnchorCandidateItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span
-            className={`text-[10px] font-mono ${isSelected ? "text-emerald-400" : "text-zinc-400"}`}
+            className={`text-[10px] font-mono ${isSelected ? 'text-emerald-400' : 'text-zinc-400'}`}
           >
             {candidate.selector}
           </span>
@@ -174,12 +174,12 @@ function AnchorCandidateItem({
             px-1 py-0.5 text-[8px] rounded
             ${
               candidate.isUnique
-                ? "bg-emerald-500/20 text-emerald-400"
-                : "bg-zinc-700 text-zinc-400"
+                ? 'bg-emerald-500/20 text-emerald-400'
+                : 'bg-zinc-700 text-zinc-400'
             }
           `}
           >
-            {candidate.type === "text_match" ? "text" : "attr"}
+            {candidate.type === 'text_match' ? 'text' : 'attr'}
           </span>
         </div>
         {candidate.text && (
@@ -233,8 +233,8 @@ export function StructureView({
         anchor: {
           selector: candidate.selector,
           type: candidate.type,
-          value: candidate.text || candidate.attribute?.value || "",
-          matchMode: "contains",
+          value: candidate.text || candidate.attribute?.value || '',
+          matchMode: 'contains',
         },
       });
     }
@@ -264,11 +264,11 @@ export function StructureView({
             className={`
             px-1.5 py-0.5 text-[8px] rounded
             ${
-              containerType === "table"
-                ? "bg-blue-500/20 text-blue-400"
-                : containerType === "list"
-                  ? "bg-emerald-500/20 text-emerald-400"
-                  : "bg-zinc-700 text-zinc-400"
+              containerType === 'table'
+                ? 'bg-blue-500/20 text-blue-400'
+                : containerType === 'list'
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'bg-zinc-700 text-zinc-400'
             }
           `}
           >
@@ -309,7 +309,7 @@ export function StructureView({
                   scope: { ...selectorDraft.scope!, selector: value },
                 })
               }
-              info={`${selectorDraft.scope.matchCount || "?"} 个`}
+              info={`${selectorDraft.scope.matchCount || '?'} 个`}
             />
           )}
 
@@ -354,7 +354,7 @@ export function StructureView({
                       ...selectorDraft,
                       anchor: {
                         ...selectorDraft.anchor!,
-                        matchMode: e.target.value as "contains" | "exact",
+                        matchMode: e.target.value as 'contains' | 'exact',
                       },
                     })
                   }
@@ -419,7 +419,7 @@ export function StructureView({
                 className="text-[9px] text-violet-400 hover:text-violet-300"
               >
                 {showAllAnchors
-                  ? "收起"
+                  ? '收起'
                   : `显示全部 (${anchorCandidates.length})`}
               </button>
             )}

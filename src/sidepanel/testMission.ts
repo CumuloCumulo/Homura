@@ -11,7 +11,7 @@
  * 3. We want to click the "Approve" button for a specific student
  */
 
-import type { AtomicTool } from "@homura/sdk/types";
+import type { AtomicTool } from '@homura/sdk/types';
 
 /**
  * Test Tool: Click Approve Button for a specific student
@@ -22,35 +22,35 @@ import type { AtomicTool } from "@homura/sdk/types";
  * 3. Target: Click the .btn-approve button in that row
  */
 export const TOOL_CLICK_APPROVE: AtomicTool = {
-  tool_id: "click_approve_button",
-  name: "点击审批通过按钮",
+  tool_id: 'click_approve_button',
+  name: '点击审批通过按钮',
   description:
-    "Click the approve button for a specific student in the audit table",
+    'Click the approve button for a specific student in the audit table',
   parameters: {
     student_name: {
-      type: "string",
-      description: "The name of the student to approve",
+      type: 'string',
+      description: 'The name of the student to approve',
       required: true,
     },
   },
   selector_logic: {
     // Step 1: Scope - Find all table rows
     scope: {
-      type: "container_list",
+      type: 'container_list',
       selector: 'table tbody tr, .audit-table tr, [data-testid="audit-row"]',
     },
     // Step 2: Anchor - Match the row with the target student name
     anchor: {
-      type: "text_match",
+      type: 'text_match',
       selector: 'td:first-child, .student-name, [data-testid="student-name"]',
-      value: "{{student_name}}",
-      matchMode: "contains",
+      value: '{{student_name}}',
+      matchMode: 'contains',
     },
     // Step 3: Target - Click the approve button
     target: {
       selector:
         '.btn-approve, button.approve, [data-testid="approve-btn"], button:last-child',
-      action: "CLICK",
+      action: 'CLICK',
     },
   },
 };
@@ -59,14 +59,14 @@ export const TOOL_CLICK_APPROVE: AtomicTool = {
  * Test Tool: Extract all student names from a table
  */
 export const TOOL_EXTRACT_NAMES: AtomicTool = {
-  tool_id: "extract_student_names",
-  name: "提取学生姓名列表",
-  description: "Extract all student names from the audit table",
+  tool_id: 'extract_student_names',
+  name: '提取学生姓名列表',
+  description: 'Extract all student names from the audit table',
   parameters: {},
   selector_logic: {
     target: {
-      selector: "table tbody td:first-child, .student-name",
-      action: "EXTRACT_TEXT",
+      selector: 'table tbody td:first-child, .student-name',
+      action: 'EXTRACT_TEXT',
       actionParams: {
         multiple: true,
       },
@@ -78,13 +78,13 @@ export const TOOL_EXTRACT_NAMES: AtomicTool = {
  * Test Tool: Input into search field
  */
 export const TOOL_SEARCH_INPUT: AtomicTool = {
-  tool_id: "search_input",
-  name: "搜索框输入",
-  description: "Input text into search field",
+  tool_id: 'search_input',
+  name: '搜索框输入',
+  description: 'Input text into search field',
   parameters: {
     search_text: {
-      type: "string",
-      description: "Text to search for",
+      type: 'string',
+      description: 'Text to search for',
       required: true,
     },
   },
@@ -92,9 +92,9 @@ export const TOOL_SEARCH_INPUT: AtomicTool = {
     target: {
       selector:
         'input[type="search"], input[placeholder*="搜索"], #search, .search-input',
-      action: "INPUT",
+      action: 'INPUT',
       actionParams: {
-        value: "{{search_text}}",
+        value: '{{search_text}}',
         clearFirst: true,
       },
     },
@@ -105,14 +105,14 @@ export const TOOL_SEARCH_INPUT: AtomicTool = {
  * Test Tool: Wait for table to load
  */
 export const TOOL_WAIT_TABLE: AtomicTool = {
-  tool_id: "wait_table_load",
-  name: "等待表格加载",
-  description: "Wait for the audit table to appear",
+  tool_id: 'wait_table_load',
+  name: '等待表格加载',
+  description: 'Wait for the audit table to appear',
   parameters: {},
   selector_logic: {
     target: {
-      selector: "table tbody tr, .audit-table tr",
-      action: "WAIT_FOR",
+      selector: 'table tbody tr, .audit-table tr',
+      action: 'WAIT_FOR',
       actionParams: {
         timeout: 5000,
         visible: true,
@@ -125,14 +125,14 @@ export const TOOL_WAIT_TABLE: AtomicTool = {
  * Simple test tool for basic click (no scope/anchor)
  */
 export const TOOL_SIMPLE_CLICK: AtomicTool = {
-  tool_id: "simple_click",
-  name: "简单点击测试",
-  description: "Simple click on a button for basic testing",
+  tool_id: 'simple_click',
+  name: '简单点击测试',
+  description: 'Simple click on a button for basic testing',
   parameters: {},
   selector_logic: {
     target: {
       selector: 'button, [role="button"], input[type="button"]',
-      action: "CLICK",
+      action: 'CLICK',
     },
   },
 };

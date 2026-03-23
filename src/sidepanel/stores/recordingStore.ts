@@ -6,22 +6,22 @@
  * State management for the recording/inspection functionality
  */
 
-import { create } from "zustand";
+import { create } from 'zustand';
 import type {
   ElementAnalysis,
   SelectorDraft,
   RecordedAction,
   PathSelector,
-} from "@shared/selectorBuilder/types";
-import type { LogEntry } from "@shared/types";
-import type { UnifiedSelector } from "@homura/sdk/types";
+} from '@shared/selectorBuilder/types';
+import type { LogEntry } from '@shared/types';
+import type { UnifiedSelector } from '@homura/sdk/types';
 
-export type RecordingMode = "inspect" | "record";
+export type RecordingMode = 'inspect' | 'record';
 
 // AI Strategy Types
-export type AIStatus = "idle" | "analyzing" | "decided";
-export type AIStrategy = "path_selector" | "scope_anchor_target" | null;
-export type ViewMode = "path" | "structure";
+export type AIStatus = 'idle' | 'analyzing' | 'decided';
+export type AIStrategy = 'path_selector' | 'scope_anchor_target' | null;
+export type ViewMode = 'path' | 'structure';
 
 interface RecordingStore {
   /** Current mode */
@@ -101,7 +101,7 @@ interface RecordingStore {
 }
 
 export const useRecordingStore = create<RecordingStore>((set) => ({
-  mode: "inspect",
+  mode: 'inspect',
   isInspecting: false,
   isRecording: false,
   hoveredElement: null,
@@ -114,7 +114,7 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   isProcessing: false,
 
   // AI Strategy State - Initial values
-  aiStatus: "idle",
+  aiStatus: 'idle',
   aiStrategy: null,
   aiReasoning: undefined,
   userModeOverride: undefined,
@@ -132,7 +132,7 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
       selectorDraft: null,
       unifiedSelector: null,
       // Reset AI state when analysis changes
-      aiStatus: "idle",
+      aiStatus: 'idle',
       aiStrategy: null,
       aiReasoning: undefined,
       userModeOverride: undefined,
@@ -145,10 +145,10 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
       // Keep selectorDraft in sync for backward compatibility
       // This can be removed once all components migrate to UnifiedSelector
       aiStrategy:
-        selector?.strategy === "path"
-          ? "path_selector"
-          : selector?.strategy === "scope_anchor_target"
-            ? "scope_anchor_target"
+        selector?.strategy === 'path'
+          ? 'path_selector'
+          : selector?.strategy === 'scope_anchor_target'
+            ? 'scope_anchor_target'
             : null,
     }),
   updateUnifiedSelector: (updates) =>
@@ -192,7 +192,7 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
       unifiedSelector: null,
       recordedActions: [],
       // Reset AI state
-      aiStatus: "idle",
+      aiStatus: 'idle',
       aiStrategy: null,
       aiReasoning: undefined,
       userModeOverride: undefined,
@@ -206,14 +206,14 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
     set({
       aiStrategy: strategy,
       aiReasoning: reasoning,
-      aiStatus: "decided",
+      aiStatus: 'decided',
     }),
   setUserModeOverride: (mode) => set({ userModeOverride: mode }),
   setPathSelectorResult: (result) => set({ pathSelectorResult: result }),
   setContainerType: (type) => set({ containerType: type }),
   resetAIState: () =>
     set({
-      aiStatus: "idle",
+      aiStatus: 'idle',
       aiStrategy: null,
       aiReasoning: undefined,
       userModeOverride: undefined,

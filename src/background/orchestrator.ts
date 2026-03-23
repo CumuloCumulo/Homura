@@ -9,9 +9,9 @@
  * For MVP, we hardcode a simple decision flow to test the execution engine.
  */
 
-import type { AtomicTool, ExecuteToolResult } from "@homura/sdk/types";
-import type { LogEntry } from "@shared/types";
-import { executeToolOnActiveTab } from "./messaging";
+import type { AtomicTool, ExecuteToolResult } from '@homura/sdk/types';
+import type { LogEntry } from '@shared/types';
+import { executeToolOnActiveTab } from './messaging';
 
 export interface MissionContext {
   /** Current step index */
@@ -55,7 +55,7 @@ export async function runMission(
     // Log start
     context.logs.push({
       timestamp: Date.now(),
-      level: "info",
+      level: 'info',
       message: `Executing step ${i + 1}/${tools.length}: ${tool.name}`,
       toolId: tool.tool_id,
     });
@@ -72,7 +72,7 @@ export async function runMission(
       // Log result
       context.logs.push({
         timestamp: Date.now(),
-        level: result.success ? "info" : "error",
+        level: result.success ? 'info' : 'error',
         message: result.success
           ? `Step ${i + 1} completed in ${result.metadata?.duration}ms`
           : `Step ${i + 1} failed: ${result.error?.message}`,
@@ -87,8 +87,8 @@ export async function runMission(
       if (!result.success) {
         context.logs.push({
           timestamp: Date.now(),
-          level: "error",
-          message: "Mission aborted due to error",
+          level: 'error',
+          message: 'Mission aborted due to error',
         });
         break;
       }
@@ -98,7 +98,7 @@ export async function runMission(
     } catch (error) {
       context.logs.push({
         timestamp: Date.now(),
-        level: "error",
+        level: 'error',
         message: `Step ${i + 1} threw exception: ${error}`,
         toolId: tool.tool_id,
       });

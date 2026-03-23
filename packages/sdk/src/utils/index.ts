@@ -14,3 +14,6 @@ export * from './text.js';
 
 // DOM utilities
 export * from './dom.js';
+
+// Blueprint utilities
+export * from './blueprint.js';

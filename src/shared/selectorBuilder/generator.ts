@@ -7,29 +7,27 @@
  * Also provides converters to/from UnifiedSelector
  */
 
-import type {
-  SelectorLogic,
-  SelectorScope,
-  SelectorAnchor,
-  SelectorTarget,
-  PrimitiveAction,
-  UnifiedSelector,
-  SelectorStrategy,
-  PathStrategyData,
-  StructureStrategyData,
-} from "@homura/sdk/types";
+// SDK types - reusable automation logic
 import {
   generateSelectorId,
   buildFullSelectorFromPath,
   buildFullSelectorFromStructure,
-} from "@homura/sdk/types";
-import type {
-  ElementAnalysis,
-  SelectorDraft,
-  AnchorCandidate,
-  PathSelector,
-} from "./types";
-import { buildMinimalSelector } from "./analyzer";
+  type SelectorLogic,
+  type SelectorScope,
+  type SelectorAnchor,
+  type SelectorTarget,
+  type PrimitiveAction,
+  type UnifiedSelector,
+  type SelectorStrategy,
+  type PathStrategyData,
+  type StructureStrategyData,
+} from '@homura/sdk/types';
+
+// Extension-specific types - recording state
+import type { ElementAnalysis, AnchorCandidate, PathSelector } from './types';
+
+// Import from SDK (core selector building logic and types)
+import { buildMinimalSelector, type SelectorDraft } from '@homura/sdk/selector';
 
 /**
  * Generate a complete selector logic from element analysis
@@ -85,62 +83,62 @@ export function generateSelectorLogic(
  * We use containerSelector and containerTagName for serialized data.
  */
 function buildScope(analysis: ElementAnalysis): SelectorScope {
-  let selector = "";
+  let selector = '';
 
   // Prefer using serialized container data (works across Chrome messaging)
   if (analysis.containerSelector) {
     selector = analysis.containerSelector;
   } else if (
     analysis.container &&
-    typeof analysis.container.tagName === "string"
+    typeof analysis.container.tagName === 'string'
   ) {
     // Fallback: container is a real HTMLElement (same context)
     const container = analysis.container;
     const parent = container.parentElement;
 
     // Build selector for the container pattern
-    if (analysis.containerType === "table") {
-      const table = container.closest("table") as HTMLElement | null;
+    if (analysis.containerType === 'table') {
+      const table = container.closest('table') as HTMLElement | null;
       if (table) {
         const tableSelector = buildMinimalSelector(table);
         selector = `${tableSelector} tbody tr`;
       } else {
-        selector = "tr";
+        selector = 'tr';
       }
-    } else if (analysis.containerType === "list") {
-      const list = container.closest("ul, ol") as HTMLElement | null;
+    } else if (analysis.containerType === 'list') {
+      const list = container.closest('ul, ol') as HTMLElement | null;
       if (list) {
         const listSelector = buildMinimalSelector(list);
         selector = `${listSelector} li`;
       } else {
-        selector = "li";
+        selector = 'li';
       }
     } else {
       selector = buildMinimalSelector(container);
 
       if (parent) {
         const parentSelector = buildMinimalSelector(parent as HTMLElement);
-        if (parentSelector.includes(".") || parentSelector.includes("[")) {
+        if (parentSelector.includes('.') || parentSelector.includes('[')) {
           selector = `${parentSelector} > ${container.tagName.toLowerCase()}`;
         }
       }
     }
   } else if (analysis.containerTagName) {
     // Fallback: use serialized tag name
-    if (analysis.containerType === "table") {
-      selector = "tr";
-    } else if (analysis.containerType === "list") {
-      selector = "li";
+    if (analysis.containerType === 'table') {
+      selector = 'tr';
+    } else if (analysis.containerType === 'list') {
+      selector = 'li';
     } else {
       selector = analysis.containerTagName;
     }
   } else {
     // Ultimate fallback
-    selector = "*";
+    selector = '*';
   }
 
   return {
-    type: "container_list",
+    type: 'container_list',
     selector,
   };
 }
@@ -158,20 +156,20 @@ function buildAnchor(
 
   if (!anchor) return undefined;
 
-  if (anchor.type === "text_match") {
+  if (anchor.type === 'text_match') {
     return {
-      type: "text_match",
+      type: 'text_match',
       selector: anchor.selector,
-      value: anchorValue || anchor.text || "{{value}}",
-      matchMode: "contains",
+      value: anchorValue || anchor.text || '{{value}}',
+      matchMode: 'contains',
     };
   } else {
     return {
-      type: "attribute_match",
+      type: 'attribute_match',
       selector: anchor.selector,
       attribute: anchor.attribute?.name,
-      value: anchorValue || anchor.attribute?.value || "{{value}}",
-      matchMode: "exact",
+      value: anchorValue || anchor.attribute?.value || '{{value}}',
+      matchMode: 'exact',
     };
   }
 }
@@ -197,7 +195,7 @@ function buildTarget(
  */
 export function createSelectorDraft(
   analysis: ElementAnalysis,
-  action: PrimitiveAction = "CLICK",
+  action: PrimitiveAction = 'CLICK',
 ): SelectorDraft {
   // Check for container using serializable fields (works across Chrome messaging)
   const hasContainer = !!(
@@ -214,7 +212,7 @@ export function createSelectorDraft(
   // Use targetSelector if available, otherwise fall back to relativeSelector or minimalSelector
   // BUT: if self-targeting, use empty string to signal "return scope element as target"
   const targetSelector = isSelfTarget
-    ? "" // Empty string signals: use scope element as target
+    ? '' // Empty string signals: use scope element as target
     : analysis.targetSelector ||
       analysis.relativeSelector ||
       analysis.minimalSelector;
@@ -239,8 +237,8 @@ export function createSelectorDraft(
       draft.anchor = {
         selector: topAnchor.selector,
         type: topAnchor.type,
-        value: topAnchor.text || topAnchor.attribute?.value || "",
-        matchMode: "contains",
+        value: topAnchor.text || topAnchor.attribute?.value || '',
+        matchMode: 'contains',
       };
     }
   }
@@ -283,7 +281,7 @@ export function draftToSelectorLogic(draft: SelectorDraft): SelectorLogic {
  */
 export function generateSelectorStrategies(
   analysis: ElementAnalysis,
-  action: PrimitiveAction = "CLICK",
+  action: PrimitiveAction = 'CLICK',
 ): SelectorLogic[] {
   const strategies: SelectorLogic[] = [];
 
@@ -312,7 +310,7 @@ export function generateSelectorStrategies(
       target: {
         // Empty string signals: use scope element as target
         selector: isSelfTarget
-          ? ""
+          ? ''
           : analysis.relativeSelector ||
             analysis.targetSelector ||
             analysis.minimalSelector,
@@ -349,29 +347,29 @@ export function generateSelectorStrategies(
  * 3. direct: Fallback for simple elements
  */
 export function determineStrategy(analysis: ElementAnalysis): SelectorStrategy {
-  const hasRepeatingStructure = analysis.containerType !== "single";
+  const hasRepeatingStructure = analysis.containerType !== 'single';
   const hasAnchorCandidates =
     analysis.anchorCandidates && analysis.anchorCandidates.length > 0;
 
   // Rule: Use scope_anchor_target for ALL repeating structures with anchors
   // This includes: table, list, card, grid (Tailwind Grid/Flex layouts)
   const isStructuredContainer =
-    analysis.containerType === "table" ||
-    analysis.containerType === "list" ||
-    analysis.containerType === "card" ||
-    analysis.containerType === "grid";
+    analysis.containerType === 'table' ||
+    analysis.containerType === 'list' ||
+    analysis.containerType === 'card' ||
+    analysis.containerType === 'grid';
 
   if (hasRepeatingStructure && isStructuredContainer && hasAnchorCandidates) {
-    return "scope_anchor_target";
+    return 'scope_anchor_target';
   }
 
   // Rule: Use path for single elements or elements with ancestor path
   if (analysis.ancestorPath && analysis.ancestorPath.length > 0) {
-    return "path";
+    return 'path';
   }
 
   // Fallback: direct selector
-  return "direct";
+  return 'direct';
 }
 
 /**
@@ -454,7 +452,7 @@ export function buildStructureData(
     target: {
       // Empty string signals: use scope element as target (self-targeting)
       selector: isSelfTarget
-        ? ""
+        ? ''
         : analysis.relativeSelector ||
           analysis.targetSelector ||
           analysis.minimalSelector,
@@ -465,8 +463,8 @@ export function buildStructureData(
     structureData.anchor = {
       selector: topAnchor.selector,
       type: topAnchor.type,
-      value: topAnchor.text || topAnchor.attribute?.value || "",
-      matchMode: "contains",
+      value: topAnchor.text || topAnchor.attribute?.value || '',
+      matchMode: 'contains',
     };
   }
 
@@ -485,7 +483,7 @@ export function buildStructureData(
  */
 export function createUnifiedSelector(
   analysis: ElementAnalysis,
-  action: PrimitiveAction = "CLICK",
+  action: PrimitiveAction = 'CLICK',
   forceStrategy?: SelectorStrategy,
 ): UnifiedSelector {
   const strategy = forceStrategy || determineStrategy(analysis);
@@ -496,7 +494,7 @@ export function createUnifiedSelector(
   let confidence = 0.5;
 
   switch (strategy) {
-    case "path":
+    case 'path':
       pathData = buildPathData(analysis);
       if (pathData) {
         fullSelector = buildFullSelectorFromPath(pathData);
@@ -513,7 +511,7 @@ export function createUnifiedSelector(
       }
       break;
 
-    case "scope_anchor_target":
+    case 'scope_anchor_target':
       structureData = buildStructureData(analysis);
       if (structureData) {
         fullSelector = buildFullSelectorFromStructure(structureData);
@@ -525,7 +523,7 @@ export function createUnifiedSelector(
       }
       break;
 
-    case "direct":
+    case 'direct':
     default:
       fullSelector = analysis.scopedSelector || analysis.minimalSelector;
       confidence = 0.5;
@@ -544,7 +542,7 @@ export function createUnifiedSelector(
     confidence,
     validated: false,
     metadata: {
-      source: "programmatic",
+      source: 'programmatic',
       createdAt: Date.now(),
     },
   };
@@ -555,11 +553,11 @@ export function createUnifiedSelector(
  */
 export function convertPathSelectorToUnified(
   pathSelector: PathSelector,
-  action: PrimitiveAction = "CLICK",
+  action: PrimitiveAction = 'CLICK',
 ): UnifiedSelector {
   return {
     id: generateSelectorId(),
-    strategy: "path",
+    strategy: 'path',
     fullSelector: pathSelector.fullSelector,
     pathData: {
       root: pathSelector.root,
@@ -573,7 +571,7 @@ export function convertPathSelectorToUnified(
     validated: false,
     reasoning: pathSelector.reasoning,
     metadata: {
-      source: "ai",
+      source: 'ai',
       createdAt: Date.now(),
     },
   };
@@ -588,8 +586,8 @@ export function convertSelectorLogicToUnified(
 ): UnifiedSelector {
   const hasScope = !!logic.scope;
   const strategy: SelectorStrategy = hasScope
-    ? "scope_anchor_target"
-    : "direct";
+    ? 'scope_anchor_target'
+    : 'direct';
 
   let fullSelector: string;
   let structureData: StructureStrategyData | undefined;
@@ -608,9 +606,9 @@ export function convertSelectorLogicToUnified(
     if (logic.anchor) {
       structureData.anchor = {
         selector: logic.anchor.selector,
-        type: logic.anchor.type === "index" ? "text_match" : logic.anchor.type,
+        type: logic.anchor.type === 'index' ? 'text_match' : logic.anchor.type,
         value: logic.anchor.value,
-        matchMode: logic.anchor.matchMode || "contains",
+        matchMode: logic.anchor.matchMode || 'contains',
       };
     }
 
@@ -631,7 +629,7 @@ export function convertSelectorLogicToUnified(
     confidence,
     validated: false,
     metadata: {
-      source: "programmatic",
+      source: 'programmatic',
       createdAt: Date.now(),
     },
   };
@@ -654,7 +652,7 @@ export function convertUnifiedToSelectorLogic(
     },
   };
 
-  if (unified.strategy === "scope_anchor_target" && unified.structureData) {
+  if (unified.strategy === 'scope_anchor_target' && unified.structureData) {
     logic.scope = {
       type: unified.structureData.scope.type,
       selector: unified.structureData.scope.selector,
@@ -689,7 +687,7 @@ export function convertUnifiedToSelectorDraft(
     validated: unified.validated,
   };
 
-  if (unified.strategy === "scope_anchor_target" && unified.structureData) {
+  if (unified.strategy === 'scope_anchor_target' && unified.structureData) {
     draft.scope = {
       selector: unified.structureData.scope.selector,
       type: unified.structureData.scope.type,

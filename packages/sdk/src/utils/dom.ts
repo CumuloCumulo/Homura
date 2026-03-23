@@ -8,7 +8,7 @@
 
 // Check if we're in a browser environment
 const isBrowser =
-  typeof window !== "undefined" && typeof document !== "undefined";
+  typeof window !== 'undefined' && typeof document !== 'undefined';
 
 export const BROWSER_REQUIRED = true;
 
@@ -21,7 +21,7 @@ export function safeQuerySelector<T extends Element = Element>(
 ): T | null {
   if (!isBrowser) {
     throw new Error(
-      "[Homura SDK] safeQuerySelector requires a browser environment",
+      '[Homura SDK] safeQuerySelector requires a browser environment',
     );
   }
   try {
@@ -41,7 +41,7 @@ export function safeQuerySelectorAll<T extends Element = Element>(
 ): T[] {
   if (!isBrowser) {
     throw new Error(
-      "[Homura SDK] safeQuerySelectorAll requires a browser environment",
+      '[Homura SDK] safeQuerySelectorAll requires a browser environment',
     );
   }
   try {
@@ -58,17 +58,17 @@ export function safeQuerySelectorAll<T extends Element = Element>(
 export function getDOMSnapshot(element: Element, depth: number = 2): string {
   if (!isBrowser) {
     throw new Error(
-      "[Homura SDK] getDOMSnapshot requires a browser environment",
+      '[Homura SDK] getDOMSnapshot requires a browser environment',
     );
   }
 
-  if (depth === 0) return "...";
+  if (depth === 0) return '...';
 
   const tag = element.tagName.toLowerCase();
-  const id = element.id ? `#${element.id}` : "";
+  const id = element.id ? `#${element.id}` : '';
   const classes = element.className
-    ? `.${element.className.split(" ").join(".")}`
-    : "";
+    ? `.${element.className.split(' ').join('.')}`
+    : '';
 
   let result = `<${tag}${id}${classes}>`;
 
@@ -76,14 +76,14 @@ export function getDOMSnapshot(element: Element, depth: number = 2): string {
     const children = Array.from(element.children)
       .slice(0, 3)
       .map((child) => getDOMSnapshot(child, depth - 1));
-    result += children.join("");
+    result += children.join('');
     if (element.children.length > 3) {
-      result += "...";
+      result += '...';
     }
   } else if (element.textContent) {
     // Inline truncate implementation to avoid circular import
     const text = element.textContent.trim();
-    result += text.length > 30 ? text.substring(0, 27) + "..." : text;
+    result += text.length > 30 ? text.substring(0, 27) + '...' : text;
   }
 
   result += `</${tag}>`;

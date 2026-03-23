@@ -16,15 +16,15 @@ import type {
   ExecutorOptions as SDKExecutorOptions,
   UnifiedSelector,
   DebugStep,
-} from "@homura/sdk/types";
-import { executeTool as sdkExecuteTool } from "@homura/sdk/executor";
-import { substituteVariables } from "@homura/sdk/utils";
-import { convertUnifiedToSelectorLogic } from "@homura/sdk/selector";
+} from '@homura/sdk/types';
+import { executeTool as sdkExecuteTool } from '@homura/sdk/executor';
+import { substituteVariables } from '@homura/sdk/utils';
+import { convertUnifiedToSelectorLogic } from '@homura/sdk/selector';
 import {
   executeClick,
   executeInput,
   executeExtractText,
-} from "@homura/sdk/primitives";
+} from '@homura/sdk/primitives';
 
 // Import debug highlighter (extension-specific)
 import {
@@ -33,7 +33,7 @@ import {
   highlightTarget,
   flashElement,
   clearAllHighlights,
-} from "./highlighter";
+} from './highlighter';
 
 /**
  * Executor options with extension-specific features
@@ -72,22 +72,22 @@ export async function executeTool(
   const onDebugStep = (step: DebugStep) => {
     if (debug) {
       switch (step.type) {
-        case "scope":
+        case 'scope':
           if (step.element) {
             highlightScope([step.element]);
           }
           break;
-        case "anchor":
+        case 'anchor':
           if (step.element) {
             highlightAnchor(step.element, step.matchCount ?? 0);
           }
           break;
-        case "target":
+        case 'target':
           if (step.element) {
             highlightTarget(step.element);
           }
           break;
-        case "action":
+        case 'action':
           if (step.element) {
             flashElement(step.element, true);
           }
@@ -149,7 +149,7 @@ export async function executeUnifiedSelector(
     // Execute using SDK (through a temporary AtomicTool wrapper)
     const tempTool: AtomicTool = {
       tool_id: `temp_${selector.id}`,
-      name: "Execute UnifiedSelector",
+      name: 'Execute UnifiedSelector',
       description: `Execute ${selector.strategy} selector`,
       parameters: {},
       selector_logic: resolvedLogic,
@@ -170,8 +170,8 @@ export async function executeUnifiedSelector(
   } catch (error) {
     const duration = Math.round(performance.now() - startTime);
 
-    const executionError: import("@homura/sdk/types").ExecutionError = {
-      code: "ACTION_FAILED",
+    const executionError: import('@homura/sdk/types').ExecutionError = {
+      code: 'ACTION_FAILED',
       message: error instanceof Error ? error.message : String(error),
       failedSelector: selector.fullSelector,
     };
@@ -213,8 +213,8 @@ export async function executeUnifiedSelectorDirect(
     const element = document.querySelector<HTMLElement>(selector.fullSelector);
 
     if (!element) {
-      const error: import("@homura/sdk/types").ExecutionError = {
-        code: "TARGET_NOT_FOUND",
+      const error: import('@homura/sdk/types').ExecutionError = {
+        code: 'TARGET_NOT_FOUND',
         message: `Element not found: ${selector.fullSelector}`,
         failedSelector: selector.fullSelector,
       };
@@ -247,8 +247,8 @@ export async function executeUnifiedSelectorDirect(
   } catch (error) {
     const duration = Math.round(performance.now() - startTime);
 
-    const executionError: import("@homura/sdk/types").ExecutionError = {
-      code: "ACTION_FAILED",
+    const executionError: import('@homura/sdk/types').ExecutionError = {
+      code: 'ACTION_FAILED',
       message: error instanceof Error ? error.message : String(error),
       failedSelector: selector.fullSelector,
     };
@@ -271,24 +271,24 @@ async function executeAction(
   const { type: action, params } = selector.action;
 
   switch (action) {
-    case "CLICK":
+    case 'CLICK':
       await executeClick(
         element,
-        params as import("@homura/sdk/types").ClickParams,
+        params as import('@homura/sdk/types').ClickParams,
       );
       return undefined;
 
-    case "INPUT":
+    case 'INPUT':
       await executeInput(
         element,
-        params as import("@homura/sdk/types").InputParams,
+        params as import('@homura/sdk/types').InputParams,
       );
       return undefined;
 
-    case "EXTRACT_TEXT":
+    case 'EXTRACT_TEXT':
       return executeExtractText(
         element,
-        params as import("@homura/sdk/types").ExtractTextParams,
+        params as import('@homura/sdk/types').ExtractTextParams,
       );
 
     default:
@@ -300,10 +300,10 @@ async function executeAction(
  * Local variable substitution helper
  */
 function resolveVariablesInLogic(
-  logic: import("@homura/sdk/types").SelectorLogic,
+  logic: import('@homura/sdk/types').SelectorLogic,
   params: Record<string, string | number | boolean>,
-): import("@homura/sdk/types").SelectorLogic {
-  const resolved: import("@homura/sdk/types").SelectorLogic = {
+): import('@homura/sdk/types').SelectorLogic {
+  const resolved: import('@homura/sdk/types').SelectorLogic = {
     target: {
       selector: substituteVariables(logic.target.selector, params),
       action: logic.target.action,
@@ -329,9 +329,9 @@ function resolveVariablesInLogic(
   }
 
   // Handle INPUT action value substitution
-  if (logic.target.action === "INPUT" && logic.target.actionParams) {
+  if (logic.target.action === 'INPUT' && logic.target.actionParams) {
     const inputParams = logic.target
-      .actionParams as import("@homura/sdk/types").InputParams;
+      .actionParams as import('@homura/sdk/types').InputParams;
     resolved.target.actionParams = {
       ...inputParams,
       value: substituteVariables(inputParams.value, params),

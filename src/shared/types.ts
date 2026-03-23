@@ -21,12 +21,12 @@
  * Message types for Background <-> Content Script communication
  */
 export type MessageType =
-  | "EXECUTE_TOOL" // Background -> Content: Execute a tool
-  | "EXECUTION_RESULT" // Content -> Background: Return result
-  | "HIGHLIGHT_ELEMENT" // Background -> Content: Highlight for debug
-  | "CLEAR_HIGHLIGHTS" // Background -> Content: Clear debug highlights
-  | "GET_PAGE_STATE" // Background -> Content: Get DOM summary
-  | "PAGE_STATE"; // Content -> Background: DOM summary response
+  | 'EXECUTE_TOOL' // Background -> Content: Execute a tool
+  | 'EXECUTION_RESULT' // Content -> Background: Return result
+  | 'HIGHLIGHT_ELEMENT' // Background -> Content: Highlight for debug
+  | 'CLEAR_HIGHLIGHTS' // Background -> Content: Clear debug highlights
+  | 'GET_PAGE_STATE' // Background -> Content: Get DOM summary
+  | 'PAGE_STATE'; // Content -> Background: DOM summary response
 
 /**
  * Base message structure
@@ -40,18 +40,18 @@ export interface Message<T extends MessageType, P = unknown> {
 
 // Specific message types
 export type ExecuteToolMessage = Message<
-  "EXECUTE_TOOL",
-  import("@homura/sdk/types").ExecuteToolRequest
+  'EXECUTE_TOOL',
+  import('@homura/sdk/types').ExecuteToolRequest
 >;
 export type ExecutionResultMessage = Message<
-  "EXECUTION_RESULT",
-  import("@homura/sdk/types").ExecuteToolResult
+  'EXECUTION_RESULT',
+  import('@homura/sdk/types').ExecuteToolResult
 >;
 export type HighlightElementMessage = Message<
-  "HIGHLIGHT_ELEMENT",
+  'HIGHLIGHT_ELEMENT',
   { selector: string; color?: string }
 >;
-export type ClearHighlightsMessage = Message<"CLEAR_HIGHLIGHTS", undefined>;
+export type ClearHighlightsMessage = Message<'CLEAR_HIGHLIGHTS', undefined>;
 
 // Union of all message types
 export type HomuraMessage =
@@ -76,7 +76,7 @@ export interface Mission {
   /** Tools available for this mission */
   toolIds: string[];
   /** Current status */
-  status: "idle" | "running" | "paused" | "completed" | "error";
+  status: 'idle' | 'running' | 'paused' | 'completed' | 'error';
 }
 
 /**
@@ -84,7 +84,7 @@ export interface Mission {
  */
 export interface LogEntry {
   timestamp: number;
-  level: "info" | "warn" | "error" | "debug";
+  level: 'info' | 'warn' | 'error' | 'debug';
   message: string;
   toolId?: string;
   data?: unknown;

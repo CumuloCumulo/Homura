@@ -7,7 +7,7 @@
  * Uses OpenAI-compatible endpoint
  */
 
-import type { SelectorLogic, AtomicTool } from "@homura/sdk/types";
+import type { SelectorLogic, AtomicTool } from '@homura/sdk/types';
 import type {
   AIClientConfig,
   ChatMessage,
@@ -22,7 +22,7 @@ import type {
   PathSelectorResult,
   SmartSelectorContext,
   SmartSelectorResult,
-} from "./types";
+} from './types';
 import {
   SELECTOR_SYSTEM_PROMPT,
   TOOL_BUILDER_SYSTEM_PROMPT,
@@ -32,14 +32,13 @@ import {
   buildToolPrompt,
   buildSelfHealingPrompt,
   buildPathSelectorPrompt,
-} from "./prompts";
-import { PATH_SELECTOR_TOOL } from "./tools";
-import type { PathSelectorToolResult } from "./tools";
-import { shouldUseScopeAnchorTarget, getDecisionReason } from "./smartRouter";
+} from './prompts';
+import { PATH_SELECTOR_TOOL, type PathSelectorToolResult } from './tools';
+import { shouldUseScopeAnchorTarget, getDecisionReason } from './smartRouter';
 
 // Default configuration
-const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
-const DEFAULT_MODEL = "qwen-plus";
+const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+const DEFAULT_MODEL = 'qwen-plus';
 
 /**
  * Tongyi AI Client
@@ -60,9 +59,9 @@ export class TongyiClient {
    */
   async chat(messages: ChatMessage[]): Promise<string> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
@@ -78,7 +77,7 @@ export class TongyiClient {
     }
 
     const data: ChatCompletionResponse = await response.json();
-    return data.choices[0]?.message?.content || "";
+    return data.choices[0]?.message?.content || '';
   }
 
   /**
@@ -96,16 +95,16 @@ export class TongyiClient {
     toolCalls?: Array<{ name: string; arguments: T }>;
   }> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
         model: this.model,
         messages,
         tools,
-        tool_choice: toolChoice || "auto",
+        tool_choice: toolChoice || 'auto',
         temperature: 0.3,
       }),
     });
@@ -119,7 +118,7 @@ export class TongyiClient {
     const choice = data.choices?.[0];
 
     if (!choice) {
-      throw new Error("No response from AI");
+      throw new Error('No response from AI');
     }
 
     // Check for tool calls
@@ -134,7 +133,7 @@ export class TongyiClient {
     }
 
     // Regular text response
-    return { content: choice.message?.content || "" };
+    return { content: choice.message?.content || '' };
   }
 
   /**
@@ -159,8 +158,8 @@ export class TongyiClient {
     const prompt = buildSelectorPrompt(context);
 
     const response = await this.chat([
-      { role: "system", content: SELECTOR_SYSTEM_PROMPT },
-      { role: "user", content: prompt },
+      { role: 'system', content: SELECTOR_SYSTEM_PROMPT },
+      { role: 'user', content: prompt },
     ]);
 
     try {
@@ -170,7 +169,7 @@ export class TongyiClient {
       return {
         selectorLogic,
         confidence: 0.8, // Default confidence
-        explanation: "AI-generated selector based on DOM analysis",
+        explanation: 'AI-generated selector based on DOM analysis',
       };
     } catch (error) {
       throw new Error(`Failed to parse selector response: ${error}`);
@@ -184,8 +183,8 @@ export class TongyiClient {
     const prompt = buildToolPrompt(recording);
 
     const response = await this.chat([
-      { role: "system", content: TOOL_BUILDER_SYSTEM_PROMPT },
-      { role: "user", content: prompt },
+      { role: 'system', content: TOOL_BUILDER_SYSTEM_PROMPT },
+      { role: 'user', content: prompt },
     ]);
 
     try {
@@ -196,7 +195,7 @@ export class TongyiClient {
       const parameters = Object.entries(tool.parameters).map(
         ([name, param]) => ({
           name,
-          value: "", // To be filled by user
+          value: '', // To be filled by user
           description: param.description,
         }),
       );
@@ -204,7 +203,7 @@ export class TongyiClient {
       return {
         tool,
         parameters,
-        explanation: "AI-generated tool from recording",
+        explanation: 'AI-generated tool from recording',
       };
     } catch (error) {
       throw new Error(`Failed to parse tool response: ${error}`);
@@ -218,8 +217,8 @@ export class TongyiClient {
     const prompt = buildSelfHealingPrompt(context);
 
     const response = await this.chat([
-      { role: "system", content: SELF_HEALING_SYSTEM_PROMPT },
-      { role: "user", content: prompt },
+      { role: 'system', content: SELF_HEALING_SYSTEM_PROMPT },
+      { role: 'user', content: prompt },
     ]);
 
     try {
@@ -243,11 +242,11 @@ export class TongyiClient {
 
     const result = await this.chatWithTools<PathSelectorToolResult>(
       [
-        { role: "system", content: PATH_SELECTOR_SYSTEM_PROMPT },
-        { role: "user", content: prompt },
+        { role: 'system', content: PATH_SELECTOR_SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
       ],
       [PATH_SELECTOR_TOOL],
-      { type: "function", function: { name: "generate_path_selector" } },
+      { type: 'function', function: { name: 'generate_path_selector' } },
     );
 
     // If tool was called, use the structured result
@@ -273,7 +272,7 @@ export class TongyiClient {
       }
     }
 
-    throw new Error("No valid response from AI for path selector generation");
+    throw new Error('No valid response from AI for path selector generation');
   }
 
   /**
@@ -299,7 +298,7 @@ export class TongyiClient {
     const reasoning = getDecisionReason(context);
 
     console.log(`[SmartSelector ${timestamp}] Strategy decision:`, {
-      strategy: useScopeAnchorTarget ? "SCOPE_ANCHOR_TARGET" : "PATH_SELECTOR",
+      strategy: useScopeAnchorTarget ? 'SCOPE_ANCHOR_TARGET' : 'PATH_SELECTOR',
       reasoning,
     });
 
@@ -328,7 +327,7 @@ export class TongyiClient {
       intent: context.intent,
       targetHtml: context.targetHtml,
       containerHtml: `<!-- Container: ${context.structureInfo.containerSelector || context.structureInfo.containerType} -->
-<!-- Anchor candidates: ${context.structureInfo.anchorCandidates.map((a) => `${a.selector}="${a.text || a.attribute?.value}"`).join(", ")} -->`,
+<!-- Anchor candidates: ${context.structureInfo.anchorCandidates.map((a) => `${a.selector}="${a.text || a.attribute?.value}"`).join(', ')} -->`,
       anchorValue: topAnchor?.text || topAnchor?.attribute?.value,
     };
 
@@ -344,7 +343,7 @@ export class TongyiClient {
       );
 
       return {
-        strategy: "scope_anchor_target",
+        strategy: 'scope_anchor_target',
         selectorLogic: result.selectorLogic,
         confidence: result.confidence,
         reasoning: `${baseReasoning}. ${result.explanation}`,
@@ -392,7 +391,7 @@ export class TongyiClient {
       );
 
       return {
-        strategy: "path_selector",
+        strategy: 'path_selector',
         pathSelector: pathResult,
         confidence: pathResult.confidence,
         reasoning: pathResult.reasoning || baseReasoning,
@@ -426,7 +425,7 @@ export function initAIClient(config: AIClientConfig): TongyiClient {
  */
 export function getAIClient(): TongyiClient {
   if (!clientInstance) {
-    throw new Error("AI client not initialized. Call initAIClient first.");
+    throw new Error('AI client not initialized. Call initAIClient first.');
   }
   return clientInstance;
 }

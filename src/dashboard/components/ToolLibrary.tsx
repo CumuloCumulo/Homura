@@ -6,9 +6,10 @@
  * Left panel showing all available tools
  */
 
-import React from "react";
-import { useToolStore } from "../stores/toolStore";
-import type { AtomicTool, PrimitiveAction } from "@homura/sdk/types";
+import React from 'react';
+import { useToolStore } from '../stores/toolStore';
+import { useBlueprintStore } from '../stores/blueprintStore';
+import type { AtomicTool, PrimitiveAction } from '@homura/sdk/types';
 
 // Action type icons
 const ActionIcons: Record<PrimitiveAction, React.ReactNode> = {
@@ -91,7 +92,8 @@ const ActionIcons: Record<PrimitiveAction, React.ReactNode> = {
 
 export function ToolLibrary() {
   const { tools, selectedTool, selectTool, removeTool } = useToolStore();
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const { blueprints } = useBlueprintStore();
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   const filteredTools = tools.filter(
     (tool) =>
@@ -103,7 +105,61 @@ export function ToolLibrary() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-white/5">
-        <h2 className="text-sm font-semibold text-zinc-100 mb-3">工具库</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-zinc-100">工具库</h2>
+          <div className="flex items-center gap-2">
+            {/* Import Button */}
+            <button
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent('open-import-dialog'))
+              }
+              className="p-1.5 rounded-md bg-zinc-900/80 border border-white/5 text-zinc-500 hover:text-violet-400 hover:border-violet-500/30 transition-colors"
+              title="导入 Blueprint"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                />
+              </svg>
+            </button>
+            {/* Export Button */}
+            <button
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent('open-export-dialog'))
+              }
+              className="p-1.5 rounded-md bg-zinc-900/80 border border-white/5 text-zinc-500 hover:text-violet-400 hover:border-violet-500/30 transition-colors"
+              title="导出 Blueprint"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+            </button>
+            {/* Blueprint Count Badge */}
+            {blueprints.length > 0 && (
+              <span className="px-2 py-0.5 text-[9px] font-medium bg-violet-500/10 text-violet-400 rounded border border-violet-500/20">
+                {blueprints.length}
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Search */}
         <div className="relative">
@@ -202,8 +258,8 @@ function ToolItem({ tool, isSelected, onSelect, onDelete }: ToolItemProps) {
         group relative p-2.5 rounded-lg cursor-pointer transition-all duration-200
         ${
           isSelected
-            ? "bg-violet-500/10 border border-violet-500/30"
-            : "bg-zinc-900/50 border border-white/5 hover:border-white/10 hover:bg-zinc-800/50"
+            ? 'bg-violet-500/10 border border-violet-500/30'
+            : 'bg-zinc-900/50 border border-white/5 hover:border-white/10 hover:bg-zinc-800/50'
         }
       `}
     >
@@ -212,7 +268,7 @@ function ToolItem({ tool, isSelected, onSelect, onDelete }: ToolItemProps) {
         <div
           className={`
           shrink-0 w-8 h-8 rounded-md flex items-center justify-center
-          ${isSelected ? "bg-violet-500/20 text-violet-400" : "bg-zinc-800 text-zinc-400"}
+          ${isSelected ? 'bg-violet-500/20 text-violet-400' : 'bg-zinc-800 text-zinc-400'}
         `}
         >
           {ActionIcons[action]}
@@ -223,7 +279,7 @@ function ToolItem({ tool, isSelected, onSelect, onDelete }: ToolItemProps) {
           <h3
             className={`
             text-xs font-medium truncate
-            ${isSelected ? "text-zinc-100" : "text-zinc-300"}
+            ${isSelected ? 'text-zinc-100' : 'text-zinc-300'}
           `}
           >
             {tool.name}

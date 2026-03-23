@@ -9,7 +9,8 @@
     "storage",
     "sidePanel",
     "tabs",
-    "webNavigation"
+    "webNavigation",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"

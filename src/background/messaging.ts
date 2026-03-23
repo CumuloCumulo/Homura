@@ -6,13 +6,13 @@
  * Type-safe messaging between Background and Content Scripts.
  */
 
-import type { AtomicTool, ExecuteToolResult } from "@homura/sdk/types";
+import type { AtomicTool, ExecuteToolResult } from '@homura/sdk/types';
 import type {
   ExecuteToolMessage,
   HighlightElementMessage,
   ClearHighlightsMessage,
-} from "@shared/types";
-import { generateMessageId } from "@homura/sdk/utils";
+} from '@shared/types';
+import { generateMessageId } from '@homura/sdk/utils';
 
 /**
  * Send a message to the active tab's content script
@@ -21,7 +21,7 @@ async function sendToActiveTab<T>(message: unknown): Promise<T> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   if (!tab?.id) {
-    throw new Error("No active tab found");
+    throw new Error('No active tab found');
   }
 
   return chrome.tabs.sendMessage(tab.id, message);
@@ -43,7 +43,7 @@ export async function executeToolOnActiveTab(
   debug: boolean = false,
 ): Promise<ExecuteToolResult> {
   const message: ExecuteToolMessage = {
-    type: "EXECUTE_TOOL",
+    type: 'EXECUTE_TOOL',
     payload: { tool, params, debug },
     messageId: generateMessageId(),
   };
@@ -61,7 +61,7 @@ export async function executeToolOnTab(
   debug: boolean = false,
 ): Promise<ExecuteToolResult> {
   const message: ExecuteToolMessage = {
-    type: "EXECUTE_TOOL",
+    type: 'EXECUTE_TOOL',
     payload: { tool, params, debug },
     messageId: generateMessageId(),
   };
@@ -77,7 +77,7 @@ export async function highlightElementOnActiveTab(
   color?: string,
 ): Promise<{ success: boolean }> {
   const message: HighlightElementMessage = {
-    type: "HIGHLIGHT_ELEMENT",
+    type: 'HIGHLIGHT_ELEMENT',
     payload: { selector, color },
   };
 
@@ -91,7 +91,7 @@ export async function clearHighlightsOnActiveTab(): Promise<{
   success: boolean;
 }> {
   const message: ClearHighlightsMessage = {
-    type: "CLEAR_HIGHLIGHTS",
+    type: 'CLEAR_HIGHLIGHTS',
     payload: undefined,
   };
 

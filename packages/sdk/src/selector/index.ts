@@ -7,7 +7,7 @@
  */
 
 // Types
-export * from "./types.js";
+export * from './types.js';
 
 // Analyzer
 export {
@@ -22,7 +22,7 @@ export {
   getElementHtml,
   getContainerContext,
   BROWSER_REQUIRED as SELECTOR_BROWSER_REQUIRED,
-} from "./analyzer.js";
+} from './analyzer.js';
 
 // Validator
 export {
@@ -33,7 +33,7 @@ export {
   findTargetElement,
   getScopePreview,
   BROWSER_REQUIRED as VALIDATOR_BROWSER_REQUIRED,
-} from "./validator.js";
+} from './validator.js';
 
 // Generator
 export {
@@ -49,11 +49,11 @@ export {
   convertSelectorLogicToUnified,
   convertUnifiedToSelectorLogic,
   convertUnifiedToSelectorDraft,
-} from "./generator.js";
+} from './generator.js';
 
 // Helper functions from types (for selector building)
 export {
   generateSelectorId,
   buildFullSelectorFromPath,
   buildFullSelectorFromStructure,
-} from "../types/selector.js";
+} from '../types/selector.js';

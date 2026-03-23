@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "description": "Homura 项目专属配置 - 规范化开发和测试工作流",
+
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npx *)",
+      "Bash(cd packages/sdk && npx tsc *)",
+      "Bash(bash scripts/*)"
+    ],
+    "deny": []
+  },
+
+  "gitHooks": {
+    "enabled": true,
+    "runOnPostWrite": [".claude/hooks/post-write.sh"]
+  },
+
+  "contextOptions": {
+    "maxContextFiles": 50,
+    "priorityFiles": [
+      "CLAUDE.md",
+      "docs/DEVELOPMENT.md",
+      "docs/sdk-architecture.md",
+      ".claude/rules.md"
+    ]
+  },
+
+  "customInstructions": "始终遵循 CLAUDE.md 和 .claude/rules.md 中的规范。开发前先读相关文档，使用代码模板，完成后自动运行检查。"
+}

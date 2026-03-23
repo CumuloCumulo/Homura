@@ -6,10 +6,12 @@
  * State management for tool library
  */
 
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import type { AtomicTool } from "@homura/sdk/types";
-import type { LogEntry, Mission } from "@shared/types";
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { AtomicTool, Blueprint, BlueprintMeta } from '@homura/sdk/types';
+import type { LogEntry, Mission } from '@shared/types';
+import { createBlueprint as createBlueprintUtil } from '../utils/blueprintIO';
+import { calculateSkillsHash } from '@homura/sdk/utils';
 
 interface ToolStore {
   /** All tools in the library */
@@ -35,6 +37,14 @@ interface ToolStore {
   addLog: (log: LogEntry) => void;
   clearLogs: () => void;
   setRunning: (running: boolean) => void;
+
+  // Blueprint actions
+  exportAsBlueprint: (
+    meta: Omit<BlueprintMeta, 'skillsHash' | 'createdAt' | 'updatedAt'>,
+  ) => Blueprint;
+  getBlueprintFromState: () => Blueprint;
+  importBlueprint: (blueprint: Blueprint, replaceExisting?: boolean) => void;
+  loadFromBlueprint: (blueprint: Blueprint) => void;
 }
 
 // Default rule book template
@@ -95,9 +105,73 @@ export const useToolStore = create<ToolStore>()(
       clearLogs: () => set({ logs: [] }),
 
       setRunning: (running) => set({ isRunning: running }),
+
+      // Blueprint actions
+      exportAsBlueprint: (meta) => {
+        // Get current state using store reference
+        const state = useToolStore.getState();
+        const blueprint = createBlueprintUtil(
+          meta,
+          state.tools,
+          state.ruleBook,
+          undefined, // agentConfig
+        );
+
+        // Recalculate skills hash
+        blueprint.meta.skillsHash = calculateSkillsHash(state.tools);
+
+        return blueprint;
+      },
+
+      getBlueprintFromState: () => {
+        // Get current state using store reference
+        const state = useToolStore.getState();
+        const blueprint: Blueprint = {
+          meta: {
+            name: 'untitled-blueprint',
+            version: '1.0.0',
+            description: 'Exported from Homura',
+            targetUrl: '*',
+            blueprintVersion: '1.0.0',
+            skillsHash: calculateSkillsHash(state.tools),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          skills: state.tools,
+          rules: state.ruleBook,
+        };
+
+        return blueprint;
+      },
+
+      importBlueprint: (blueprint, replaceExisting = false) => {
+        set((state) => {
+          const newTools = replaceExisting
+            ? blueprint.skills
+            : [
+                ...state.tools.filter(
+                  (t) =>
+                    !blueprint.skills.some((bt) => bt.tool_id === t.tool_id),
+                ),
+                ...blueprint.skills,
+              ];
+
+          return {
+            tools: newTools,
+            ruleBook: blueprint.rules || state.ruleBook,
+          };
+        });
+      },
+
+      loadFromBlueprint: (blueprint) => {
+        set(() => ({
+          tools: blueprint.skills,
+          ruleBook: blueprint.rules || DEFAULT_RULE_BOOK,
+        }));
+      },
     }),
     {
-      name: "homura-tool-store",
+      name: 'homura-tool-store',
       partialize: (state) => ({
         tools: state.tools,
         ruleBook: state.ruleBook,

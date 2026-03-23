@@ -14,14 +14,14 @@
 
 /** Storage keys for extension state */
 export const STORAGE_KEYS = {
-  RECORDING_STATE: "homura_recording_state",
-  TOOL_LIBRARY: "homura_tool_library",
-  RULE_BOOK: "homura_rule_book",
-  SELECTOR_DRAFT: "homura_selector_draft",
+  RECORDING_STATE: 'homura_recording_state',
+  TOOL_LIBRARY: 'homura_tool_library',
+  RULE_BOOK: 'homura_rule_book',
+  SELECTOR_DRAFT: 'homura_selector_draft',
 } as const;
 
 /** Chrome extension IDs */
 export const EXTENSION_IDS = {
-  SIDEPANEL: "homura-sidepanel",
-  DASHBOARD: "homura-dashboard",
+  SIDEPANEL: 'homura-sidepanel',
+  DASHBOARD: 'homura-dashboard',
 } as const;

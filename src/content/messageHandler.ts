@@ -7,25 +7,24 @@
  * This is the bridge between the orchestration layer and the execution engine.
  */
 
-import type { HomuraMessage } from "@shared/types";
-import type { ExecuteToolRequest, ExecuteToolResult } from "@homura/sdk/types";
-import { executeTool } from "./engine";
-import { clearAllHighlights } from "./engine";
+import type { HomuraMessage } from '@shared/types';
+import type { ExecuteToolRequest, ExecuteToolResult } from '@homura/sdk/types';
+import { executeTool, clearAllHighlights } from './engine';
 import {
   executeClick,
   executeInput,
   executeExtractText,
-} from "./engine/primitives";
+} from './engine/primitives';
 import {
   analyzeElement,
   validateSelectorDraft,
   buildPathData,
   createUnifiedSelector,
+  buildFullSelectorFromPath,
   type SelectorDraft,
   type ElementAnalysis,
   type AncestorInfo,
-} from "@homura/sdk/selector";
-import { buildFullSelectorFromPath } from "@homura/sdk/selector";
+} from '@homura/sdk/selector';
 
 // =============================================================================
 // STATE FOR INSPECT/RECORD MODE
@@ -53,10 +52,10 @@ export function initMessageHandler(): void {
       handleMessage(message as { type: string; payload?: unknown })
         .then(sendResponse)
         .catch((error) => {
-          console.error("[Homura] Message handling error:", error);
+          console.error('[Homura] Message handling error:', error);
           sendResponse({
             success: false,
-            error: { code: "UNKNOWN", message: String(error) },
+            error: { code: 'UNKNOWN', message: String(error) },
           });
         });
 
@@ -65,7 +64,7 @@ export function initMessageHandler(): void {
     },
   );
 
-  console.log("[Homura] Content script message handler initialized");
+  console.log('[Homura] Content script message handler initialized');
 }
 
 /**
@@ -75,82 +74,82 @@ async function handleMessage(message: {
   type: string;
   payload?: unknown;
 }): Promise<unknown> {
-  console.log("[Homura] Received message:", message.type);
+  console.log('[Homura] Received message:', message.type);
 
   switch (message.type) {
     // Health check
-    case "PING":
-      return { success: true, message: "pong" };
+    case 'PING':
+      return { success: true, message: 'pong' };
 
-    case "EXECUTE_TOOL":
+    case 'EXECUTE_TOOL':
       return handleExecuteTool(message.payload as ExecuteToolRequest);
 
-    case "HIGHLIGHT_ELEMENT":
+    case 'HIGHLIGHT_ELEMENT':
       return handleHighlightElement(
         message.payload as { selector: string; color?: string },
       );
 
-    case "CLEAR_HIGHLIGHTS":
+    case 'CLEAR_HIGHLIGHTS':
       return handleClearHighlights();
 
     // Inspect Mode
-    case "START_INSPECT":
+    case 'START_INSPECT':
       return handleStartInspect();
 
-    case "STOP_INSPECT":
+    case 'STOP_INSPECT':
       return handleStopInspect();
 
     // Record Mode
-    case "START_RECORDING":
+    case 'START_RECORDING':
       return handleStartRecording();
 
-    case "STOP_RECORDING":
+    case 'STOP_RECORDING':
       return handleStopRecording();
 
     // Selector Validation
-    case "VALIDATE_SELECTOR":
+    case 'VALIDATE_SELECTOR':
       return handleValidateSelector(message.payload as SelectorDraft);
 
     // AI Operations (placeholder - actual AI calls happen in background)
-    case "AI_GENERATE_SELECTOR":
+    case 'AI_GENERATE_SELECTOR':
       return handleAIGenerateSelector(
         message.payload as { intent: string; analysis: ElementAnalysis },
       );
 
-    case "AI_GENERATE_PATH_SELECTOR":
+    case 'AI_GENERATE_PATH_SELECTOR':
       return handleAIGeneratePathSelector(
         message.payload as AIGeneratePathSelectorPayload,
       );
 
-    case "AI_GENERATE_SMART_SELECTOR":
+    case 'AI_GENERATE_SMART_SELECTOR':
       return handleAIGenerateSmartSelector(
         message.payload as SmartSelectorPayload,
       );
 
-    case "AI_GENERATE_TOOL":
+    case 'AI_GENERATE_TOOL':
       return handleAIGenerateTool(message.payload as { actions: unknown[] });
 
     // Direct Element Operations (for Inspect Mode quick actions)
-    case "EXECUTE_CLICK":
+    case 'EXECUTE_CLICK':
       return handleExecuteClick(message.payload as { selector: string });
 
-    case "EXECUTE_INPUT":
+    case 'EXECUTE_INPUT':
       return handleExecuteInput(
         message.payload as { selector: string; value: string },
       );
 
-    case "EXECUTE_EXTRACT":
+    case 'EXECUTE_EXTRACT':
       return handleExecuteExtract(message.payload as { selector: string });
 
     // Execute with full Scope + Anchor + Target logic
-    case "EXECUTE_WITH_LOGIC":
+    case 'EXECUTE_WITH_LOGIC':
       return handleExecuteWithLogic(message.payload as ExecuteWithLogicPayload);
 
     default:
-      console.warn("[Homura] Unknown message type:", message.type);
+      console.warn('[Homura] Unknown message type:', message.type);
       return {
         success: false,
-        error: { code: "UNKNOWN", message: "Unknown message type" },
+        error: { code: 'UNKNOWN', message: 'Unknown message type' },
       };
   }
 }
@@ -179,7 +178,7 @@ function handleHighlightElement(payload: {
   selector: string;
   color?: string;
 }): { success: boolean } {
-  const { selector, color = "rgba(249, 115, 22, 0.5)" } = payload;
+  const { selector, color = 'rgba(249, 115, 22, 0.5)' } = payload;
 
   const element = document.querySelector(selector);
   if (!element) {
@@ -187,20 +186,20 @@ function handleHighlightElement(payload: {
   }
 
   const rect = element.getBoundingClientRect();
-  const overlay = document.createElement("div");
-  overlay.id = "homura-manual-highlight";
+  const overlay = document.createElement('div');
+  overlay.id = 'homura-manual-highlight';
 
   Object.assign(overlay.style, {
-    position: "fixed",
+    position: 'fixed',
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
     backgroundColor: color,
-    border: `2px solid ${color.replace("0.5", "1")}`,
-    borderRadius: "4px",
-    pointerEvents: "none",
-    zIndex: "2147483647",
+    border: `2px solid ${color.replace('0.5', '1')}`,
+    borderRadius: '4px',
+    pointerEvents: 'none',
+    zIndex: '2147483647',
   });
 
   document.body.appendChild(overlay);
@@ -211,7 +210,7 @@ function handleHighlightElement(payload: {
 function handleClearHighlights(): { success: boolean } {
   clearAllHighlights();
 
-  const manual = document.getElementById("homura-manual-highlight");
+  const manual = document.getElementById('homura-manual-highlight');
   if (manual) {
     manual.remove();
   }
@@ -231,12 +230,12 @@ function handleStartInspect(): { success: boolean } {
   if (isInspectMode) return { success: true };
 
   isInspectMode = true;
-  document.addEventListener("mouseover", onInspectMouseOver, true);
-  document.addEventListener("mouseout", onInspectMouseOut, true);
-  document.addEventListener("click", onInspectClick, true);
-  document.body.style.cursor = "crosshair";
+  document.addEventListener('mouseover', onInspectMouseOver, true);
+  document.addEventListener('mouseout', onInspectMouseOut, true);
+  document.addEventListener('click', onInspectClick, true);
+  document.body.style.cursor = 'crosshair';
 
-  console.log("[Homura] Inspect mode started");
+  console.log('[Homura] Inspect mode started');
   return { success: true };
 }
 
@@ -244,14 +243,14 @@ function handleStopInspect(): { success: boolean } {
   if (!isInspectMode) return { success: true };
 
   isInspectMode = false;
-  document.removeEventListener("mouseover", onInspectMouseOver, true);
-  document.removeEventListener("mouseout", onInspectMouseOut, true);
-  document.removeEventListener("click", onInspectClick, true);
-  document.body.style.cursor = "";
+  document.removeEventListener('mouseover', onInspectMouseOver, true);
+  document.removeEventListener('mouseout', onInspectMouseOut, true);
+  document.removeEventListener('click', onInspectClick, true);
+  document.body.style.cursor = '';
   removeInspectHighlight();
   removeSelectedHighlight();
 
-  console.log("[Homura] Inspect mode stopped");
+  console.log('[Homura] Inspect mode stopped');
   return { success: true };
 }
 
@@ -301,32 +300,32 @@ function onInspectClick(e: MouseEvent): void {
 
   // Send to SidePanel
   chrome.runtime.sendMessage({
-    type: "ELEMENT_SELECTED",
+    type: 'ELEMENT_SELECTED',
     payload: analysis,
   });
 
-  console.log("[Homura] Element selected:", analysis);
+  console.log('[Homura] Element selected:', analysis);
 }
 
 function showInspectHighlight(element: HTMLElement): void {
   removeInspectHighlight();
 
   const rect = element.getBoundingClientRect();
-  const overlay = document.createElement("div");
-  overlay.id = "homura-inspect-highlight";
+  const overlay = document.createElement('div');
+  overlay.id = 'homura-inspect-highlight';
 
   Object.assign(overlay.style, {
-    position: "fixed",
+    position: 'fixed',
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
-    backgroundColor: "rgba(139, 92, 246, 0.2)",
-    border: "2px solid rgba(139, 92, 246, 0.8)",
-    borderRadius: "2px",
-    pointerEvents: "none",
-    zIndex: "2147483646",
-    transition: "all 0.1s ease-out",
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    border: '2px solid rgba(139, 92, 246, 0.8)',
+    borderRadius: '2px',
+    pointerEvents: 'none',
+    zIndex: '2147483646',
+    transition: 'all 0.1s ease-out',
   });
 
   document.body.appendChild(overlay);
@@ -338,7 +337,7 @@ function removeInspectHighlight(): void {
     currentHighlight.remove();
     currentHighlight = null;
   }
-  const existing = document.getElementById("homura-inspect-highlight");
+  const existing = document.getElementById('homura-inspect-highlight');
   if (existing) {
     existing.remove();
   }
@@ -352,22 +351,22 @@ function showSelectedHighlight(element: HTMLElement): void {
   removeSelectedHighlight();
 
   const rect = element.getBoundingClientRect();
-  const overlay = document.createElement("div");
-  overlay.id = "homura-selected-highlight";
+  const overlay = document.createElement('div');
+  overlay.id = 'homura-selected-highlight';
 
   Object.assign(overlay.style, {
-    position: "fixed",
+    position: 'fixed',
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
-    backgroundColor: "rgba(16, 185, 129, 0.15)", // Emerald with low opacity
-    border: "2px solid rgba(16, 185, 129, 0.9)", // Emerald solid border
-    borderRadius: "3px",
-    pointerEvents: "none",
-    zIndex: "2147483645", // Below hover highlight
+    backgroundColor: 'rgba(16, 185, 129, 0.15)', // Emerald with low opacity
+    border: '2px solid rgba(16, 185, 129, 0.9)', // Emerald solid border
+    borderRadius: '3px',
+    pointerEvents: 'none',
+    zIndex: '2147483645', // Below hover highlight
     boxShadow:
-      "0 0 0 1px rgba(16, 185, 129, 0.3), 0 0 12px rgba(16, 185, 129, 0.2)",
+      '0 0 0 1px rgba(16, 185, 129, 0.3), 0 0 12px rgba(16, 185, 129, 0.2)',
   });
 
   document.body.appendChild(overlay);
@@ -379,7 +378,7 @@ function removeSelectedHighlight(): void {
     selectedHighlight.remove();
     selectedHighlight = null;
   }
-  const existing = document.getElementById("homura-selected-highlight");
+  const existing = document.getElementById('homura-selected-highlight');
   if (existing) {
     existing.remove();
   }
@@ -393,10 +392,10 @@ function handleStartRecording(): { success: boolean } {
   if (isRecordMode) return { success: true };
 
   isRecordMode = true;
-  document.addEventListener("click", onRecordClick, true);
-  document.addEventListener("input", onRecordInput, true);
+  document.addEventListener('click', onRecordClick, true);
+  document.addEventListener('input', onRecordInput, true);
 
-  console.log("[Homura] Recording started");
+  console.log('[Homura] Recording started');
   return { success: true };
 }
 
@@ -404,10 +403,10 @@ function handleStopRecording(): { success: boolean } {
   if (!isRecordMode) return { success: true };
 
   isRecordMode = false;
-  document.removeEventListener("click", onRecordClick, true);
-  document.removeEventListener("input", onRecordInput, true);
+  document.removeEventListener('click', onRecordClick, true);
+  document.removeEventListener('input', onRecordInput, true);
 
-  console.log("[Homura] Recording stopped");
+  console.log('[Homura] Recording stopped');
   return { success: true };
 }
 
@@ -459,7 +458,7 @@ function generateActionName(
   }
 
   // Check aria-label
-  const ariaLabel = targetElement.getAttribute("aria-label");
+  const ariaLabel = targetElement.getAttribute('aria-label');
   if (ariaLabel?.trim()) {
     return ariaLabel.trim();
   }
@@ -473,7 +472,7 @@ function generateActionName(
     const text = prevSibling.textContent.trim();
     // Exclude common action text
     if (
-      !["编辑", "删除", "保存", "取消", "提交", "确认", "查看"].includes(text)
+      !['编辑', '删除', '保存', '取消', '提交', '确认', '查看'].includes(text)
     ) {
       return text;
     }
@@ -483,14 +482,14 @@ function generateActionName(
   const parent = targetElement.parentElement;
   if (parent) {
     // Look for a label or span with text before the input
-    const labelChild = parent.querySelector("label, span");
+    const labelChild = parent.querySelector('label, span');
     if (
       labelChild?.textContent?.trim() &&
       labelChild.textContent.trim().length < 30
     ) {
       const text = labelChild.textContent.trim();
       if (
-        !["编辑", "删除", "保存", "取消", "提交", "确认", "查看"].includes(text)
+        !['编辑', '删除', '保存', '取消', '提交', '确认', '查看'].includes(text)
       ) {
         return text;
       }
@@ -515,24 +514,24 @@ function onRecordClick(e: MouseEvent): void {
   const analysis = analyzeElement(target);
 
   // Auto-generate UnifiedSelector for recorded action
-  const unifiedSelector = createUnifiedSelector(analysis, "CLICK");
+  const unifiedSelector = createUnifiedSelector(analysis, 'CLICK');
 
   // Generate name from anchor candidates or associated labels
-  const actionName = generateActionName(analysis, target, "点击");
+  const actionName = generateActionName(analysis, target, '点击');
 
   chrome.runtime.sendMessage({
-    type: "ACTION_RECORDED",
+    type: 'ACTION_RECORDED',
     payload: {
       id: generateActionId(),
       name: actionName,
-      type: "click",
+      type: 'click',
       timestamp: Date.now(),
       elementAnalysis: analysis,
       unifiedSelector,
     },
   });
 
-  console.log("[Homura] Recorded click with UnifiedSelector:", {
+  console.log('[Homura] Recorded click with UnifiedSelector:', {
     strategy: unifiedSelector.strategy,
     fullSelector: unifiedSelector.fullSelector,
     confidence: unifiedSelector.confidence,
@@ -549,17 +548,17 @@ function onRecordInput(e: Event): void {
   const analysis = analyzeElement(target);
 
   // Auto-generate UnifiedSelector for recorded action
-  const unifiedSelector = createUnifiedSelector(analysis, "INPUT");
+  const unifiedSelector = createUnifiedSelector(analysis, 'INPUT');
 
   // Generate name from anchor candidates or associated labels
-  const actionName = generateActionName(analysis, target, "输入");
+  const actionName = generateActionName(analysis, target, '输入');
 
   chrome.runtime.sendMessage({
-    type: "ACTION_RECORDED",
+    type: 'ACTION_RECORDED',
     payload: {
       id: generateActionId(),
       name: actionName,
-      type: "input",
+      type: 'input',
       timestamp: Date.now(),
       elementAnalysis: analysis,
       value: target.value,
@@ -567,7 +566,7 @@ function onRecordInput(e: Event): void {
     },
   });
 
-  console.log("[Homura] Recorded input with UnifiedSelector:", {
+  console.log('[Homura] Recorded input with UnifiedSelector:', {
     strategy: unifiedSelector.strategy,
     fullSelector: unifiedSelector.fullSelector,
     confidence: unifiedSelector.confidence,
@@ -592,9 +591,9 @@ interface ExecuteWithLogicPayload {
   scopeSelector?: string;
   anchorSelector?: string;
   anchorValue?: string;
-  anchorMatchMode?: "exact" | "contains" | "startsWith";
+  anchorMatchMode?: 'exact' | 'contains' | 'startsWith';
   targetSelector: string;
-  action: "highlight" | "click" | "input" | "extract";
+  action: 'highlight' | 'click' | 'input' | 'extract';
   inputValue?: string;
 }
 
@@ -613,7 +612,7 @@ async function handleExecuteClick(payload: {
     }
 
     await executeClick(element);
-    console.log("[Homura] Click executed on:", selector);
+    console.log('[Homura] Click executed on:', selector);
     return { success: true };
   } catch (error) {
     return { success: false, error: `点击失败: ${error}` };
@@ -636,7 +635,7 @@ async function handleExecuteInput(payload: {
     }
 
     await executeInput(element, { value, clearFirst: true, typeDelay: 0 });
-    console.log("[Homura] Input executed on:", selector, "value:", value);
+    console.log('[Homura] Input executed on:', selector, 'value:', value);
     return { success: true };
   } catch (error) {
     return { success: false, error: `输入失败: ${error}` };
@@ -658,7 +657,7 @@ function handleExecuteExtract(payload: {
     }
 
     const text = executeExtractText(element);
-    console.log("[Homura] Text extracted from:", selector, "text:", text);
+    console.log('[Homura] Text extracted from:', selector, 'text:', text);
     return { success: true, data: text as string };
   } catch (error) {
     return { success: false, error: `读取失败: ${error}` };
@@ -687,13 +686,13 @@ async function handleExecuteWithLogic(
     scopeSelector,
     anchorSelector,
     anchorValue,
-    anchorMatchMode = "contains",
+    anchorMatchMode = 'contains',
     targetSelector,
     action,
     inputValue,
   } = payload;
 
-  console.log("[Homura] EXECUTE_WITH_LOGIC payload:", {
+  console.log('[Homura] EXECUTE_WITH_LOGIC payload:', {
     scopeSelector,
     anchorSelector,
     anchorValue,
@@ -708,9 +707,9 @@ async function handleExecuteWithLogic(
 
     // Case 1: Has scope (repeating structure)
     if (scopeSelector) {
-      console.log("[Homura] Has scope, querying:", scopeSelector);
+      console.log('[Homura] Has scope, querying:', scopeSelector);
       const scopeElements = document.querySelectorAll(scopeSelector);
-      console.log("[Homura] Found", scopeElements.length, "scope elements");
+      console.log('[Homura] Found', scopeElements.length, 'scope elements');
 
       if (scopeElements.length === 0) {
         return { success: false, error: `未找到容器: ${scopeSelector}` };
@@ -724,9 +723,9 @@ async function handleExecuteWithLogic(
         // This fixes the bug where "安排教室" couldn't be found when preceded by "详情"
         // in the same cell: <a>详情</a> | <a>安排教室</a>
         console.log(
-          "[Homura] Filtering by anchor:",
+          '[Homura] Filtering by anchor:',
           anchorSelector,
-          "=",
+          '=',
           anchorValue,
         );
 
@@ -735,7 +734,7 @@ async function handleExecuteWithLogic(
           const anchorCandidates = scope.querySelectorAll(anchorSelector);
 
           if (anchorCandidates.length === 0) {
-            console.log("[Homura] No anchor found in scope");
+            console.log('[Homura] No anchor found in scope');
             continue;
           }
 
@@ -743,14 +742,14 @@ async function handleExecuteWithLogic(
           for (const anchor of anchorCandidates) {
             const anchorText =
               anchor.textContent?.trim() ||
-              anchor.getAttribute("value") ||
-              anchor.getAttribute("data-value") ||
-              "";
+              anchor.getAttribute('value') ||
+              anchor.getAttribute('data-value') ||
+              '';
 
-            console.log("[Homura] Checking anchor candidate:", anchorText);
+            console.log('[Homura] Checking anchor candidate:', anchorText);
             const matches = matchText(anchorText, anchorValue, anchorMatchMode);
             if (matches) {
-              console.log("[Homura] Anchor matched!", anchorText);
+              console.log('[Homura] Anchor matched!', anchorText);
               matchedScope = scope;
               break scopeLoop; // Found a match, exit both loops
             }
@@ -758,7 +757,7 @@ async function handleExecuteWithLogic(
         }
 
         if (!matchedScope) {
-          console.log("[Homura] No matching scope found");
+          console.log('[Homura] No matching scope found');
           return {
             success: false,
             error: `未找到匹配锚点 "${anchorValue}" 的容器`,
@@ -766,16 +765,16 @@ async function handleExecuteWithLogic(
         }
       } else {
         // No anchor - use first scope (or could be improved to use selected element's scope)
-        console.log("[Homura] No anchor filter, using first scope");
+        console.log('[Homura] No anchor filter, using first scope');
         matchedScope = scopeElements[0];
       }
 
       // Find target within scope
-      console.log("[Homura] Finding target in scope:", targetSelector);
+      console.log('[Homura] Finding target in scope:', targetSelector);
 
       // CRITICAL: Handle self-targeting (empty targetSelector means scope IS the target)
-      if (!targetSelector || targetSelector === "") {
-        console.log("[Homura] Self-targeting: scope element is the target");
+      if (!targetSelector || targetSelector === '') {
+        console.log('[Homura] Self-targeting: scope element is the target');
         targetElement = matchedScope as HTMLElement;
       } else {
         targetElement = matchedScope.querySelector(
@@ -786,7 +785,7 @@ async function handleExecuteWithLogic(
         if (!targetElement) {
           try {
             if (matchedScope.matches(targetSelector)) {
-              console.log("[Homura] Target selector matches scope itself");
+              console.log('[Homura] Target selector matches scope itself');
               targetElement = matchedScope as HTMLElement;
             }
           } catch {
@@ -795,69 +794,72 @@ async function handleExecuteWithLogic(
         }
       }
 
-      usedSelector = `${scopeSelector} >> ${anchorSelector || "(无锚点)"} = "${anchorValue}" >> ${targetSelector || "(self)"}`;
-      console.log("[Homura] Target found:", !!targetElement);
+      usedSelector = `${scopeSelector} >> ${anchorSelector || '(无锚点)'} = "${anchorValue}" >> ${targetSelector || '(self)'}`;
+      console.log('[Homura] Target found:', !!targetElement);
     } else {
       // Case 2: No scope - use target selector directly
-      console.log("[Homura] No scope, using target directly:", targetSelector);
+      console.log('[Homura] No scope, using target directly:', targetSelector);
       targetElement = document.querySelector(targetSelector) as HTMLElement;
       usedSelector = targetSelector;
-      console.log("[Homura] Target found:", !!targetElement);
+      console.log('[Homura] Target found:', !!targetElement);
     }
 
     if (!targetElement) {
-      console.log("[Homura] Target not found!");
+      console.log('[Homura] Target not found!');
       return { success: false, error: `目标元素未找到: ${targetSelector}` };
     }
 
     console.log(
-      "[Homura] Executing action:",
+      '[Homura] Executing action:',
       action,
-      "on element:",
+      'on element:',
       targetElement.tagName,
     );
 
     // Execute the action
     switch (action) {
-      case "highlight":
+      case 'highlight':
         showValidationHighlight(targetElement);
-        console.log("[Homura] Highlighted:", usedSelector);
+        console.log('[Homura] Highlighted:', usedSelector);
         return { success: true, usedSelector };
 
-      case "click":
+      case 'click': {
         // Temporarily disable inspect mode listeners to prevent interference
         // The onInspectClick handler calls preventDefault() which blocks native onclick
         const wasInspectMode = isInspectMode;
         if (wasInspectMode) {
-          document.removeEventListener("click", onInspectClick, true);
+          document.removeEventListener('click', onInspectClick, true);
         }
         try {
           await executeClick(targetElement);
-          console.log("[Homura] Clicked:", usedSelector);
+          console.log('[Homura] Clicked:', usedSelector);
           return { success: true, usedSelector };
         } finally {
           // Restore inspect mode listeners
           if (wasInspectMode) {
-            document.addEventListener("click", onInspectClick, true);
+            document.addEventListener('click', onInspectClick, true);
           }
         }
+      }
 
-      case "input":
+      case 'input': {
         if (!inputValue) {
-          return { success: false, error: "输入值不能为空" };
+          return { success: false, error: '输入值不能为空' };
         }
         await executeInput(targetElement, {
           value: inputValue,
           clearFirst: true,
           typeDelay: 0,
         });
-        console.log("[Homura] Input:", usedSelector, "value:", inputValue);
+        console.log('[Homura] Input:', usedSelector, 'value:', inputValue);
         return { success: true, usedSelector };
+      }
 
-      case "extract":
+      case 'extract': {
         const text = executeExtractText(targetElement);
-        console.log("[Homura] Extracted from:", usedSelector, "text:", text);
+        console.log('[Homura] Extracted from:', usedSelector, 'text:', text);
         return { success: true, data: text as string, usedSelector };
+      }
 
       default:
         return { success: false, error: `未知操作: ${action}` };
@@ -873,17 +875,17 @@ async function handleExecuteWithLogic(
 function matchText(
   text: string,
   pattern: string,
-  mode: "exact" | "contains" | "startsWith",
+  mode: 'exact' | 'contains' | 'startsWith',
 ): boolean {
   const normalizedText = text.toLowerCase();
   const normalizedPattern = pattern.toLowerCase();
 
   switch (mode) {
-    case "exact":
+    case 'exact':
       return normalizedText === normalizedPattern;
-    case "startsWith":
+    case 'startsWith':
       return normalizedText.startsWith(normalizedPattern);
-    case "contains":
+    case 'contains':
     default:
       return normalizedText.includes(normalizedPattern);
   }
@@ -968,29 +970,29 @@ function showValidationHighlight(element: HTMLElement): void {
   removeValidationHighlight();
 
   const rect = element.getBoundingClientRect();
-  const overlay = document.createElement("div");
-  overlay.id = "homura-validation-highlight";
+  const overlay = document.createElement('div');
+  overlay.id = 'homura-validation-highlight';
 
   Object.assign(overlay.style, {
-    position: "fixed",
+    position: 'fixed',
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
-    backgroundColor: "rgba(59, 130, 246, 0.2)", // Blue
-    border: "2px solid rgba(59, 130, 246, 0.9)", // Blue solid border
-    borderRadius: "3px",
-    pointerEvents: "none",
-    zIndex: "2147483644", // Below selected and hover highlights
+    backgroundColor: 'rgba(59, 130, 246, 0.2)', // Blue
+    border: '2px solid rgba(59, 130, 246, 0.9)', // Blue solid border
+    borderRadius: '3px',
+    pointerEvents: 'none',
+    zIndex: '2147483644', // Below selected and hover highlights
     boxShadow:
-      "0 0 0 1px rgba(59, 130, 246, 0.3), 0 0 15px rgba(59, 130, 246, 0.3)",
-    animation: "homura-pulse 1.5s ease-in-out infinite",
+      '0 0 0 1px rgba(59, 130, 246, 0.3), 0 0 15px rgba(59, 130, 246, 0.3)',
+    animation: 'homura-pulse 1.5s ease-in-out infinite',
   });
 
   // Add pulse animation style if not exists
-  if (!document.getElementById("homura-validation-style")) {
-    const style = document.createElement("style");
-    style.id = "homura-validation-style";
+  if (!document.getElementById('homura-validation-style')) {
+    const style = document.createElement('style');
+    style.id = 'homura-validation-style';
     style.textContent = `
       @keyframes homura-pulse {
         0%, 100% { box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3), 0 0 15px rgba(59, 130, 246, 0.3); }
@@ -1005,7 +1007,7 @@ function showValidationHighlight(element: HTMLElement): void {
 
   // Scroll element into view if not visible
   if (!isElementInViewport(element)) {
-    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 }
 
@@ -1014,7 +1016,7 @@ function removeValidationHighlight(): void {
     validationHighlight.remove();
     validationHighlight = null;
   }
-  const existing = document.getElementById("homura-validation-highlight");
+  const existing = document.getElementById('homura-validation-highlight');
   if (existing) {
     existing.remove();
   }
@@ -1046,7 +1048,7 @@ async function handleAIGenerateSelector(_payload: {
   return {
     success: false,
     error:
-      "AI generation not yet implemented. Please use manual selector building.",
+      'AI generation not yet implemented. Please use manual selector building.',
   };
 }
 
@@ -1071,10 +1073,10 @@ interface SmartSelectorPayload {
   targetHtml: string;
   ancestorPath: AncestorInfo[];
   structureInfo: {
-    containerType: ElementAnalysis["containerType"];
+    containerType: ElementAnalysis['containerType'];
     hasRepeatingStructure: boolean;
     containerSelector?: string;
-    anchorCandidates: ElementAnalysis["anchorCandidates"];
+    anchorCandidates: ElementAnalysis['anchorCandidates'];
   };
 }
 
@@ -1102,13 +1104,13 @@ async function handleAIGeneratePathSelector(
   try {
     // Forward to background script for AI processing
     const response = await chrome.runtime.sendMessage({
-      type: "AI_GENERATE_PATH_SELECTOR",
+      type: 'AI_GENERATE_PATH_SELECTOR',
       payload,
     });
 
     if (response && response.success) {
       console.log(
-        "[Homura] AI path selector generated:",
+        '[Homura] AI path selector generated:',
         response.pathSelector,
       );
       return {
@@ -1123,7 +1125,7 @@ async function handleAIGeneratePathSelector(
           : null;
 
       if (pathSelector) {
-        console.log("[Homura] Using fallback path selector:", pathSelector);
+        console.log('[Homura] Using fallback path selector:', pathSelector);
         return {
           success: true,
           pathSelector,
@@ -1132,11 +1134,11 @@ async function handleAIGeneratePathSelector(
 
       return {
         success: false,
-        error: response?.error || "AI path selector generation failed",
+        error: response?.error || 'AI path selector generation failed',
       };
     }
   } catch (error) {
-    console.error("[Homura] AI path selector error:", error);
+    console.error('[Homura] AI path selector error:', error);
 
     // Fallback to programmatic generation
     const pathSelector =
@@ -1181,7 +1183,7 @@ function buildFallbackPathSelector(payload: AIGeneratePathSelectorPayload): {
   // Create a minimal ElementAnalysis-like object for buildPathData
   const analysisLike: Pick<
     ElementAnalysis,
-    "ancestorPath" | "targetSelector" | "minimalSelector"
+    'ancestorPath' | 'targetSelector' | 'minimalSelector'
   > = {
     ancestorPath: ancestorPath as AncestorInfo[],
     targetSelector,
@@ -1215,7 +1217,7 @@ async function handleAIGenerateTool(_payload: {
   // TODO: Forward to background script for AI processing
   return {
     success: false,
-    error: "AI tool generation not yet implemented.",
+    error: 'AI tool generation not yet implemented.',
   };
 }
 
@@ -1231,7 +1233,7 @@ async function handleAIGenerateSmartSelector(
   payload: SmartSelectorPayload,
 ): Promise<{
   success: boolean;
-  strategy?: "path_selector" | "scope_anchor_target";
+  strategy?: 'path_selector' | 'scope_anchor_target';
   pathSelector?: {
     root: string;
     path: string[];
@@ -1254,7 +1256,7 @@ async function handleAIGenerateSmartSelector(
   reasoning?: string;
   error?: string;
 }> {
-  console.log("[MessageHandler] Received SmartSelector request:", {
+  console.log('[MessageHandler] Received SmartSelector request:', {
     containerType: payload.structureInfo.containerType,
     hasRepeating: payload.structureInfo.hasRepeatingStructure,
     anchorCount: payload.structureInfo.anchorCandidates.length,
@@ -1263,12 +1265,12 @@ async function handleAIGenerateSmartSelector(
   try {
     // Forward to background script for AI processing
     const response = await chrome.runtime.sendMessage({
-      type: "AI_GENERATE_SMART_SELECTOR",
+      type: 'AI_GENERATE_SMART_SELECTOR',
       payload,
     });
 
     if (response && response.success) {
-      console.log("[MessageHandler] SmartSelector result:", response);
+      console.log('[MessageHandler] SmartSelector result:', response);
       return {
         success: true,
         strategy: response.strategy,
@@ -1292,12 +1294,12 @@ async function handleAIGenerateSmartSelector(
 
         if (pathSelector) {
           console.log(
-            "[MessageHandler] Using fallback path selector:",
+            '[MessageHandler] Using fallback path selector:',
             pathSelector,
           );
           return {
             success: true,
-            strategy: "path_selector",
+            strategy: 'path_selector',
             pathSelector,
             confidence: pathSelector.confidence,
             reasoning: pathSelector.reasoning,
@@ -1307,11 +1309,11 @@ async function handleAIGenerateSmartSelector(
 
       return {
         success: false,
-        error: response?.error || "Smart selector generation failed",
+        error: response?.error || 'Smart selector generation failed',
       };
     }
   } catch (error) {
-    console.error("[MessageHandler] SmartSelector error:", error);
+    console.error('[MessageHandler] SmartSelector error:', error);
 
     // Fallback to programmatic generation for non-repeating structures
     if (
@@ -1328,7 +1330,7 @@ async function handleAIGenerateSmartSelector(
       if (pathSelector) {
         return {
           success: true,
-          strategy: "path_selector",
+          strategy: 'path_selector',
           pathSelector,
           confidence: pathSelector.confidence,
           reasoning: pathSelector.reasoning,

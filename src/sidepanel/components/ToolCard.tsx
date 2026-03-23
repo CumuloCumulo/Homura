@@ -1,5 +1,5 @@
-import React from "react";
-import type { AtomicTool, PrimitiveAction } from "@homura/sdk/types";
+import React from 'react';
+import type { AtomicTool, PrimitiveAction } from '@homura/sdk/types';
 
 interface ToolCardProps {
   tool: AtomicTool;
@@ -94,7 +94,7 @@ const PlayIcon = () => (
 
 const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
   <svg
-    className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+    className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"
@@ -131,8 +131,8 @@ export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
         group rounded-lg overflow-hidden transition-all duration-300 ease-out
         ${
           isExpanded
-            ? "bg-zinc-800/60 border border-violet-500/20 shadow-neon"
-            : "bg-zinc-900/50 border border-white/5 hover:border-white/10 hover:bg-zinc-800/40"
+            ? 'bg-zinc-800/60 border border-violet-500/20 shadow-neon'
+            : 'bg-zinc-900/50 border border-white/5 hover:border-white/10 hover:bg-zinc-800/40'
         }
       `}
     >
@@ -147,8 +147,8 @@ export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
           shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors
           ${
             isExpanded
-              ? "bg-violet-500/20 text-violet-400"
-              : "bg-zinc-800/80 text-zinc-400 group-hover:text-zinc-300"
+              ? 'bg-violet-500/20 text-violet-400'
+              : 'bg-zinc-800/80 text-zinc-400 group-hover:text-zinc-300'
           }
         `}
         >
@@ -160,7 +160,7 @@ export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
           <span
             className={`
             text-[13px] font-medium truncate block transition-colors
-            ${isExpanded ? "text-zinc-100" : "text-zinc-300 group-hover:text-zinc-100"}
+            ${isExpanded ? 'text-zinc-100' : 'text-zinc-300 group-hover:text-zinc-100'}
           `}
           >
             {tool.name}
@@ -183,8 +183,8 @@ export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
             shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-all
             ${
               disabled
-                ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                : "bg-violet-600/80 text-white hover:bg-violet-500 hover:shadow-neon active:scale-95"
+                ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                : 'bg-violet-600/80 text-white hover:bg-violet-500 hover:shadow-neon active:scale-95'
             }
           `}
           title="Run"
@@ -198,7 +198,7 @@ export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
       </div>
 
       {/* Expanded Content */}
-      <div className={`collapse-content ${isExpanded ? "expanded" : ""}`}>
+      <div className={`collapse-content ${isExpanded ? 'expanded' : ''}`}>
         <div>
           <div className="px-3 pb-3 pt-1 space-y-3 animate-fade-in">
             {/* Description */}
@@ -249,7 +249,7 @@ export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
                     </label>
                     <input
                       type="text"
-                      value={params[key] || ""}
+                      value={params[key] || ''}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                         handleParamChange(key, e.target.value)
                       }
@@ -276,12 +276,12 @@ export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
                 transition-all duration-200
                 ${
                   disabled
-                    ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                    : "bg-gradient-to-r from-violet-600/90 to-fuchsia-600/90 text-white hover:from-violet-500 hover:to-fuchsia-500 hover:shadow-neon active:scale-[0.98]"
+                    ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-violet-600/90 to-fuchsia-600/90 text-white hover:from-violet-500 hover:to-fuchsia-500 hover:shadow-neon active:scale-[0.98]'
                 }
               `}
             >
-              {disabled ? "Running..." : "Execute"}
+              {disabled ? 'Running...' : 'Execute'}
             </button>
           </div>
         </div>
@@ -292,11 +292,11 @@ export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
 
 function ActionBadge({ action }: { action: PrimitiveAction }) {
   const colors: Record<PrimitiveAction, string> = {
-    CLICK: "text-amber-400/80",
-    INPUT: "text-violet-400/80",
-    EXTRACT_TEXT: "text-cyan-400/80",
-    WAIT_FOR: "text-yellow-400/80",
-    NAVIGATE: "text-emerald-400/80",
+    CLICK: 'text-amber-400/80',
+    INPUT: 'text-violet-400/80',
+    EXTRACT_TEXT: 'text-cyan-400/80',
+    WAIT_FOR: 'text-yellow-400/80',
+    NAVIGATE: 'text-emerald-400/80',
   };
 
   return (
@@ -306,7 +306,7 @@ function ActionBadge({ action }: { action: PrimitiveAction }) {
       bg-white/5 ${colors[action]}
     `}
     >
-      {action.replace("_", "")}
+      {action.replace('_', '')}
     </span>
   );
 }

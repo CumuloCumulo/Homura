@@ -28,28 +28,26 @@ import type {
   NavigateParams,
   ClickParams,
   ExecutorOptions,
-} from "../types/index.js";
+} from '../types/index.js';
 import {
   substituteVariables,
   matchText,
   getDOMSnapshot,
-} from "../utils/index.js";
-import {
   safeQuerySelectorAll,
   safeQuerySelector,
   sleep,
-} from "../utils/index.js";
+} from '../utils/index.js';
 import {
   executeClick,
   executeInput,
   executeExtractText,
   executeWaitFor,
   executeNavigate,
-} from "../primitives/index.js";
+} from '../primitives/index.js';
 
 // Check if we're in a browser environment
 const isBrowser =
-  typeof window !== "undefined" && typeof document !== "undefined";
+  typeof window !== 'undefined' && typeof document !== 'undefined';
 
 export const BROWSER_REQUIRED = true;
 
@@ -66,7 +64,7 @@ export async function executeTool(
   options: ExecutorOptions = {},
 ): Promise<ExecuteToolResult> {
   if (!isBrowser) {
-    throw new Error("[Homura SDK] executeTool requires a browser environment");
+    throw new Error('[Homura SDK] executeTool requires a browser environment');
   }
 
   const startTime = performance.now();
@@ -110,7 +108,7 @@ export async function executeTool(
 
     // Wrap unexpected errors
     const executionError: ExecutionError = {
-      code: "UNKNOWN",
+      code: 'UNKNOWN',
       message: error instanceof Error ? error.message : String(error),
     };
 
@@ -152,7 +150,7 @@ async function executeSelectionLogic(
 
     if (scopeElements.length === 0) {
       throw createError(
-        "SCOPE_NOT_FOUND",
+        'SCOPE_NOT_FOUND',
         `No elements found for scope selector: ${logic.scope.selector}`,
         logic.scope.selector,
         document.body,
@@ -164,12 +162,12 @@ async function executeSelectionLogic(
     const hasSplitTable = splitTableGroups !== null;
 
     console.log(
-      `[Homura SDK] Scope matched ${scopeElements.length} elements${hasSplitTable ? " (split table detected)" : ""}`,
+      `[Homura SDK] Scope matched ${scopeElements.length} elements${hasSplitTable ? ' (split table detected)' : ''}`,
     );
 
     if (debug) {
       onDebugStep?.({
-        type: "scope",
+        type: 'scope',
         selector: logic.scope.selector,
         matchCount: scopeElements.length,
       });
@@ -197,7 +195,7 @@ async function executeSelectionLogic(
 
       if (!matchedContext) {
         throw createError(
-          "ANCHOR_NOT_FOUND",
+          'ANCHOR_NOT_FOUND',
           `No element matched anchor criteria: ${logic.anchor.value}`,
           logic.anchor.selector,
           scopeElements[0],
@@ -218,7 +216,7 @@ async function executeSelectionLogic(
 
       if (debug) {
         onDebugStep?.({
-          type: "anchor",
+          type: 'anchor',
           selector: logic.anchor.selector,
           matchCount: 1,
           element: context,
@@ -237,13 +235,13 @@ async function executeSelectionLogic(
   let targetElement: HTMLElement | null = null;
 
   // Handle self-targeting (empty target selector)
-  if (!target.selector || target.selector === "") {
-    console.log("[Homura SDK] Self-targeting: using context element as target");
+  if (!target.selector || target.selector === '') {
+    console.log('[Homura SDK] Self-targeting: using context element as target');
     if (context instanceof Document) {
       throw createError(
-        "TARGET_NOT_FOUND",
-        "Self-targeting requires a scope context, not document",
-        "",
+        'TARGET_NOT_FOUND',
+        'Self-targeting requires a scope context, not document',
+        '',
         document.body,
       );
     }
@@ -256,7 +254,7 @@ async function executeSelectionLogic(
     if (!targetElement && !(context instanceof Document)) {
       try {
         if ((context as Element).matches(target.selector)) {
-          console.log("[Homura SDK] Target selector matches context itself");
+          console.log('[Homura SDK] Target selector matches context itself');
           targetElement = context as HTMLElement;
         }
       } catch {
@@ -267,7 +265,7 @@ async function executeSelectionLogic(
 
   if (!targetElement) {
     throw createError(
-      "TARGET_NOT_FOUND",
+      'TARGET_NOT_FOUND',
       `Target element not found: ${target.selector}`,
       target.selector,
       context instanceof Document ? document.body : context,
@@ -278,7 +276,7 @@ async function executeSelectionLogic(
 
   if (debug) {
     onDebugStep?.({
-      type: "target",
+      type: 'target',
       selector: target.selector,
       element: targetElement,
     });
@@ -290,7 +288,7 @@ async function executeSelectionLogic(
 
   if (debug) {
     onDebugStep?.({
-      type: "action",
+      type: 'action',
       element: targetElement,
     });
   }
@@ -319,16 +317,16 @@ function resolveAnchor(
   for (let i = 0; i < scopeElements.length; i++) {
     const scopeEl = scopeElements[i];
 
-    if (anchor.type === "index") {
+    if (anchor.type === 'index') {
       const targetIndex = parseInt(anchor.value, 10);
       if (i === targetIndex) {
         return { element: scopeEl, index: i };
       }
-    } else if (anchor.type === "text_match") {
+    } else if (anchor.type === 'text_match') {
       const anchorCandidates = safeQuerySelectorAll(anchor.selector, scopeEl);
 
       for (const candidate of anchorCandidates) {
-        const text = candidate.textContent || "";
+        const text = candidate.textContent || '';
         if (matchText(text, anchor.value, anchor.matchMode)) {
           console.log(
             `[Homura SDK] Anchor matched: "${anchor.value}" in scope[${i}]`,
@@ -336,12 +334,12 @@ function resolveAnchor(
           return { element: scopeEl, index: i };
         }
       }
-    } else if (anchor.type === "attribute_match") {
+    } else if (anchor.type === 'attribute_match') {
       const anchorCandidates = safeQuerySelectorAll(anchor.selector, scopeEl);
 
       for (const candidate of anchorCandidates) {
         if (anchor.attribute) {
-          const attrValue = candidate.getAttribute(anchor.attribute) || "";
+          const attrValue = candidate.getAttribute(anchor.attribute) || '';
           if (matchText(attrValue, anchor.value, anchor.matchMode)) {
             console.log(
               `[Homura SDK] Anchor matched: [${anchor.attribute}="${anchor.value}"] in scope[${i}]`,
@@ -379,27 +377,27 @@ async function executeAction(
   const { action, actionParams } = target;
 
   switch (action) {
-    case "CLICK":
+    case 'CLICK':
       await executeClick(element, actionParams as ClickParams);
       return undefined;
 
-    case "INPUT":
+    case 'INPUT':
       await executeInput(element, actionParams as InputParams);
       return undefined;
 
-    case "EXTRACT_TEXT":
+    case 'EXTRACT_TEXT':
       return executeExtractText(element, actionParams as ExtractTextParams);
 
-    case "WAIT_FOR":
+    case 'WAIT_FOR':
       await executeWaitFor(target.selector, actionParams as WaitForParams);
       return undefined;
 
-    case "NAVIGATE":
+    case 'NAVIGATE':
       await executeNavigate(actionParams as NavigateParams);
       return undefined;
 
     default:
-      throw createError("ACTION_FAILED", `Unknown action: ${action}`);
+      throw createError('ACTION_FAILED', `Unknown action: ${action}`);
   }
 }
 
@@ -436,7 +434,7 @@ function resolveVariables(
   }
 
   // Handle INPUT action value substitution
-  if (logic.target.action === "INPUT" && logic.target.actionParams) {
+  if (logic.target.action === 'INPUT' && logic.target.actionParams) {
     const inputParams = logic.target.actionParams as InputParams;
     resolved.target.actionParams = {
       ...inputParams,
@@ -451,7 +449,7 @@ function resolveVariables(
  * Create execution error with DOM snapshot
  */
 function createError(
-  code: ExecutionError["code"],
+  code: ExecutionError['code'],
   message: string,
   failedSelector?: string,
   contextElement?: Element,
@@ -469,10 +467,10 @@ function createError(
  */
 function isExecutionError(error: unknown): error is ExecutionError {
   return (
-    typeof error === "object" &&
+    typeof error === 'object' &&
     error !== null &&
-    "code" in error &&
-    "message" in error
+    'code' in error &&
+    'message' in error
   );
 }
 
@@ -504,7 +502,7 @@ function detectSplitTableGroups(
 
   if (hasDuplicateIds) {
     console.log(
-      "[Homura SDK] Split table layout detected:",
+      '[Homura SDK] Split table layout detected:',
       Array.from(idGroups.entries())
         .filter(([, els]) => els.length > 1)
         .map(([id, els]) => `${id}: ${els.length} elements`),
@@ -526,7 +524,7 @@ function resolveAnchorInSplitTable(
 
   for (const [id, elements] of groups) {
     for (const scopeEl of elements) {
-      if (anchor.type === "index") {
+      if (anchor.type === 'index') {
         const targetIndex = parseInt(anchor.value, 10);
         if (groupIndex === targetIndex) {
           return {
@@ -535,11 +533,11 @@ function resolveAnchorInSplitTable(
             compositeScope: elements,
           };
         }
-      } else if (anchor.type === "text_match") {
+      } else if (anchor.type === 'text_match') {
         const anchorCandidates = safeQuerySelectorAll(anchor.selector, scopeEl);
 
         for (const candidate of anchorCandidates) {
-          const text = candidate.textContent || "";
+          const text = candidate.textContent || '';
           if (matchText(text, anchor.value, anchor.matchMode)) {
             console.log(
               `[Homura SDK] Split table anchor matched in group "${id}": "${anchor.value}"`,
@@ -551,11 +549,11 @@ function resolveAnchorInSplitTable(
             };
           }
         }
-      } else if (anchor.type === "attribute_match" && anchor.attribute) {
+      } else if (anchor.type === 'attribute_match' && anchor.attribute) {
         const anchorCandidates = safeQuerySelectorAll(anchor.selector, scopeEl);
 
         for (const candidate of anchorCandidates) {
-          const attrValue = candidate.getAttribute(anchor.attribute) || "";
+          const attrValue = candidate.getAttribute(anchor.attribute) || '';
           if (matchText(attrValue, anchor.value, anchor.matchMode)) {
             console.log(
               `[Homura SDK] Split table anchor matched in group "${id}": [${anchor.attribute}="${anchor.value}"]`,

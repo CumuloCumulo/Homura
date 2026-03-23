@@ -10,4 +10,4 @@
 export {
   executeTool,
   BROWSER_REQUIRED as EXECUTOR_BROWSER_REQUIRED,
-} from "./tool.js";
+} from './tool.js';

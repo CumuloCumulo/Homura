@@ -7,12 +7,12 @@
  * This module requires a browser environment.
  */
 
-import type { SelectorLogic, SelectorAnchor } from "../types/index.js";
-import type { SelectorDraft, ValidationResult } from "./types.js";
+import type { SelectorLogic, SelectorAnchor } from '../types/index.js';
+import type { SelectorDraft, ValidationResult } from './types.js';
 
 // Check if we're in a browser environment
 const isBrowser =
-  typeof window !== "undefined" && typeof document !== "undefined";
+  typeof window !== 'undefined' && typeof document !== 'undefined';
 
 export const BROWSER_REQUIRED = true;
 
@@ -25,7 +25,7 @@ function safeQuerySelector<T extends Element = Element>(
 ): T | null {
   if (!isBrowser) {
     throw new Error(
-      "[Homura SDK] safeQuerySelector requires a browser environment",
+      '[Homura SDK] safeQuerySelector requires a browser environment',
     );
   }
   try {
@@ -45,7 +45,7 @@ function safeQuerySelectorAll<T extends Element = Element>(
 ): T[] {
   if (!isBrowser) {
     throw new Error(
-      "[Homura SDK] safeQuerySelectorAll requires a browser environment",
+      '[Homura SDK] safeQuerySelectorAll requires a browser environment',
     );
   }
   try {
@@ -62,19 +62,19 @@ function safeQuerySelectorAll<T extends Element = Element>(
 function matchText(
   actual: string,
   expected: string,
-  mode: SelectorAnchor["matchMode"] = "contains",
+  mode: SelectorAnchor['matchMode'] = 'contains',
 ): boolean {
   const normalizedActual = actual.trim().toLowerCase();
   const normalizedExpected = expected.trim().toLowerCase();
 
   switch (mode) {
-    case "exact":
+    case 'exact':
       return normalizedActual === normalizedExpected;
-    case "contains":
+    case 'contains':
       return normalizedActual.includes(normalizedExpected);
-    case "startsWith":
+    case 'startsWith':
       return normalizedActual.startsWith(normalizedExpected);
-    case "endsWith":
+    case 'endsWith':
       return normalizedActual.endsWith(normalizedExpected);
     default:
       return normalizedActual.includes(normalizedExpected);
@@ -87,7 +87,7 @@ function matchText(
 export function validateSelectorDraft(draft: SelectorDraft): ValidationResult {
   if (!isBrowser) {
     throw new Error(
-      "[Homura SDK] validateSelectorDraft requires a browser environment",
+      '[Homura SDK] validateSelectorDraft requires a browser environment',
     );
   }
 
@@ -137,7 +137,7 @@ export function validateSelectorDraft(draft: SelectorDraft): ValidationResult {
       const anchorEl = safeQuerySelector(draft.anchor.selector, scopeEl);
 
       if (anchorEl) {
-        const textOrAttr = anchorEl.textContent || "";
+        const textOrAttr = anchorEl.textContent || '';
         if (matchText(textOrAttr, draft.anchor.value, draft.anchor.matchMode)) {
           anchorMatchIndex = i;
           break;
@@ -218,7 +218,7 @@ export function validateSelectorLogic(logic: SelectorLogic): ValidationResult {
 export function isValidCssSelector(selector: string): boolean {
   if (!isBrowser) {
     throw new Error(
-      "[Homura SDK] isValidCssSelector requires a browser environment",
+      '[Homura SDK] isValidCssSelector requires a browser environment',
     );
   }
   try {
@@ -234,7 +234,7 @@ export function isValidCssSelector(selector: string): boolean {
  */
 export function countMatches(selector: string, context?: Element): number {
   if (!isBrowser) {
-    throw new Error("[Homura SDK] countMatches requires a browser environment");
+    throw new Error('[Homura SDK] countMatches requires a browser environment');
   }
   try {
     if (context) {
@@ -255,7 +255,7 @@ export function findTargetElement(
 ): HTMLElement | null {
   if (!isBrowser) {
     throw new Error(
-      "[Homura SDK] findTargetElement requires a browser environment",
+      '[Homura SDK] findTargetElement requires a browser environment',
     );
   }
   try {
@@ -278,9 +278,9 @@ export function findTargetElement(
       const anchorEl = safeQuerySelector(logic.anchor.selector, scopeEl);
       if (anchorEl) {
         const textOrAttr =
-          logic.anchor.type === "attribute_match" && logic.anchor.attribute
-            ? anchorEl.getAttribute(logic.anchor.attribute) || ""
-            : anchorEl.textContent || "";
+          logic.anchor.type === 'attribute_match' && logic.anchor.attribute
+            ? anchorEl.getAttribute(logic.anchor.attribute) || ''
+            : anchorEl.textContent || '';
 
         if (matchText(textOrAttr, searchValue, logic.anchor.matchMode)) {
           return safeQuerySelector<HTMLElement>(logic.target.selector, scopeEl);
@@ -307,13 +307,13 @@ export function getScopePreview(logic: SelectorLogic): {
   const scopeElements = safeQuerySelectorAll(logic.scope.selector);
 
   return scopeElements.map((scopeEl) => {
-    let anchorText = "";
+    let anchorText = '';
     let isMatch = false;
 
     if (logic.anchor) {
       const anchorEl = safeQuerySelector(logic.anchor.selector, scopeEl);
       if (anchorEl) {
-        anchorText = anchorEl.textContent?.trim().slice(0, 50) || "";
+        anchorText = anchorEl.textContent?.trim().slice(0, 50) || '';
         isMatch = matchText(
           anchorText,
           logic.anchor.value,

@@ -7,11 +7,11 @@
  * vertical stepper from target element to semantic root
  */
 
-import React from "react";
-import { motion } from "framer-motion";
-import type { AncestorInfo, PathSelector } from "@shared/selectorBuilder/types";
-import type { UnifiedSelector } from "@homura/sdk/types";
-import { sendToContentScript } from "../utils/ensureContentScript";
+import React from 'react';
+import { motion } from 'framer-motion';
+import type { AncestorInfo, PathSelector } from '@shared/selectorBuilder/types';
+import type { UnifiedSelector } from '@homura/sdk/types';
+import { sendToContentScript } from '../utils/ensureContentScript';
 
 interface PathVisualizerProps {
   ancestorPath: AncestorInfo[];
@@ -21,21 +21,21 @@ interface PathVisualizerProps {
   onPathChange?: (includedDepths: number[]) => void;
   onLog?: (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => void;
 }
 
-type ActionType = "highlight" | "click" | "extract" | "input" | null;
+type ActionType = 'highlight' | 'click' | 'extract' | 'input' | null;
 
 // Get color based on semantic score
 function getScoreColor(score: number): { text: string; bg: string } {
   if (score >= 0.7) {
-    return { text: "text-emerald-400", bg: "bg-emerald-500/20" };
+    return { text: 'text-emerald-400', bg: 'bg-emerald-500/20' };
   } else if (score >= 0.4) {
-    return { text: "text-yellow-400", bg: "bg-yellow-500/20" };
+    return { text: 'text-yellow-400', bg: 'bg-yellow-500/20' };
   }
-  return { text: "text-zinc-500", bg: "bg-zinc-700/50" };
+  return { text: 'text-zinc-500', bg: 'bg-zinc-700/50' };
 }
 
 // Checkbox Icon
@@ -128,9 +128,9 @@ function AncestorItem({
           ${
             included
               ? ancestor.isSemanticRoot
-                ? "bg-emerald-500/10 border-emerald-500/30 hover:border-emerald-500/50"
-                : "bg-zinc-900/80 border-zinc-700/50 hover:border-zinc-600"
-              : "bg-zinc-950/50 border-zinc-800/30 opacity-50 hover:opacity-70"
+                ? 'bg-emerald-500/10 border-emerald-500/30 hover:border-emerald-500/50'
+                : 'bg-zinc-900/80 border-zinc-700/50 hover:border-zinc-600'
+              : 'bg-zinc-950/50 border-zinc-800/30 opacity-50 hover:opacity-70'
           }
         `}
       >
@@ -142,9 +142,9 @@ function AncestorItem({
             ${
               included
                 ? ancestor.isSemanticRoot
-                  ? "text-emerald-400"
-                  : "text-violet-400"
-                : "text-zinc-600"
+                  ? 'text-emerald-400'
+                  : 'text-violet-400'
+                : 'text-zinc-600'
             }
           `}
         >
@@ -161,7 +161,7 @@ function AncestorItem({
             <code
               className={`
               text-[10px] font-mono truncate
-              ${included ? "text-violet-400" : "text-zinc-600"}
+              ${included ? 'text-violet-400' : 'text-zinc-600'}
             `}
             >
               {ancestor.selector}
@@ -181,7 +181,7 @@ function AncestorItem({
                   key={i}
                   className={`
                     text-[8px] font-mono px-1 py-0.5 rounded
-                    ${included ? "bg-zinc-800 text-zinc-500" : "bg-zinc-900 text-zinc-700"}
+                    ${included ? 'bg-zinc-800 text-zinc-500' : 'bg-zinc-900 text-zinc-700'}
                   `}
                 >
                   .{cls}
@@ -234,7 +234,7 @@ export function PathVisualizer({
 
   // Quick actions state
   const [isLoading, setIsLoading] = React.useState<ActionType>(null);
-  const [inputValue, setInputValue] = React.useState("");
+  const [inputValue, setInputValue] = React.useState('');
   const [extractedText, setExtractedText] = React.useState<string | null>(null);
 
   // Reset when ancestorPath changes
@@ -282,7 +282,7 @@ export function PathVisualizer({
       parts.push(targetSelector);
     }
 
-    return parts.join(" ") || targetSelector || "*";
+    return parts.join(' ') || targetSelector || '*';
   }, [ancestorPath, includedDepths, pathSelector, targetSelector]);
 
   // Quick action handler for Path mode
@@ -297,7 +297,7 @@ export function PathVisualizer({
         targetSelector: selectorToUse,
         action,
         inputValue: value,
-        strategy: "path" as const,
+        strategy: 'path' as const,
         // No scope/anchor for path mode
         scopeSelector: undefined,
         anchorSelector: undefined,
@@ -309,37 +309,37 @@ export function PathVisualizer({
         data?: string;
         error?: string;
       }>({
-        type: "EXECUTE_WITH_LOGIC",
+        type: 'EXECUTE_WITH_LOGIC',
         payload,
       });
 
       const actionNames = {
-        highlight: "高亮",
-        click: "点击",
-        input: "输入",
-        extract: "读取",
+        highlight: '高亮',
+        click: '点击',
+        input: '输入',
+        extract: '读取',
       };
 
       if (result.success) {
-        if (action === "extract") {
-          setExtractedText(result.data || "");
+        if (action === 'extract') {
+          setExtractedText(result.data || '');
         }
         const msg =
-          action === "extract"
+          action === 'extract'
             ? `${actionNames[action]}成功: "${result.data}"`
             : `${actionNames[action]}成功`;
-        onLog?.({ timestamp: Date.now(), level: "info", message: msg });
+        onLog?.({ timestamp: Date.now(), level: 'info', message: msg });
       } else {
         onLog?.({
           timestamp: Date.now(),
-          level: "error",
+          level: 'error',
           message: result.error || `${actionNames[action]}失败`,
         });
       }
     } catch (error) {
       onLog?.({
         timestamp: Date.now(),
-        level: "error",
+        level: 'error',
         message: `操作失败: ${error}`,
       });
     } finally {
@@ -419,10 +419,10 @@ export function PathVisualizer({
             <span
               className={`text-[9px] font-mono ${
                 pathSelector.confidence >= 0.7
-                  ? "text-emerald-400"
+                  ? 'text-emerald-400'
                   : pathSelector.confidence >= 0.4
-                    ? "text-yellow-400"
-                    : "text-zinc-500"
+                    ? 'text-yellow-400'
+                    : 'text-zinc-500'
               }`}
             >
               {Math.round(pathSelector.confidence * 100)}%
@@ -457,7 +457,7 @@ export function PathVisualizer({
           {/* Action Buttons Row */}
           <div className="flex gap-1.5">
             <button
-              onClick={() => handleAction("highlight")}
+              onClick={() => handleAction('highlight')}
               disabled={isLoading !== null}
               className="
                 flex-1 h-7 flex items-center justify-center gap-1
@@ -468,7 +468,7 @@ export function PathVisualizer({
                 transition-all duration-200
               "
             >
-              {isLoading === "highlight" ? (
+              {isLoading === 'highlight' ? (
                 <div className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
               ) : (
                 <svg
@@ -488,7 +488,7 @@ export function PathVisualizer({
               <span>高亮</span>
             </button>
             <button
-              onClick={() => handleAction("click")}
+              onClick={() => handleAction('click')}
               disabled={isLoading !== null}
               className="
                 flex-1 h-7 flex items-center justify-center gap-1
@@ -499,7 +499,7 @@ export function PathVisualizer({
                 transition-all duration-200
               "
             >
-              {isLoading === "click" ? (
+              {isLoading === 'click' ? (
                 <div className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
               ) : (
                 <svg
@@ -519,7 +519,7 @@ export function PathVisualizer({
               <span>点击</span>
             </button>
             <button
-              onClick={() => handleAction("extract")}
+              onClick={() => handleAction('extract')}
               disabled={isLoading !== null}
               className="
                 flex-1 h-7 flex items-center justify-center gap-1
@@ -530,7 +530,7 @@ export function PathVisualizer({
                 transition-all duration-200
               "
             >
-              {isLoading === "extract" ? (
+              {isLoading === 'extract' ? (
                 <div className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
               ) : (
                 <svg
@@ -558,9 +558,9 @@ export function PathVisualizer({
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) =>
-                e.key === "Enter" &&
+                e.key === 'Enter' &&
                 inputValue.trim() &&
-                handleAction("input", inputValue)
+                handleAction('input', inputValue)
               }
               placeholder="输入内容..."
               className="
@@ -573,8 +573,8 @@ export function PathVisualizer({
             />
             <button
               onClick={() => {
-                handleAction("input", inputValue);
-                setInputValue("");
+                handleAction('input', inputValue);
+                setInputValue('');
               }}
               disabled={isLoading !== null || !inputValue.trim()}
               className="
@@ -586,7 +586,7 @@ export function PathVisualizer({
                 transition-all duration-200
               "
             >
-              {isLoading === "input" ? (
+              {isLoading === 'input' ? (
                 <div className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
               ) : (
                 <svg

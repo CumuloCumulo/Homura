@@ -580,6 +580,188 @@ div.section (score: 0.6) ← 保留
 
 ---
 
+## 🏛️ 软件工程规范
+
+> 防止技术债积累、保持代码质量、统一开发规范
+
+### Spec-Driven Development（规范驱动开发）
+
+**核心原则**：先定义规范，再编写代码
+
+```
+1. 📋 定义规范 → 在 DEVELOPMENT.md 或相关文档中定义接口、类型
+2. 🔤 类型定义 → 先定义 TypeScript 类型，确保无冲突
+3. 💻 实现代码 → 按照规范实现
+4. ✅ 测试验证 → 编写测试用例
+5. 📚 文档同步 → 更新文档
+```
+
+### 类型系统规范
+
+**防止类型冲突、统一类型定义**
+
+#### 类型所有权
+
+| 类型 | 所有权 | 路径 |
+|------|--------|------|
+| **SelectorLogic** | SDK | `packages/sdk/src/types/selector.ts` |
+| **UnifiedSelector** | SDK | `packages/sdk/src/types/selector.ts` |
+| **AtomicTool** | SDK | `packages/sdk/src/types/primitives.ts` |
+| **Blueprint** | SDK | `packages/sdk/src/types/blueprint.ts` |
+| **ValidationResult** | SDK | `packages/sdk/src/selector/types.ts` |
+| **BlueprintValidationResult** | 扩展 | `src/dashboard/utils/blueprintValidator.ts` |
+| **HomuraMessage** | 扩展 | `src/shared/types.ts` |
+| **RecordingState** | 扩展 | `src/shared/selectorBuilder/types.ts` |
+
+#### 类型定义规则
+
+```typescript
+// ✅ 正确：类型在唯一位置定义
+// packages/sdk/src/types/selector.ts
+export interface SelectorLogic {
+  strategy: 'path' | 'scope_anchor_target';
+  // ...
+}
+
+// ✅ 正确：需要时导入并 re-export
+// packages/sdk/src/types/blueprint.ts
+import type { SelectorLogic } from './selector.js';
+export type { SelectorLogic } from './selector.js';
+
+// ❌ 错误：重复定义类型
+// packages/sdk/src/types/blueprint.ts
+export interface SelectorLogic { ... }  // 冲突！
+```
+
+#### 类型命名约定
+
+| 模式 | 用途 | 示例 |
+|------|------|------|
+| **...Config** | 配置对象 | `AgentConfig`, `SelectorConfig` |
+| **...Options** | 可选参数 | `ExecuteOptions`, `ValidateOptions` |
+| **...Result** | 返回结果 | `ExecuteToolResult`, `ValidationResult` |
+| **...State** | 状态对象 | `RecordingState`, `AgentState` |
+| **...Props** | React Props | `ToolCardProps`, `ButtonProps` |
+| **...Draft** | 未验证数据 | `SelectorDraft` |
+| **...Meta** | 元数据 | `BlueprintMeta` |
+
+### API 设计规范
+
+**统一的 API 签名、一致的函数命名**
+
+#### 函数签名约定
+
+```typescript
+// ✅ 正确：参数顺序（必需 → 可选 → 上下文）
+export async function executeTool(
+  tool: AtomicTool,                    // 必需
+  params: Record<string, unknown>,     // 必需
+  context?: ExecutionContext           // 可选上下文
+): Promise<ExecuteToolResult> {
+  // ...
+}
+
+// ✅ 正确：对象参数（≥3 个参数或有关联性）
+export async function executeInput(
+  element: Element,
+  params: {
+    value: string;
+    clearFirst?: boolean;
+    delay?: number;
+  }
+): Promise<ExecuteToolResult> {
+  // ...
+}
+```
+
+#### 错误处理约定
+
+```typescript
+// ✅ 正确：明确错误类型
+export async function executeTool(
+  tool: AtomicTool,
+  params: Record<string, unknown>
+): Promise<ExecuteToolResult> {
+  try {
+    // ...
+  } catch (error) {
+    throw new ExecutionError(
+      `Failed to execute tool ${tool.tool_id}`,
+      { cause: error }
+    );
+  }
+}
+
+// ❌ 错误：吞掉错误
+export async function executeTool(...) {
+  try {
+    // ...
+  } catch (e) {
+    console.error(e);
+    return null;  // 不要吞掉错误！
+  }
+}
+```
+
+### 代码质量检查
+
+#### 自动化检查脚本
+
+```bash
+# 添加到 package.json
+npm run typecheck    # TypeScript 类型检查
+npm run lint         # ESLint 检查
+npm run check:dups   # 检查类型重复
+npm run test         # 运行测试
+```
+
+#### 开发前检查清单
+
+- [ ] 新类型是否已检查不与现有类型冲突？
+- [ ] 是否从正确的模块导入类型（SDK vs @shared）？
+- [ ] 函数签名是否遵循 API 规范？
+- [ ] 是否添加了 JSDoc 注释？
+- [ ] 是否添加了错误处理？
+- [ ] 是否添加了测试用例？
+
+### Git Hook 检查
+
+建议添加 pre-commit hook：
+
+```bash
+#!/bin/sh
+# .husky/pre-commit
+
+# 1. TypeScript 类型检查
+npm run typecheck
+
+# 2. ESLint 检查
+npm run lint
+
+# 3. 检查类型重复
+if grep -r "export interface SelectorLogic" packages/sdk/src/ | wc -l | grep -q "^[2-9]"; then
+  echo "❌ 发现重复的类型定义：SelectorLogic"
+  exit 1
+fi
+
+# 4. 检查错误的导入路径
+if git diff --cached --name-only | grep -E '\.ts$' | xargs grep "from '@shared/types.*AtomicTool"; then
+  echo "❌ 不要从 @shared/types 导入 SDK 类型"
+  exit 1
+fi
+```
+
+### 常见错误与修复
+
+| 错误 | 原因 | 修复方法 |
+|------|------|----------|
+| `TS2308: Member already exported` | 类型重复定义 | 删除重复定义，使用 re-export |
+| `TS2345: Type 'X' is not assignable` | 类型不匹配 | 检查导入路径，确保类型正确 |
+| `TS2304: Cannot find name 'get'` | Zustand store 使用错误 | 使用 `useStore.getState()` |
+| `TS2352: Conversion may be a mistake` | 类型断言错误 | 使用 `as unknown as Type` |
+
+---
+
 ## 📋 开发检查清单
 
 ### 通用检查
@@ -644,6 +826,231 @@ div.section (score: 0.6) ← 保留
 2. 点击扩展的 "Service Worker" 链接
 3. 查看 Console 日志，搜索 "[Homura]"
 ```
+
+---
+
+## 📚 API 设计规范
+
+> 统一 API 签名、一致的函数命名、清晰的错误处理
+
+### 函数签名约定
+
+#### 参数顺序
+
+```typescript
+// 1. 必需参数在前
+export function createUnifiedSelector(
+  analysis: ElementAnalysis,  // 必需
+  action: PrimitiveType        // 必需
+): UnifiedSelector { ... }
+
+// 2. 可选参数在后
+export async function executeClick(
+  element: Element,
+  options?: ExecuteOptions  // 可选
+): Promise<ExecuteToolResult> { ... }
+
+// 3. 上下文参数最后
+export async function executeTool(
+  tool: AtomicTool,
+  params: Record<string, unknown>,
+  context?: ExecutionContext  // 上下文
+): Promise<ExecuteToolResult> { ... }
+```
+
+#### 对象参数 vs 多参数
+
+```typescript
+// ✅ 使用对象参数：当参数 ≥ 3 个或有关联性
+export async function executeInput(
+  element: Element,
+  params: {
+    value: string;
+    clearFirst?: boolean;
+    delay?: number;
+  }
+): Promise<ExecuteToolResult> { ... }
+
+// ✅ 使用多参数：当参数独立且 ≤ 2 个
+export function generateMessageId(prefix?: string): string { ... }
+```
+
+### 错误处理规范
+
+```typescript
+// ✅ 正确：明确错误类型
+export async function executeTool(
+  tool: AtomicTool,
+  params: Record<string, unknown>
+): Promise<ExecuteToolResult> {
+  try {
+    // ...
+  } catch (error) {
+    throw new ExecutionError(
+      `Failed to execute tool ${tool.tool_id}`,
+      { cause: error }
+    );
+  }
+}
+
+// ❌ 错误：吞掉错误
+export async function executeTool(...) {
+  try {
+    // ...
+  } catch (e) {
+    console.error(e);
+    return null;  // 不要吞掉错误！
+  }
+}
+```
+
+### 异步函数约定
+
+```typescript
+// ✅ 正确：明确返回类型
+export async function executeClick(
+  element: Element,
+  options?: ExecuteOptions
+): Promise<ExecuteToolResult> {
+  // ...
+}
+
+// ✅ 正确：使用 JSDoc 文档
+/**
+ * 执行点击操作
+ * @param element - 目标元素
+ * @param options - 执行选项
+ * @returns 执行结果
+ */
+export async function executeClick(
+  element: Element,
+  options?: ExecuteOptions
+): Promise<ExecuteToolResult> {
+  // ...
+}
+```
+
+### API 版本控制
+
+**SemVer 版本号**：
+- **Major（主版本）**：破坏性变更
+- **Minor（次版本）**：新功能，向后兼容
+- **Patch（补丁）**：Bug 修复
+
+**破坏性变更处理**：
+```typescript
+// ❌ 不要直接删除旧 API
+export function oldApiName() { }  // 删除！
+
+// ✅ 标记为废弃，保留至少一个大版本
+/**
+ * @deprecated 使用 `newApiName` 代替
+ * @removed 2.0.0
+ */
+export function oldApiName() { }
+
+/**
+ * 新 API，推荐使用
+ */
+export function newApiName() { }
+```
+
+---
+
+## 🔄 开发工作流
+
+> Spec-Driven Development：规范 → 类型 → 代码 → 测试 → 文档
+
+### 新功能开发流程
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. 📋 规范定义                                              │
+│    在 DEVELOPMENT.md 中定义接口、类型、函数签名              │
+├─────────────────────────────────────────────────────────────┤
+│ 2. 🔤 类型定义                                              │
+│    创建类型文件，确保无冲突                                  │
+│    - 检查类型是否已存在                                     │
+│    - 在正确的模块中定义                                     │
+│    - 从正确的模块导入依赖                                   │
+├─────────────────────────────────────────────────────────────┤
+│ 3. 💻 实现代码                                              │
+│    按照规范实现，添加 JSDoc 注释                            │
+├─────────────────────────────────────────────────────────────┤
+│ 4. ✅ 运行检查                                              │
+│    - npm run typecheck                                     │
+│    - npm run lint                                          │
+│    - npm run check:duplicates                              │
+├─────────────────────────────────────────────────────────────┤
+│ 5. 🧪 编写测试                                              │
+│    - 单元测试（核心逻辑）                                   │
+│    - 集成测试（API 边界）                                   │
+│    - npm run test                                          │
+├─────────────────────────────────────────────────────────────┤
+│ 6. 📚 更新文档                                              │
+│    - 更新 DEVELOPMENT.md                                   │
+│    - 更新相关 README                                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 开发前检查清单
+
+- [ ] **规范定义**：功能规范是否已在文档中定义？
+- [ ] **类型检查**：新类型是否检查了冲突？
+- [ ] **导入路径**：是否从正确的模块导入？
+- [ ] **JSDoc 注释**：是否添加了注释？
+- [ ] **错误处理**：是否正确处理错误？
+- [ ] **测试用例**：是否编写了测试？
+- [ ] **Git Hook**：pre-commit 检查是否通过？
+
+### 代码提交规范
+
+**Commit Message 格式**：
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Type 类型**：
+- `feat`: 新功能
+- `fix`: Bug 修复
+- `docs`: 文档更新
+- `style`: 代码风格（不影响功能）
+- `refactor`: 重构
+- `test`: 测试相关
+- `chore`: 构建/工具相关
+
+**示例**：
+```
+feat(selector): add path strategy support
+
+- Implement path selector generation
+- Add ancestor path analysis
+- Support self-targeting elements
+
+Closes #123
+```
+
+### PR 审查清单
+
+**代码质量**：
+- [ ] 通过所有检查（typecheck, lint, test）
+- [ ] 无 console.log 或调试代码
+- [ ] 错误处理完善
+- [ ] 添加了必要的注释
+
+**测试覆盖**：
+- [ ] 核心逻辑有单元测试
+- [ ] 边界情况有测试
+- [ ] 测试覆盖率 ≥ 80%
+
+**文档更新**：
+- [ ] 更新了 DEVELOPMENT.md
+- [ ] 更新了相关 API 文档
+- [ ] 添加了使用示例
 
 ---
 

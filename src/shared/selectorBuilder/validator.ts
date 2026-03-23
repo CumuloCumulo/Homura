@@ -6,13 +6,13 @@
  * Validates selector logic against the current DOM
  */
 
-import type { SelectorLogic } from "@homura/sdk/types";
-import type { SelectorDraft, ValidationResult } from "./types";
+import type { SelectorLogic } from '@homura/sdk/types';
+import type { SelectorDraft, ValidationResult } from '@homura/sdk/selector';
 import {
   safeQuerySelectorAll,
   safeQuerySelector,
   matchText,
-} from "@homura/sdk/utils";
+} from '@homura/sdk/utils';
 
 /**
  * Validate a selector draft against the current DOM
@@ -68,7 +68,7 @@ export function validateSelectorDraft(draft: SelectorDraft): ValidationResult {
       const anchorEl = safeQuerySelector(draft.anchor.selector, scopeEl);
 
       if (anchorEl) {
-        const textOrAttr = anchorEl.textContent || "";
+        const textOrAttr = anchorEl.textContent || '';
         if (matchText(textOrAttr, draft.anchor.value, draft.anchor.matchMode)) {
           anchorMatchIndex = i;
           break;
@@ -201,9 +201,9 @@ export function findTargetElement(
       const anchorEl = safeQuerySelector(logic.anchor.selector, scopeEl);
       if (anchorEl) {
         const textOrAttr =
-          logic.anchor.type === "attribute_match" && logic.anchor.attribute
-            ? anchorEl.getAttribute(logic.anchor.attribute) || ""
-            : anchorEl.textContent || "";
+          logic.anchor.type === 'attribute_match' && logic.anchor.attribute
+            ? anchorEl.getAttribute(logic.anchor.attribute) || ''
+            : anchorEl.textContent || '';
 
         if (matchText(textOrAttr, searchValue, logic.anchor.matchMode)) {
           return safeQuerySelector<HTMLElement>(logic.target.selector, scopeEl);
@@ -230,13 +230,13 @@ export function getScopePreview(logic: SelectorLogic): {
   const scopeElements = safeQuerySelectorAll(logic.scope.selector);
 
   return scopeElements.map((scopeEl) => {
-    let anchorText = "";
+    let anchorText = '';
     let isMatch = false;
 
     if (logic.anchor) {
       const anchorEl = safeQuerySelector(logic.anchor.selector, scopeEl);
       if (anchorEl) {
-        anchorText = anchorEl.textContent?.trim().slice(0, 50) || "";
+        anchorText = anchorEl.textContent?.trim().slice(0, 50) || '';
         isMatch = matchText(
           anchorText,
           logic.anchor.value,

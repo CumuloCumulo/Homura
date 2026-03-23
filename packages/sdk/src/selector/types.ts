@@ -7,7 +7,7 @@
  * These types are environment-agnostic and can be used in any context.
  */
 
-import type { SelectorScope, SelectorAnchor } from "../types/index.js";
+import type { SelectorScope, SelectorAnchor } from '../types/index.js';
 
 // =============================================================================
 // ELEMENT ANALYSIS
@@ -92,17 +92,17 @@ export interface AncestorInfo {
 }
 
 export type ContainerType =
-  | "table" // Table row (tr)
-  | "list" // List item (li, ol, ul)
-  | "grid" // Grid/flex item
-  | "card" // Card container
-  | "single"; // No repeating container
+  | 'table' // Table row (tr)
+  | 'list' // List item (li, ol, ul)
+  | 'grid' // Grid/flex item
+  | 'card' // Card container
+  | 'single'; // No repeating container
 
 export interface AnchorCandidate {
   /** CSS selector within container */
   selector: string;
   /** Anchor type */
-  type: "text_match" | "attribute_match";
+  type: 'text_match' | 'attribute_match';
   /** Text content (for text_match) */
   text?: string;
   /** Attribute info (for attribute_match) */
@@ -164,15 +164,15 @@ export interface SelectorDraft {
   /** Scope configuration */
   scope?: {
     selector: string;
-    type: SelectorScope["type"];
+    type: SelectorScope['type'];
     matchCount: number;
   };
   /** Anchor configuration */
   anchor?: {
     selector: string;
-    type: SelectorAnchor["type"];
+    type: SelectorAnchor['type'];
     value: string;
-    matchMode: SelectorAnchor["matchMode"];
+    matchMode: SelectorAnchor['matchMode'];
   };
   /** Target configuration */
   target: {

@@ -25,6 +25,10 @@ npm-debug.log*
 .env.local
 .env.*.local
 
+# Claude Code - Local settings (should not be committed)
+.claude/settings.local.json
+.claude/settings.local.json.backup
+
 # Lock files (optional, keep if you want reproducible builds)
 # package-lock.json
 # pnpm-lock.yaml

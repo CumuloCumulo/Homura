@@ -11,13 +11,13 @@
  * - RecordingPanel (ActionCard expanded view)
  */
 
-import React from "react";
+import React from 'react';
 import type {
   ElementAnalysis,
   SelectorDraft,
-} from "@shared/selectorBuilder/types";
-import type { UnifiedSelector } from "@homura/sdk/types";
-import { sendToContentScript } from "../utils/ensureContentScript";
+} from '@shared/selectorBuilder/types';
+import type { UnifiedSelector } from '@homura/sdk/types';
+import { sendToContentScript } from '../utils/ensureContentScript';
 
 // =============================================================================
 // TYPES
@@ -33,14 +33,14 @@ export interface QuickActionPanelProps {
   /** Callback for logging actions */
   onLog: (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => void;
   /** Optional: Compact mode for embedded use */
   compact?: boolean;
 }
 
-type ActionType = "highlight" | "click" | "input" | "extract" | null;
+type ActionType = 'highlight' | 'click' | 'input' | 'extract' | null;
 
 // =============================================================================
 // ICONS
@@ -152,7 +152,7 @@ interface ActionButtonProps {
   disabled: boolean;
   onClick: () => void;
   icon: React.ReactNode;
-  color?: "blue" | "default";
+  color?: 'blue' | 'default';
 }
 
 function ActionButton({
@@ -161,7 +161,7 @@ function ActionButton({
   disabled,
   onClick,
   icon,
-  color = "default",
+  color = 'default',
 }: ActionButtonProps) {
   return (
     <button
@@ -174,9 +174,9 @@ function ActionButton({
         disabled:opacity-50 disabled:cursor-not-allowed
         transition-all duration-200
         ${
-          color === "blue"
-            ? "border-blue-500/20 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/40"
-            : "border-zinc-700 text-zinc-300 hover:border-violet-500/50 hover:text-violet-400"
+          color === 'blue'
+            ? 'border-blue-500/20 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/40'
+            : 'border-zinc-700 text-zinc-300 hover:border-violet-500/50 hover:text-violet-400'
         }
       `}
     >
@@ -197,16 +197,16 @@ export function QuickActionPanel({
   onLog,
   compact = false,
 }: QuickActionPanelProps) {
-  const [inputValue, setInputValue] = React.useState("");
+  const [inputValue, setInputValue] = React.useState('');
   const [extractedText, setExtractedText] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState<ActionType>(null);
 
   // Determine which strategy is active
   const strategy =
     unifiedSelector?.strategy ||
-    (selectorDraft?.scope ? "scope_anchor_target" : "path");
-  const isPathMode = strategy === "path" || strategy === "direct";
-  const isStructureMode = strategy === "scope_anchor_target";
+    (selectorDraft?.scope ? 'scope_anchor_target' : 'path');
+  const isPathMode = strategy === 'path' || strategy === 'direct';
+  const isStructureMode = strategy === 'scope_anchor_target';
 
   // Anchor value for repeating structures
   const defaultAnchorValue =
@@ -214,7 +214,7 @@ export function QuickActionPanel({
     selectorDraft?.anchor?.value ||
     analysis.anchorCandidates?.[0]?.text ||
     analysis.anchorCandidates?.[0]?.attribute?.value ||
-    "";
+    '';
   const [anchorValue, setAnchorValue] = React.useState(defaultAnchorValue);
 
   // Use targetSelector as a stable identity for the selected element
@@ -227,13 +227,13 @@ export function QuickActionPanel({
       selectorDraft?.anchor?.value ||
       analysis.anchorCandidates?.[0]?.text ||
       analysis.anchorCandidates?.[0]?.attribute?.value ||
-      "";
+      '';
     setAnchorValue(newValue);
     setExtractedText(null); // Clear previous extracted text
   }, [analysisId, unifiedSelector, selectorDraft, analysis.anchorCandidates]);
 
   const hasRepeatingContainer =
-    analysis.containerType !== "single" && !!analysis.containerSelector;
+    analysis.containerType !== 'single' && !!analysis.containerSelector;
 
   // Build payload from UnifiedSelector or SelectorDraft
   const buildPayload = () => {
@@ -256,7 +256,7 @@ export function QuickActionPanel({
           anchorSelector: unifiedSelector.structureData.anchor?.selector,
           anchorValue: anchorValue, // Use local state (user may have edited it)
           anchorMatchMode:
-            unifiedSelector.structureData.anchor?.matchMode || "contains",
+            unifiedSelector.structureData.anchor?.matchMode || 'contains',
           targetSelector: unifiedSelector.structureData.target.selector,
         };
       }
@@ -270,7 +270,7 @@ export function QuickActionPanel({
         selectorDraft?.anchor?.selector ||
         analysis.anchorCandidates?.[0]?.selector,
       anchorValue: anchorValue,
-      anchorMatchMode: selectorDraft?.anchor?.matchMode || "contains",
+      anchorMatchMode: selectorDraft?.anchor?.matchMode || 'contains',
       targetSelector:
         selectorDraft?.target?.selector ||
         analysis.targetSelector ||
@@ -296,37 +296,37 @@ export function QuickActionPanel({
         data?: string;
         error?: string;
       }>({
-        type: "EXECUTE_WITH_LOGIC",
+        type: 'EXECUTE_WITH_LOGIC',
         payload,
       });
 
       const actionNames = {
-        highlight: "高亮",
-        click: "点击",
-        input: "输入",
-        extract: "读取",
+        highlight: '高亮',
+        click: '点击',
+        input: '输入',
+        extract: '读取',
       };
 
       if (result.success) {
-        if (action === "extract") {
-          setExtractedText(result.data || "");
+        if (action === 'extract') {
+          setExtractedText(result.data || '');
         }
         const msg =
-          action === "extract"
+          action === 'extract'
             ? `${actionNames[action]}成功: "${result.data}"`
             : `${actionNames[action]}成功`;
-        onLog({ timestamp: Date.now(), level: "info", message: msg });
+        onLog({ timestamp: Date.now(), level: 'info', message: msg });
       } else {
         onLog({
           timestamp: Date.now(),
-          level: "error",
+          level: 'error',
           message: result.error || `${actionNames[action]}失败`,
         });
       }
     } catch (error) {
       onLog({
         timestamp: Date.now(),
-        level: "error",
+        level: 'error',
         message: `操作失败: ${error}`,
       });
     } finally {
@@ -343,7 +343,7 @@ export function QuickActionPanel({
 
   return (
     <div
-      className={`rounded-lg bg-zinc-800/60 border border-violet-500/20 ${compact ? "p-2" : "p-2.5"}`}
+      className={`rounded-lg bg-zinc-800/60 border border-violet-500/20 ${compact ? 'p-2' : 'p-2.5'}`}
     >
       <h3 className="text-[10px] font-medium text-violet-400 mb-2 flex items-center gap-1.5">
         <TargetIcon className="w-3 h-3" />
@@ -354,12 +354,12 @@ export function QuickActionPanel({
           ml-auto px-1.5 py-0.5 text-[8px] rounded
           ${
             isPathMode
-              ? "bg-violet-500/20 text-violet-400"
-              : "bg-emerald-500/20 text-emerald-400"
+              ? 'bg-violet-500/20 text-violet-400'
+              : 'bg-emerald-500/20 text-emerald-400'
           }
         `}
         >
-          {isPathMode ? "Path" : "Structure"}
+          {isPathMode ? 'Path' : 'Structure'}
         </span>
       </h3>
 
@@ -374,20 +374,20 @@ export function QuickActionPanel({
           </div>
           {unifiedSelector?.pathData && (
             <div className="mt-1.5 text-[8px] text-zinc-600">
-              根:{" "}
+              根:{' '}
               <span className="text-violet-400/70">
                 {unifiedSelector.pathData.root}
               </span>
               {unifiedSelector.pathData.intermediates.length > 0 && (
                 <>
-                  {" "}
-                  → 路径:{" "}
+                  {' '}
+                  → 路径:{' '}
                   <span className="text-violet-400/70">
-                    {unifiedSelector.pathData.intermediates.join(" → ")}
+                    {unifiedSelector.pathData.intermediates.join(' → ')}
                   </span>
                 </>
               )}
-              → 目标:{" "}
+              → 目标:{' '}
               <span className="text-violet-400/70">
                 {unifiedSelector.pathData.target}
               </span>
@@ -399,7 +399,7 @@ export function QuickActionPanel({
       {/* Structure Mode: Show Container & Anchor Info */}
       {isStructureMode && hasRepeatingContainer && (
         <div
-          className={`p-2 rounded bg-black/20 border border-white/5 space-y-1.5 ${compact ? "mb-2" : "mb-2.5"}`}
+          className={`p-2 rounded bg-black/20 border border-white/5 space-y-1.5 ${compact ? 'mb-2' : 'mb-2.5'}`}
         >
           <div className="flex items-center gap-2">
             <span className="text-[9px] text-zinc-500 shrink-0">容器:</span>
@@ -444,24 +444,24 @@ export function QuickActionPanel({
         <div className="flex gap-1.5">
           <ActionButton
             label="高亮"
-            isLoading={isLoading === "highlight"}
+            isLoading={isLoading === 'highlight'}
             disabled={isLoading !== null}
-            onClick={() => handleAction("highlight")}
+            onClick={() => handleAction('highlight')}
             icon={<SearchIcon />}
             color="blue"
           />
           <ActionButton
             label="点击"
-            isLoading={isLoading === "click"}
+            isLoading={isLoading === 'click'}
             disabled={isLoading !== null}
-            onClick={() => handleAction("click")}
+            onClick={() => handleAction('click')}
             icon={<CursorIcon />}
           />
           <ActionButton
             label="读取"
-            isLoading={isLoading === "extract"}
+            isLoading={isLoading === 'extract'}
             disabled={isLoading !== null}
-            onClick={() => handleAction("extract")}
+            onClick={() => handleAction('extract')}
             icon={<DocumentIcon />}
           />
         </div>
@@ -473,9 +473,9 @@ export function QuickActionPanel({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) =>
-              e.key === "Enter" &&
+              e.key === 'Enter' &&
               inputValue.trim() &&
-              handleAction("input", inputValue)
+              handleAction('input', inputValue)
             }
             placeholder="输入内容..."
             className="
@@ -488,8 +488,8 @@ export function QuickActionPanel({
           />
           <button
             onClick={() => {
-              handleAction("input", inputValue);
-              setInputValue("");
+              handleAction('input', inputValue);
+              setInputValue('');
             }}
             disabled={isLoading !== null || !inputValue.trim()}
             className="
@@ -501,7 +501,7 @@ export function QuickActionPanel({
               transition-all duration-200
             "
           >
-            {isLoading === "input" ? <Spinner /> : <EditIcon />}
+            {isLoading === 'input' ? <Spinner /> : <EditIcon />}
             <span>填写</span>
           </button>
         </div>

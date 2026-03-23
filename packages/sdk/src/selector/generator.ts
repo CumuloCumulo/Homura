@@ -7,23 +7,26 @@
  * Also provides converters to/from UnifiedSelector.
  */
 
-import type {
-  SelectorLogic,
-  SelectorScope,
-  SelectorAnchor,
-  SelectorTarget,
-  PrimitiveAction,
-  UnifiedSelector,
-  SelectorStrategy,
-  PathStrategyData,
-  StructureStrategyData,
-} from '../types/index.js';
 import {
   generateSelectorId,
   buildFullSelectorFromPath,
   buildFullSelectorFromStructure,
+  type SelectorLogic,
+  type SelectorScope,
+  type SelectorAnchor,
+  type SelectorTarget,
+  type PrimitiveAction,
+  type UnifiedSelector,
+  type SelectorStrategy,
+  type PathStrategyData,
+  type StructureStrategyData,
 } from '../types/index.js';
-import type { ElementAnalysis, SelectorDraft, AnchorCandidate, PathSelector } from './types.js';
+import type {
+  ElementAnalysis,
+  SelectorDraft,
+  AnchorCandidate,
+  PathSelector,
+} from './types.js';
 import { buildMinimalSelector } from './analyzer.js';
 
 /**
@@ -35,11 +38,15 @@ export function generateSelectorLogic(
     action: PrimitiveAction;
     anchorValue?: string;
     preferredAnchor?: AnchorCandidate;
-  }
+  },
 ): SelectorLogic {
   const { action, anchorValue, preferredAnchor } = options;
 
-  const hasContainer = !!(analysis.container || analysis.containerSelector || analysis.containerTagName);
+  const hasContainer = !!(
+    analysis.container ||
+    analysis.containerSelector ||
+    analysis.containerTagName
+  );
 
   if (!hasContainer) {
     return {
@@ -69,7 +76,10 @@ function buildScope(analysis: ElementAnalysis): SelectorScope {
 
   if (analysis.containerSelector) {
     selector = analysis.containerSelector;
-  } else if (analysis.container && typeof analysis.container.tagName === 'string') {
+  } else if (
+    analysis.container &&
+    typeof analysis.container.tagName === 'string'
+  ) {
     const container = analysis.container;
     const parent = container.parentElement;
 
@@ -123,7 +133,7 @@ function buildScope(analysis: ElementAnalysis): SelectorScope {
 function buildAnchor(
   analysis: ElementAnalysis,
   preferredAnchor?: AnchorCandidate,
-  anchorValue?: string
+  anchorValue?: string,
 ): SelectorAnchor | undefined {
   const anchor = preferredAnchor || analysis.anchorCandidates[0];
 
@@ -150,7 +160,10 @@ function buildAnchor(
 /**
  * Build target from analysis
  */
-function buildTarget(analysis: ElementAnalysis, action: PrimitiveAction): SelectorTarget {
+function buildTarget(
+  analysis: ElementAnalysis,
+  action: PrimitiveAction,
+): SelectorTarget {
   return {
     selector: analysis.relativeSelector || analysis.minimalSelector,
     action,
@@ -162,16 +175,22 @@ function buildTarget(analysis: ElementAnalysis, action: PrimitiveAction): Select
  */
 export function createSelectorDraft(
   analysis: ElementAnalysis,
-  action: PrimitiveAction = 'CLICK'
+  action: PrimitiveAction = 'CLICK',
 ): SelectorDraft {
-  const hasContainer = !!(analysis.container || analysis.containerSelector || analysis.containerTagName);
+  const hasContainer = !!(
+    analysis.container ||
+    analysis.containerSelector ||
+    analysis.containerTagName
+  );
   const topAnchor = analysis.anchorCandidates?.[0];
 
   const isSelfTarget = hasContainer && !analysis.relativeSelector;
 
   const targetSelector = isSelfTarget
     ? ''
-    : (analysis.targetSelector || analysis.relativeSelector || analysis.minimalSelector);
+    : analysis.targetSelector ||
+      analysis.relativeSelector ||
+      analysis.minimalSelector;
 
   const draft: SelectorDraft = {
     target: {
@@ -237,11 +256,15 @@ export function draftToSelectorLogic(draft: SelectorDraft): SelectorLogic {
  */
 export function generateSelectorStrategies(
   analysis: ElementAnalysis,
-  action: PrimitiveAction = 'CLICK'
+  action: PrimitiveAction = 'CLICK',
 ): SelectorLogic[] {
   const strategies: SelectorLogic[] = [];
 
-  const hasContainer = !!(analysis.container || analysis.containerSelector || analysis.containerTagName);
+  const hasContainer = !!(
+    analysis.container ||
+    analysis.containerSelector ||
+    analysis.containerTagName
+  );
 
   strategies.push({
     target: {
@@ -256,7 +279,11 @@ export function generateSelectorStrategies(
     strategies.push({
       scope,
       target: {
-        selector: isSelfTarget ? '' : (analysis.relativeSelector || analysis.targetSelector || analysis.minimalSelector),
+        selector: isSelfTarget
+          ? ''
+          : analysis.relativeSelector ||
+            analysis.targetSelector ||
+            analysis.minimalSelector,
         action,
       },
     });
@@ -284,7 +311,8 @@ export function generateSelectorStrategies(
  */
 export function determineStrategy(analysis: ElementAnalysis): SelectorStrategy {
   const hasRepeatingStructure = analysis.containerType !== 'single';
-  const hasAnchorCandidates = analysis.anchorCandidates && analysis.anchorCandidates.length > 0;
+  const hasAnchorCandidates =
+    analysis.anchorCandidates && analysis.anchorCandidates.length > 0;
 
   const isStructuredContainer =
     analysis.containerType === 'table' ||
@@ -306,12 +334,14 @@ export function determineStrategy(analysis: ElementAnalysis): SelectorStrategy {
 /**
  * Build PathStrategyData from ElementAnalysis
  */
-export function buildPathData(analysis: ElementAnalysis): PathStrategyData | undefined {
+export function buildPathData(
+  analysis: ElementAnalysis,
+): PathStrategyData | undefined {
   if (!analysis.ancestorPath || analysis.ancestorPath.length === 0) {
     return undefined;
   }
 
-  let rootIndex = analysis.ancestorPath.findIndex(a => a.isSemanticRoot);
+  let rootIndex = analysis.ancestorPath.findIndex((a) => a.isSemanticRoot);
   if (rootIndex === -1) {
     let maxScore = 0;
     analysis.ancestorPath.forEach((a, i) => {
@@ -322,7 +352,10 @@ export function buildPathData(analysis: ElementAnalysis): PathStrategyData | und
     });
   }
 
-  if (rootIndex === -1 || analysis.ancestorPath[rootIndex].semanticScore < 0.3) {
+  if (
+    rootIndex === -1 ||
+    analysis.ancestorPath[rootIndex].semanticScore < 0.3
+  ) {
     return undefined;
   }
 
@@ -348,8 +381,14 @@ export function buildPathData(analysis: ElementAnalysis): PathStrategyData | und
 /**
  * Build StructureStrategyData from ElementAnalysis
  */
-export function buildStructureData(analysis: ElementAnalysis): StructureStrategyData | undefined {
-  const hasContainer = !!(analysis.container || analysis.containerSelector || analysis.containerTagName);
+export function buildStructureData(
+  analysis: ElementAnalysis,
+): StructureStrategyData | undefined {
+  const hasContainer = !!(
+    analysis.container ||
+    analysis.containerSelector ||
+    analysis.containerTagName
+  );
 
   if (!hasContainer) {
     return undefined;
@@ -366,7 +405,11 @@ export function buildStructureData(analysis: ElementAnalysis): StructureStrategy
       type: scopeData.type,
     },
     target: {
-      selector: isSelfTarget ? '' : (analysis.relativeSelector || analysis.targetSelector || analysis.minimalSelector),
+      selector: isSelfTarget
+        ? ''
+        : analysis.relativeSelector ||
+          analysis.targetSelector ||
+          analysis.minimalSelector,
     },
   };
 
@@ -388,7 +431,7 @@ export function buildStructureData(analysis: ElementAnalysis): StructureStrategy
 export function createUnifiedSelector(
   analysis: ElementAnalysis,
   action: PrimitiveAction = 'CLICK',
-  forceStrategy?: SelectorStrategy
+  forceStrategy?: SelectorStrategy,
 ): UnifiedSelector {
   const strategy = forceStrategy || determineStrategy(analysis);
 
@@ -402,9 +445,14 @@ export function createUnifiedSelector(
       pathData = buildPathData(analysis);
       if (pathData) {
         fullSelector = buildFullSelectorFromPath(pathData);
-        confidence = analysis.ancestorPath?.find(a => a.isSemanticRoot)?.semanticScore || 0.7;
+        confidence =
+          analysis.ancestorPath?.find((a) => a.isSemanticRoot)?.semanticScore ||
+          0.7;
       } else {
-        fullSelector = analysis.pathSelector || analysis.scopedSelector || analysis.minimalSelector;
+        fullSelector =
+          analysis.pathSelector ||
+          analysis.scopedSelector ||
+          analysis.minimalSelector;
         confidence = 0.5;
       }
       break;
@@ -450,7 +498,7 @@ export function createUnifiedSelector(
  */
 export function convertPathSelectorToUnified(
   pathSelector: PathSelector,
-  action: PrimitiveAction = 'CLICK'
+  action: PrimitiveAction = 'CLICK',
 ): UnifiedSelector {
   return {
     id: generateSelectorId(),
@@ -479,10 +527,12 @@ export function convertPathSelectorToUnified(
  */
 export function convertSelectorLogicToUnified(
   logic: SelectorLogic,
-  confidence = 0.7
+  confidence = 0.7,
 ): UnifiedSelector {
   const hasScope = !!logic.scope;
-  const strategy: SelectorStrategy = hasScope ? 'scope_anchor_target' : 'direct';
+  const strategy: SelectorStrategy = hasScope
+    ? 'scope_anchor_target'
+    : 'direct';
 
   let fullSelector: string;
   let structureData: StructureStrategyData | undefined;
@@ -533,12 +583,15 @@ export function convertSelectorLogicToUnified(
 /**
  * Convert UnifiedSelector back to SelectorLogic
  */
-export function convertUnifiedToSelectorLogic(unified: UnifiedSelector): SelectorLogic {
+export function convertUnifiedToSelectorLogic(
+  unified: UnifiedSelector,
+): SelectorLogic {
   const logic: SelectorLogic = {
     target: {
-      selector: unified.structureData?.target.selector ||
-                unified.pathData?.target ||
-                unified.fullSelector,
+      selector:
+        unified.structureData?.target.selector ||
+        unified.pathData?.target ||
+        unified.fullSelector,
       action: unified.action.type,
       actionParams: unified.action.params,
     },
@@ -567,7 +620,9 @@ export function convertUnifiedToSelectorLogic(unified: UnifiedSelector): Selecto
  * Convert UnifiedSelector to SelectorDraft
  * @deprecated Use UnifiedSelector directly in UI when possible
  */
-export function convertUnifiedToSelectorDraft(unified: UnifiedSelector): SelectorDraft {
+export function convertUnifiedToSelectorDraft(
+  unified: UnifiedSelector,
+): SelectorDraft {
   const draft: SelectorDraft = {
     target: {
       selector: unified.fullSelector,

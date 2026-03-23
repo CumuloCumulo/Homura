@@ -11,26 +11,24 @@
  * - StructureView for Scope+Anchor+Target configuration
  */
 
-import React from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useRecordingStore } from "../stores/recordingStore";
-import { sendToContentScript } from "../utils/ensureContentScript";
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useRecordingStore, type ViewMode } from '../stores/recordingStore';
+import { sendToContentScript } from '../utils/ensureContentScript';
 import type {
   ElementAnalysis,
   SelectorDraft,
-} from "@shared/selectorBuilder/types";
+} from '@shared/selectorBuilder/types';
+// Sub-components & Store imports
 import {
   createUnifiedSelector,
   convertPathSelectorToUnified,
   convertUnifiedToSelectorDraft,
-} from "@shared/selectorBuilder/generator";
-import type { UnifiedSelector } from "@homura/sdk/types";
-import type { ViewMode } from "../stores/recordingStore";
-
-// Sub-components
-import { SmartStatus } from "./SmartStatus";
-import { PathVisualizer } from "./PathVisualizer";
-import { StructureView } from "./StructureView";
+} from '@shared/selectorBuilder/generator';
+import type { UnifiedSelector } from '@homura/sdk/types';
+import { SmartStatus } from './SmartStatus';
+import { PathVisualizer } from './PathVisualizer';
+import { StructureView } from './StructureView';
 
 // =============================================================================
 // MAIN COMPONENT
@@ -65,13 +63,13 @@ export function InspectMode() {
   // Determine active mode: user override > AI decision > default based on analysis
   const activeMode: ViewMode = React.useMemo(() => {
     if (userModeOverride) return userModeOverride;
-    if (aiStrategy === "scope_anchor_target") return "structure";
-    if (aiStrategy === "path_selector") return "path";
+    if (aiStrategy === 'scope_anchor_target') return 'structure';
+    if (aiStrategy === 'path_selector') return 'path';
     // Default: use structure if repeating container, otherwise path
-    if (analysis?.containerType && analysis.containerType !== "single") {
-      return "structure";
+    if (analysis?.containerType && analysis.containerType !== 'single') {
+      return 'structure';
     }
-    return "path";
+    return 'path';
   }, [userModeOverride, aiStrategy, analysis]);
 
   // Initialize UnifiedSelector from analysis
@@ -80,24 +78,24 @@ export function InspectMode() {
     if (analysis && !unifiedSelector) {
       try {
         // Create UnifiedSelector from analysis (primary path)
-        const selector = createUnifiedSelector(analysis, "CLICK");
+        const selector = createUnifiedSelector(analysis, 'CLICK');
         setUnifiedSelector(selector);
 
         // Also create legacy SelectorDraft for backward compatibility
         const draft = convertUnifiedToSelectorDraft(selector);
         setSelectorDraft(draft);
 
-        console.log("[Homura] Created UnifiedSelector:", selector);
+        console.log('[Homura] Created UnifiedSelector:', selector);
       } catch (error) {
-        console.error("[Homura] Failed to create UnifiedSelector:", error);
+        console.error('[Homura] Failed to create UnifiedSelector:', error);
         // Fallback to basic selector
-        import("@homura/sdk/selector")
+        import('@homura/sdk/selector')
           .then(({ createSelectorDraft }) => {
-            const draft = createSelectorDraft(analysis, "CLICK");
+            const draft = createSelectorDraft(analysis, 'CLICK');
             setSelectorDraft(draft);
           })
           .catch((err) => {
-            console.error("[Homura] Fallback also failed:", err);
+            console.error('[Homura] Fallback also failed:', err);
           });
       }
     }
@@ -105,17 +103,17 @@ export function InspectMode() {
 
   const handleStartInspect = async () => {
     try {
-      await sendToContentScript({ type: "START_INSPECT" });
+      await sendToContentScript({ type: 'START_INSPECT' });
       setInspecting(true);
       addLog({
         timestamp: Date.now(),
-        level: "info",
-        message: "开始检查模式，请点击页面元素",
+        level: 'info',
+        message: '开始检查模式，请点击页面元素',
       });
     } catch (error) {
       addLog({
         timestamp: Date.now(),
-        level: "error",
+        level: 'error',
         message: `启动检查模式失败: ${error}`,
       });
     }
@@ -123,10 +121,10 @@ export function InspectMode() {
 
   const handleStopInspect = async () => {
     try {
-      await sendToContentScript({ type: "STOP_INSPECT" });
+      await sendToContentScript({ type: 'STOP_INSPECT' });
       setInspecting(false);
     } catch (error) {
-      console.error("Stop inspect error:", error);
+      console.error('Stop inspect error:', error);
       setInspecting(false);
     }
   };
@@ -135,33 +133,33 @@ export function InspectMode() {
     if (!analysis) return;
 
     setProcessing(true);
-    setAIStatus("analyzing");
+    setAIStatus('analyzing');
     addLog({
       timestamp: Date.now(),
-      level: "info",
-      message: "正在使用 AI 智能分析页面结构...",
+      level: 'info',
+      message: '正在使用 AI 智能分析页面结构...',
     });
 
     try {
       const payload = {
-        intent: "定位并操作目标元素",
+        intent: '定位并操作目标元素',
         targetSelector: analysis.targetSelector || analysis.minimalSelector,
         targetHtml: getTargetHtml(analysis),
         ancestorPath: analysis.ancestorPath || [],
         structureInfo: {
           containerType: analysis.containerType,
-          hasRepeatingStructure: analysis.containerType !== "single",
+          hasRepeatingStructure: analysis.containerType !== 'single',
           containerSelector: analysis.containerSelector,
           anchorCandidates: analysis.anchorCandidates || [],
         },
       };
 
-      console.log("[InspectMode] Sending SmartSelector Context:", payload);
+      console.log('[InspectMode] Sending SmartSelector Context:', payload);
 
       const result = await sendToContentScript<{
         success: boolean;
         draft?: SelectorDraft;
-        strategy?: "path_selector" | "scope_anchor_target";
+        strategy?: 'path_selector' | 'scope_anchor_target';
         pathSelector?: {
           root: string;
           path: string[];
@@ -184,23 +182,23 @@ export function InspectMode() {
         reasoning?: string;
         error?: string;
       }>({
-        type: "AI_GENERATE_SMART_SELECTOR",
+        type: 'AI_GENERATE_SMART_SELECTOR',
         payload,
       });
 
       if (result.success) {
-        const strategy = result.strategy || "path_selector";
+        const strategy = result.strategy || 'path_selector';
         setAIStrategy(strategy, result.reasoning);
         setContainerType(analysis.containerType);
 
         const strategyName =
-          strategy === "scope_anchor_target"
-            ? "Scope+Anchor+Target"
-            : "Path Selector";
+          strategy === 'scope_anchor_target'
+            ? 'Scope+Anchor+Target'
+            : 'Path Selector';
 
         addLog({
           timestamp: Date.now(),
-          level: "info",
+          level: 'info',
           message: `AI 选择策略: ${strategyName}`,
         });
 
@@ -208,7 +206,7 @@ export function InspectMode() {
           // Convert PathSelector to UnifiedSelector (preserving full structure)
           const newUnified = convertPathSelectorToUnified(
             result.pathSelector,
-            unifiedSelector?.action?.type || "CLICK",
+            unifiedSelector?.action?.type || 'CLICK',
           );
           setUnifiedSelector(newUnified);
 
@@ -221,29 +219,29 @@ export function InspectMode() {
 
           addLog({
             timestamp: Date.now(),
-            level: "info",
+            level: 'info',
             message: `AI 生成选择器: ${result.pathSelector.fullSelector}`,
           });
         } else if (result.selectorLogic) {
           // Build UnifiedSelector from selectorLogic
           const scopeType = result.selectorLogic.scope?.type as
-            | "container_list"
-            | "single_container"
+            | 'container_list'
+            | 'single_container'
             | undefined;
           const anchorType = result.selectorLogic.anchor?.type as
-            | "text_match"
-            | "attribute_match"
+            | 'text_match'
+            | 'attribute_match'
             | undefined;
           const matchMode = result.selectorLogic.anchor?.matchMode as
-            | "exact"
-            | "contains"
-            | "startsWith"
-            | "endsWith"
+            | 'exact'
+            | 'contains'
+            | 'startsWith'
+            | 'endsWith'
             | undefined;
 
           const newUnified: UnifiedSelector = {
             id: unifiedSelector?.id || `sel_${Date.now().toString(36)}`,
-            strategy: "scope_anchor_target",
+            strategy: 'scope_anchor_target',
             fullSelector: result.selectorLogic.scope
               ? `${result.selectorLogic.scope.selector} ${result.selectorLogic.target.selector}`
               : result.selectorLogic.target.selector,
@@ -251,14 +249,14 @@ export function InspectMode() {
               ? {
                   scope: {
                     selector: result.selectorLogic.scope.selector,
-                    type: scopeType || "container_list",
+                    type: scopeType || 'container_list',
                   },
                   anchor: result.selectorLogic.anchor
                     ? {
                         selector: result.selectorLogic.anchor.selector,
-                        type: anchorType || "text_match",
+                        type: anchorType || 'text_match',
                         value: result.selectorLogic.anchor.value,
-                        matchMode: matchMode || "contains",
+                        matchMode: matchMode || 'contains',
                       }
                     : undefined,
                   target: {
@@ -269,15 +267,15 @@ export function InspectMode() {
             action: {
               type:
                 (result.selectorLogic.target
-                  .action as UnifiedSelector["action"]["type"]) ||
+                  .action as UnifiedSelector['action']['type']) ||
                 unifiedSelector?.action?.type ||
-                "CLICK",
+                'CLICK',
             },
             confidence: result.confidence || 0.8,
             validated: false,
             reasoning: result.reasoning,
             metadata: {
-              source: "ai",
+              source: 'ai',
               createdAt: Date.now(),
             },
           };
@@ -289,7 +287,7 @@ export function InspectMode() {
 
           addLog({
             timestamp: Date.now(),
-            level: "info",
+            level: 'info',
             message: `AI 生成 Scope+Anchor+Target 选择器`,
           });
         } else if (result.draft) {
@@ -297,23 +295,23 @@ export function InspectMode() {
           setSelectorDraft(result.draft);
           addLog({
             timestamp: Date.now(),
-            level: "info",
-            message: "AI 生成选择器完成",
+            level: 'info',
+            message: 'AI 生成选择器完成',
           });
         }
       } else {
-        setAIStatus("idle");
+        setAIStatus('idle');
         addLog({
           timestamp: Date.now(),
-          level: "error",
+          level: 'error',
           message: `AI 生成失败: ${result.error}`,
         });
       }
     } catch (error) {
-      setAIStatus("idle");
+      setAIStatus('idle');
       addLog({
         timestamp: Date.now(),
-        level: "error",
+        level: 'error',
         message: `AI 请求失败: ${error}`,
       });
     } finally {
@@ -323,22 +321,22 @@ export function InspectMode() {
 
   const getTargetHtml = (analysis: ElementAnalysis): string => {
     const selector = analysis.targetSelector || analysis.minimalSelector;
-    return `<target selector="${selector}" pathSelector="${analysis.pathSelector || ""}" />`;
+    return `<target selector="${selector}" pathSelector="${analysis.pathSelector || ''}" />`;
   };
 
   const handleSaveTool = async () => {
     if (!selectorDraft) {
       addLog({
         timestamp: Date.now(),
-        level: "error",
-        message: "没有可保存的选择器",
+        level: 'error',
+        message: '没有可保存的选择器',
       });
       return;
     }
     addLog({
       timestamp: Date.now(),
-      level: "info",
-      message: "保存到工具库功能即将推出...",
+      level: 'info',
+      message: '保存到工具库功能即将推出...',
     });
   };
 
@@ -372,7 +370,7 @@ export function InspectMode() {
           activeMode={activeMode}
           onChange={handleModeChange}
           hasPathData={!!analysis.ancestorPath?.length}
-          hasStructureData={analysis.containerType !== "single"}
+          hasStructureData={analysis.containerType !== 'single'}
         />
       )}
 
@@ -380,7 +378,7 @@ export function InspectMode() {
       <div className="flex-1 overflow-y-auto">
         {analysis ? (
           <AnimatePresence mode="wait">
-            {activeMode === "path" ? (
+            {activeMode === 'path' ? (
               <motion.div
                 key="path"
                 initial={{ opacity: 0, x: -20 }}
@@ -511,16 +509,16 @@ function ModeTabBar({
     <div className="px-3 pb-2">
       <div className="flex gap-1 p-1 bg-zinc-900/50 rounded-lg">
         <TabButton
-          active={activeMode === "path"}
-          onClick={() => onChange("path")}
+          active={activeMode === 'path'}
+          onClick={() => onChange('path')}
           disabled={!hasPathData}
         >
           <TreeIcon className="w-3 h-3" />
           <span>路径模式</span>
         </TabButton>
         <TabButton
-          active={activeMode === "structure"}
-          onClick={() => onChange("structure")}
+          active={activeMode === 'structure'}
+          onClick={() => onChange('structure')}
           disabled={!hasStructureData}
         >
           <LayersIcon className="w-3 h-3" />
@@ -548,14 +546,14 @@ function TabButton({ active, onClick, disabled, children }: TabButtonProps) {
         text-[10px] font-medium rounded-md
         transition-all duration-200
         disabled:opacity-40 disabled:cursor-not-allowed
-        ${active ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}
+        ${active ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}
       `}
     >
       {active && (
         <motion.div
           layoutId="tab-indicator"
           className="absolute inset-0 bg-zinc-800 rounded-md"
-          transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+          transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
         />
       )}
       <span className="relative z-10 flex items-center gap-1.5">
@@ -763,10 +761,10 @@ function EmptyState({ isInspecting }: { isInspecting: boolean }) {
         </svg>
       </div>
       <p className="text-xs text-zinc-500">
-        {isInspecting ? "点击页面元素进行分析" : '点击"开始检查"'}
+        {isInspecting ? '点击页面元素进行分析' : '点击"开始检查"'}
       </p>
       <p className="text-[10px] text-zinc-600 mt-1">
-        {isInspecting ? "将鼠标移到目标元素上" : "分析页面元素结构"}
+        {isInspecting ? '将鼠标移到目标元素上' : '分析页面元素结构'}
       </p>
     </div>
   );

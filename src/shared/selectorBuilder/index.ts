@@ -34,9 +34,9 @@ export interface RecordingState {
   /** Selected element for building */
   selectedElement: HTMLElement | null;
   /** Current element analysis */
-  analysis: import("@homura/sdk/selector").ElementAnalysis | null;
+  analysis: import('@homura/sdk/selector').ElementAnalysis | null;
   /** Draft selector being built */
-  selectorDraft: import("@homura/sdk/selector").SelectorDraft | null;
+  selectorDraft: import('@homura/sdk/selector').SelectorDraft | null;
   /** Recorded actions */
   recordedActions: RecordedAction[];
 }
@@ -50,20 +50,20 @@ export interface RecordedAction {
   /** User-defined name for this action */
   name?: string;
   /** Action type */
-  type: "click" | "input" | "select" | "scroll";
+  type: 'click' | 'input' | 'select' | 'scroll';
   /** Timestamp */
   timestamp: number;
   /** Target element analysis */
-  elementAnalysis: import("@homura/sdk/selector").ElementAnalysis;
+  elementAnalysis: import('@homura/sdk/selector').ElementAnalysis;
   /** Input value (for input actions) */
   value?: string;
   /** Screenshot data URL (optional) */
   screenshot?: string;
   /** User-edited selector draft @deprecated Use unifiedSelector instead */
-  selectorDraft?: import("@homura/sdk/selector").SelectorDraft;
+  selectorDraft?: import('@homura/sdk/selector').SelectorDraft;
   /**
    * Unified selector - automatically generated during recording
    * Contains both Path and Structure strategy data for execution
    */
-  unifiedSelector?: import("@homura/sdk/types").UnifiedSelector;
+  unifiedSelector?: import('@homura/sdk/types').UnifiedSelector;
 }
