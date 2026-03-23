@@ -1,9 +1,9 @@
 <p align="center">
   <!-- Main Title with Typing Animation -->
-  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=48&pause=2000&color=8B5CF6&vCenter=true&width=650&height=70&lines=Homura;AI+驱动的浏览器自动化" alt="Homura Title" />
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=48&pause=2000&color=8B5CF6&vCenter=true&width=650&height=70&lines=Homura;AI-Powered+Browser+Automation" alt="Homura Title" />
 
   <!-- Tagline with Secondary Animation -->
-  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=17&pause=3000&color=22D3EE&vCenter=true&width=600&repeat=true&lines=定义目标%2C+而非步骤;声明式自动化+for+the+AI+Era;用心交互设计" alt="Tagline" />
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=17&pause=3000&color=22D3EE&vCenter=true&width=600&repeat=true&lines=Define+goals%2C+not+steps;Declarative+automation+for+the+AI+Era;Mindful+interaction+design" alt="Tagline" />
 </p>
 
 <p align="center">
@@ -52,7 +52,7 @@
 ### 🎯 AI 时代的声明式自动化
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=15&pause=4000&color=8B5CF6&vCenter=true&width=750&repeat=true&lines=传统+RPA%EF%BC%9A绘制复杂流程图%2C+手动配置分支;Homura%EF%BC%9A定义目标%2C+AI+自动规划执行路径" alt="Comparison" />
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=15&pause=4000&color=8B5CF6&vCenter=true&width=750&repeat=true&lines=Traditional+RPA%3A+Draw+complex+flowcharts;Homura%3A+Define+goals%2C+AI+figures+out+the+path" alt="Comparison" />
 </p>
 
 ```
@@ -89,7 +89,7 @@
 ### 大脑-肢体解耦设计
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=14&pause=3000&color=D946EF&vCenter=true&width=650&repeat=true&lines=AI+(大脑)+→+非确定性决策;引擎+(肢体)+→+确定性执行" alt="Brain-Limb" />
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=14&pause=3000&color=D946EF&vCenter=true&width=650&repeat=true&lines=AI+(Brain)+%E2%86%92+Non-deterministic+decisions;Engine+(Limb)+%E2%86%92+Deterministic+execution" alt="Brain-Limb" />
 </p>
 
 | 层级 | 职责 | 技术栈 |
@@ -241,7 +241,7 @@ npm run build
 ## 📦 模块化 SDK
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=15&pause=3000&color=8B5CF6&vCenter=true&width=600&repeat=true&lines=使用+Homura+核心作为独立+SDK;使用+@homura/sdk+构建自定义自动化" alt="SDK Tagline" />
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=15&pause=3000&color=8B5CF6&vCenter=true&width=600&repeat=true&lines=Use+Homura's+core+as+a+standalone+SDK;Build+custom+automations+with+@homura/sdk" alt="SDK Tagline" />
 </p>
 
 ```typescript
@@ -318,7 +318,7 @@ MIT License — 详见 [LICENSE](LICENSE)
 ---
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=18&pause=3000&color=8B5CF6&vCenter=true&width=450&repeat=false&lines=用心设计+by+the+Homura+Team" alt="Footer" />
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=18&pause=3000&color=8B5CF6&vCenter=true&width=450&repeat=false&lines=Built+with+mindful+design+by+the+Homura+Team" alt="Footer" />
 
   <a href="docs/README.zh-CN.md">文档</a> •
   <a href="https://github.com/CumuloCumulo/Homura/issues">报告问题</a> •
