@@ -1,358 +1,247 @@
 <p align="center">
   <!-- Main Title with Typing Animation -->
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=42&pause=2000&color=8B5CF6&vCenter=true&width=600&height=60&lines=Homura;AI-Powered+Browser+Automation" alt="Homura Title" />
+  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=48&pause=2000&color=8B5CF6&vCenter=true&width=650&height=70&lines=Homura;AI+驱动的浏览器自动化" alt="Homura Title" />
 
   <!-- Tagline with Secondary Animation -->
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=16&pause=3000&color=22D3EE&vCenter=true&width=550&repeat=true&lines=Define+goals%2C+not+steps;Declarative+automation+for+the+AI+era;Mindful+interaction+design" alt="Tagline" />
+  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=17&pause=3000&color=22D3EE&vCenter=true&width=600&repeat=true&lines=定义目标%2C+而非步骤;声明式自动化+for+the+AI+Era;用心交互设计" alt="Tagline" />
 </p>
 
 <p align="center">
   <!-- Badges -->
   <a href="https://chrome.google.com/webstore/detail/homura/">
-    <img src="https://img.shields.io/badge/Chrome-Extension-8B5CF6?logo=google-chrome&style=for-the-badge" alt="Chrome Extension" />
+    <img src="https://img.shields.io/badge/Chrome-扩展-8B5CF6?logo=google-chrome&logoColor=white&style=for-the-badge&logoWidth=20" alt="Chrome Extension" />
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-27272a?style=for-the-badge" alt="License" />
+    <img src="https://img.shields.io/badge/许可证-MIT-27272a?style=for-the-badge" alt="License" />
   </a>
-  <a href="https://github.com/homura/homura/releases">
-    <img src="https://img.shields.io/badge/version-1.1.0-D946EF?style=for-the-badge" alt="Version" />
+  <a href="https://github.com/CumuloCumulo/Homura/releases">
+    <img src="https://img.shields.io/badge/版本-1.1.0-D946EF?style=for-the-badge" alt="Version" />
   </a>
   <a href="https://www.npmjs.com/package/@homura/sdk">
-    <img src="https://img.shields.io/badge/npm-@homura/sdk-34D399?style=for-the-badge&logo=npm" alt="SDK" />
+    <img src="https://img.shields.io/badge/npm-@homura/sdk-34D399?style=for-the-badge&logo=npm&logoWidth=20" alt="SDK" />
   </a>
 </p>
 
 <p align="center">
   <!-- Navigation -->
-  <a href="#-why-homura">Why Homura</a> •
-  <a href="#-features">Features</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-sdk">SDK</a> •
-  <a href="#-docs">Docs</a> •
-  <a href="README.zh-CN.md">%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3</a>
+  <a href="#-为什么选择-homura">为什么选择</a> •
+  <a href="#-核心技术">核心技术</a> •
+  <a href="#-核心功能">核心功能</a> •
+  <a href="#-快速开始">快速开始</a> •
+  <a href="#-模块化-sdk">SDK</a> •
+  <a href="README.en.md">English</a>
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/homura/homura/main/assets/demo.gif" alt="Demo GIF" width="800" />
+  <!-- Visitor Badge -->
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=CumuloCumulo.Homura" alt="Visitor Count" />
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/homura/homura/main/assets/demo.gif" alt="Demo GIF" width="850" />
 </p>
 
 ---
 
-## ✨ Why Homura?
+<table>
+<tr>
+<td width="50%">
 
-### 🎯 Declarative Automation for the AI Era
+## ✨ 为什么选择 Homura？
+
+### 🎯 AI 时代的声明式自动化
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=14&pause=4000&color=8B5CF6&vCenter=true&width=700&repeat=true&lines=Traditional+RPA%3A+Draw+complex+flowcharts;Homura%3A+Define+goals%2C+AI+figures+out+the+path" alt="Comparison" />
+  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=15&pause=4000&color=8B5CF6&vCenter=true&width=750&repeat=true&lines=传统+RPA%EF%BC%9A绘制复杂流程图%2C+手动配置分支;Homura%EF%BC%9A定义目标%2C+AI+自动规划执行路径" alt="Comparison" />
 </p>
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Traditional RPA (Imperative)                                  │
-│                                                             │
+│ 传统 RPA (命令式)                                             │
 │  ┌─────┐   ┌─────┐   ┌─────┐                              │
-│  │Step 1│ → │Step 2│ → │Step 3│ → ...                 │
+│  │步骤1│ → │步骤2│ → │步骤3│ → ...                      │
 │  └─────┘   └─────┘   └─────┘                              │
-│                                                             │
-│  Rigid flow, manual branching, breaks when UI changes           │
+│  僵化的流程、手动分支、UI 变化即失效                             │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│ Homura (Declarative)                                         │
-│                                                             │
+│ Homura (声明式)                                               │
 │  ┌─────────────┐   ┌─────────────┐                        │
-│  │ Skills Lib   │   │ Rule Book    │                        │
-│  │ (Capabilities) │   │ (Objectives)  │                        │
+│  │ 技能库       │   │ 规则书        │                        │
+│  │ (Skills)    │   │ (Rule Book)  │                        │
 │  └─────────────┘   └─────────────┘                        │
 │           │                    │                            │
 │           └────────────────────┴                            │
 │                     ↓                                       │
 │  ┌──────────────┐  ┌───────────────┐                       │
-│  │ AI Agent    │  │  Execution   │                       │
-│  │ (Intelligence)│  │  Engine      │                       │
-│  │              │  │  (Precision)  │                       │
+│  │ AI 智能体    │  │  执行引擎      │                       │
+│  │ (决策)       │  │  (精确执行)    │                       │
 │  └──────────────┘  └───────────────┘                       │
-│                                                             │
-│  Dynamic decisions, self-healing, AI-driven adaptation      │
+│  动态决策、自愈能力、AI 驱动的自适应                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
----
+</td>
+<td width="50%">
 
-## 🧩 Core Technology
+## 🏗️ 技术架构
 
-### Brain-Limb Decoupled Architecture
+### 大脑-肢体解耦设计
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=14&pause=3000&color=D946EF&vCenter=true&width=600&repeat=true&lines=AI+(Brain)+%E2%86%92+Non-deterministic+decisions;Engine+(Limb)+%E2%86%92+Deterministic+execution" alt="Brain-Limb" />
+  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=14&pause=3000&color=D946EF&vCenter=true&width=650&repeat=true&lines=AI+(大脑)+→+非确定性决策;引擎+(肢体)+→+确定性执行" alt="Brain-Limb" />
 </p>
 
-| Layer | Role | Technology |
-|:-----:|:-----|:-----------|
-| **Brain (AI)** | Non-deterministic decision making | LLM + Rule Book |
-| **Limb (Engine)** | Deterministic execution | Scope + Anchor + Target |
+| 层级 | 职责 | 技术栈 |
+|:-----:|:-----|:-------|
+| **大脑 (AI)** | 非确定性决策 | LLM + 规则书 |
+| **肢体 (引擎)** | 确定性执行 | Scope + Anchor + Target |
 
-### 🎯 Unique Selector System
+### 🎯 独特的选择器系统
 
-**Scope + Anchor + Target** — Three-layer positioning that's robust against UI changes:
+**作用域 + 锚点 + 目标** — 三层定位架构：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 1️⃣  SCOPE - Find all containers                                 │
-│    selector: "tr.audit-row" → [Row1, Row2, Row3, ...]       │
+│ 1️⃣  SCOPE - 查找所有容器                                   │
+│    selector: "tr.audit-row" → [Row1, Row2, Row3, ...]     │
 ├─────────────────────────────────────────────────────────────┤
-│ 2️⃣  ANCHOR - Locate the right row                               │
-│    selector: ".name" contains "张三" → Row2                   │
+│ 2️⃣  ANCHOR - 定位目标行                                    │
+│    selector: ".name" contains "张三" → Row2                │
 ├─────────────────────────────────────────────────────────────┤
-│ 3️⃣  TARGET - Act within located row                             │
-│    selector: "button.btn-approve" → CLICK                    │
+│ 3️⃣  TARGET - 在定位行内操作                                │
+│    selector: "button.btn-approve" → CLICK                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Why it matters:**
-- ✅ **High-entropy anchors** — Validates uniqueness across rows
-- ✅ **Split table support** — Handles frozen column layouts
-- ✅ **Cell-level targeting** — Precise element location
-- ✅ **Self-healing** — AI repairs broken selectors automatically
+**核心优势：**
+- ✅ **高熵值锚点** — 验证跨行唯一性
+- ✅ **分栏表格支持** — 处理冻结列布局
+- ✅ **单元格级定位** — 精确元素位置
+- ✅ **自愈能力** — AI 自动修复损坏的选择器
+
+</td>
+</tr>
+</table>
 
 ---
 
-## 🎨 Features
+## 🎨 核心功能
 
-### 🤖 AI-Powered Orchestration
+### 🤖 AI 驱动的编排
 
-<table>
-<tr>
-<td width="50">
+| 功能 | 说明 |
+|:-----|:-----|
+| **规则书驱动** | 用自然语言 (Markdown) 编写业务规则 |
+| **动态决策** | AI 实时适应页面条件 |
+| **迭代执行** | 持续执行直到目标达成 |
+| **异常恢复** | AI 分析错误并尝试替代方案 |
 
-**Rule Book Driven**
-</td>
-<td>
+### 🔧 智能录制
 
-Write business rules in natural language (Markdown)
+| 功能 | 说明 |
+|:-----|:-----|
+| **一键生成** | 录制操作，AI 生成可复用工具 |
+| **自动参数化** | AI 识别变量 (如 "张三" → `{{student_name}}`) |
+| **跨页录制** | 跨越导航和新标签页持续录制 |
+| **实时验证** | 录制时实时测试选择器 |
 
-</td>
-</tr>
-<tr>
-<td width="50">
+### 🛡️ 稳健执行
 
-**Dynamic Decisions**
-</td>
-<td>
+| 功能 | 说明 |
+|:-----|:-----|
+| **原子操作** | CLICK, INPUT, EXTRACT_TEXT, WAIT_FOR, NAVIGATE |
+| **毫秒级精度** | 直接 DOM 操作，无 Puppeteer 开销 |
+| **可视化调试** | 实时元素高亮和执行预览 |
+| **错误恢复** | 自动重试和回退策略 |
 
-AI adapts to page conditions in real-time
+### 🎨 深空 UI 设计
 
-</td>
-</tr>
-<tr>
-<td width="50">
+> *"用心交互 — 数字减负、平静界面、空间高效"*
 
-**Iterative Execution**
-</td>
-<td>
-
-Continue until goal is reached, no hardcoded paths
-
-</td>
-</tr>
-<tr>
-<td width="50">
-
-**Exception Recovery**
-</td>
-<td>
-
-AI analyzes errors and tries alternatives
-
-</td>
-</tr>
-</table>
-
-### 🔧 Smart Recording
-
-<table>
-<tr>
-<td width="50">
-
-**One-Click Generation**
-</td>
-<td>
-
-Record actions, AI generates reusable tools
-
-</td>
-</tr>
-<tr>
-<td width="50">
-
-**Auto Parameterization**
-</td>
-<td>
-
-AI identifies variables (e.g., "张三" → `{{student_name}}`)
-
-</td>
-</tr>
-<tr>
-<td width="50">
-
-**Cross-Page Recording**
-</td>
-<td>
-
-Continue recording across navigations and new tabs
-
-</td>
-</tr>
-<tr>
-<td width="50">
-
-**Real-time Validation**
-</td>
-<td>
-
-Test selectors as you record
-
-</td>
-</tr>
-</table>
-
-### 🛡️ Robust Execution
-
-<table>
-<tr>
-<td width="50">
-
-**Primitive Actions**
-</td>
-<td>
-
-CLICK, INPUT, EXTRACT_TEXT, WAIT_FOR, NAVIGATE
-
-</td>
-</tr>
-<tr>
-<td width="50">
-
-**Millisecond Precision**
-</td>
-<td>
-
-Direct DOM manipulation, no Puppeteer overhead
-
-</td>
-</tr>
-<tr>
-<td width="50">
-
-**Visual Debugging**
-</td>
-<td>
-
-Real-time element highlighting and execution preview
-
-</td>
-</tr>
-<tr>
-<td width="50">
-
-**Error Recovery**
-</td>
-<td>
-
-Automatic retry and fallback strategies
-
-</td>
-</tr>
-</table>
-
-### 🎨 Deep Space UI
-
-> *"Mindful Interaction — Digital Diet, Calm Interface, Space Efficient"*
-
-- **Zero Learning Curve** — Familiar patterns, progressive disclosure
-- **Compact & Efficient** — Optimized for sidebar usage
-- **Dark Theme** — Easy on the eyes, developer-friendly
-- **Breathing Animations** — Subtle feedback, cognitive load reduction
+- **零学习曲线** — 熟悉的模式，渐进式披露
+- **紧凑高效** — 为侧边栏优化
+- **暗色主题** — 护眼，开发者友好
+- **呼吸动画** — 微妙反馈，降低认知负荷
 
 ---
 
-## 🚀 Quick Start
+## 🚀 快速开始
 
-### Installation
+### 安装
 
 ```bash
-# Clone the repository
-git clone https://github.com/homura/homura.git
-cd homura
+# 克隆仓库
+git clone https://github.com/CumuloCumulo/Homura.git
+cd Homura
 
-# Install dependencies
+# 安装依赖
 npm install
 
-# Build the extension
+# 构建扩展
 npm run build
 ```
 
-### Load in Chrome
+### 加载到 Chrome
 
-1. Open `chrome://extensions/`
-2. Enable **Developer mode**
-3. Click **Load unpacked**
-4. Select the `dist` folder
+1. 打开 `chrome://extensions/`
+2. 启用 **开发者模式**
+3. 点击 **加载已解压的扩展程序**
+4. 选择 `dist` 文件夹
 
-### First Automation
+### 首次自动化
 
 <ol>
-<li>Click the Homura icon in your toolbar</li>
-<li>Switch to <strong>Record</strong> mode</li>
-<li>Perform your actions on the page</li>
-<li>Click <strong>Generate Tool</strong> — AI creates a reusable automation</li>
-<li>Test and save to your <strong>Toolkit Library</strong></li>
+<li>点击工具栏中的 Homura 图标</li>
+<li>切换到 <strong>录制</strong> 模式</li>
+<li>在页面上执行你的操作</li>
+<li>点击 <strong>生成工具</strong> — AI 创建可复用自动化</li>
+<li>测试并保存到 <strong>工具库</strong></li>
 </ol>
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ 系统架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Presentation Layer                   │
+│                    表现层 (Presentation)                    │
 │  ┌──────────────┐  ┌───────────────┐                      │
 │  │  SidePanel   │  │   Dashboard    │                      │
 │  │              │  │               │                      │
-│  │  • Inspector │  │   • Toolkit   │                      │
-│  │  • Recorder  │  │   • Blueprint │                      │
-│  │  • Test Mode  │  │   • Rule Book │                      │
+│  │  • 检查器    │  │   • 工具库     │                      │
+│  │  • 录制器    │  │   • 蓝图      │                      │
+│  │  • 测试模式  │  │   • 规则书     │                      │
 │  └──────────────┘  └───────────────┘                      │
 ├─────────────────────────────────────────────────────────────┤
-│                   Intelligence Layer                    │
+│                    智能层 (Intelligence)                    │
 │  ┌──────────────┐  ┌───────────────┐                      │
-│  │  AI Service  │  │   Orchestrator │                      │
+│  │  AI 服务     │  │   编排器       │                      │
 │  │              │  │               │                      │
-│  │  • Tool       │  │   • Agent     │                      │
-│  │  │  Builder   │  │   • Decision   │                      │
-│  │  │           │  │   │   Loop    │                      │
-│  │  └───────────┘  │   └─────────────┘                      │
+│  │  • 工具      │  │   • 智能体    │                      │
+│  │  │  构建器   │  │   • 决策      │                      │
+│  │  │           │  │   │   循环    │                      │
+│  │  └───────────┘  │   └───────────┘                      │
 │  └──────────────┘  └───────────────┘                      │
 ├─────────────────────────────────────────────────────────────┤
-│                    Execution Layer                     │
-│  ┌──────────────┐  ┌───────────────┐  ┌──────────────┐      │
-│  │   Selector   │  │    Executor    │  │  Primitives  │      │
-│  │   Engine     │  │               │  │  (5 actions) │      │
-│  │              │  │  ┌─────────┐ │  └──────────────┘      │
-│  │  • Path      │  │  │ Highlighter│                       │
-│  │  │ Structure │  │  └─────────┘ │                       │
-│  │  └──────────┘  │               │                       │
-│  └──────────────┘  └───────────────┘                       │
+│                    执行层 (Execution)                       │
+│  ┌──────────────┐  ┌───────────────┐  ┌──────────────┐   │
+│  │   选择器     │  │    执行器      │  │  原语操作     │   │
+│  │   引擎       │  │               │  │  (5 actions) │   │
+│  │              │  │  ┌─────────┐ │  └──────────────┘   │
+│  │  • 路径      │  │  │ 高亮器  │ │                      │
+│  │  │ 结构     │  │  └─────────┘ │                      │
+│  │  └──────────┘  │               │                      │
+│  └──────────────┘  └───────────────┘                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📦 Modular SDK
+## 📦 模块化 SDK
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=14&pause=3000&color=8B5CF6&vCenter=true&width=550&repeat=true&lines=Use+Homura's+core+as+a+standalone+SDK;Build+custom+automations+with+@homura/sdk" alt="SDK Tagline" />
+  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=15&pause=3000&color=8B5CF6&vCenter=true&width=600&repeat=true&lines=使用+Homura+核心作为独立+SDK;使用+@homura/sdk+构建自定义自动化" alt="SDK Tagline" />
 </p>
 
 ```typescript
@@ -360,12 +249,12 @@ import { analyzeElement, createUnifiedSelector } from '@homura/sdk/selector';
 import { executeClick } from '@homura/sdk/primitives';
 import { executeTool } from '@homura/sdk/executor';
 
-// Analyze an element and generate a robust selector
+// 分析元素并生成稳健的选择器
 const element = document.querySelector('button');
 const analysis = analyzeElement(element);
 const selector = createUnifiedSelector(analysis, 'CLICK');
 
-// Execute with automatic retry and error handling
+// 使用自动重试和错误处理执行
 await executeClick(element, { delay: 100 });
 ```
 
@@ -375,69 +264,76 @@ npm install @homura/sdk
 
 ---
 
-## 📚 Documentation
+## 📚 文档
 
-| Document | Description |
+| 文档 | 描述 |
 |:---------|:------------|
-| [User Guide](docs/README.md) | Complete documentation |
-| [Development](docs/DEVELOPMENT.md) | Contributing guide |
-| [SDK Architecture](docs/specs/architecture/sdk-architecture.md) | SDK reference |
-| [UI Design](docs/specs/ui/UI-DESIGN.md) | Design system |
+| [用户指南](docs/README.zh-CN.md) | 完整文档 |
+| [开发指南](docs/DEVELOPMENT.md) | 贡献指南 |
+| [SDK 架构](docs/specs/architecture/sdk-architecture.md) | SDK 参考 |
+| [UI 设计](docs/specs/ui/UI-DESIGN.md) | 设计系统 |
 
 ---
 
-## 🛠️ Development
+## 🛠️ 开发
 
 ```bash
-# Install dependencies
+# 安装依赖
 npm install
 
-# Development mode
+# 开发模式
 npm run dev
 
-# Type checking
+# 类型检查
 npm run typecheck
 
-# Build SDK
+# 构建 SDK
 npm run build:sdk
 
-# Build extension
+# 构建扩展
 npm run build:extension
 
-# Run tests
+# 运行测试
 npm test
 ```
 
 ---
 
-## 🤝 Contributing
+## 🤝 贡献
 
-Contributions are welcome! Please see [Development Guide](docs/DEVELOPMENT.md) for details.
+欢迎贡献！请参阅 [开发指南](docs/DEVELOPMENT.md)
 
-**Core Principles:**
-1. **Spec-Driven Development** — Write specs before code
-2. **Type Safety First** — All code must pass typecheck
-3. **Test Coverage ≥80%** — Maintain high test standards
-4. **Consistent Naming** — Follow [naming conventions](docs/guides/naming-convention.md)
+**核心原则：**
+1. **规范驱动开发** — 先写规范
+2. **类型安全优先** — 必须通过类型检查
+3. **测试覆盖率 ≥80%** — 维持高测试标准
+4. **一致命名** — 遵循 [命名规范](docs/guides/naming-convention.md)
 
 ---
 
-## 📄 License
+## 📄 许可证
 
-MIT License — see [LICENSE](LICENSE) for details
+MIT License — 详见 [LICENSE](LICENSE)
 
 ---
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=18&pause=3000&color=8B5CF6&vCenter=true&width=400&repeat=false&lines=Built+with+mindful+design+by+the+Homura+Team" alt="Footer" />
+  <img src="https://readme-typing-svg.demolab.com?font=Noto+Sans+SC&size=18&pause=3000&color=8B5CF6&vCenter=true&width=450&repeat=false&lines=用心设计+by+the+Homura+Team" alt="Footer" />
 
-  <a href="docs/README.md">Documentation</a> •
-  <a href="https://github.com/homura/homura/issues">Report Issues</a> •
-  <a href="https://github.com/homura/homura/discussions">Discussions</a>
+  <a href="docs/README.zh-CN.md">文档</a> •
+  <a href="https://github.com/CumuloCumulo/Homura/issues">报告问题</a> •
+  <a href="https://github.com/CumuloCumulo/Homura/discussions">讨论</a>
 </p>
 
 <p align="center">
-  <a href="https://star-history.com/#homura/homura&Timeline">
-    <img src="https://api.star-history.com/svg?repos=homura/homura&type=Timeline" alt="Star History Chart" />
+  <!-- Star History Chart -->
+  <a href="https://star-history.com/#CumuloCumulo/Homura&Timeline">
+    <img src="https://api.star-history.com/svg?repos=CumuloCumulo/Homura&type=Timeline" alt="Star History Chart" />
   </a>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/devicons/devicon/icons/typescript/typescript-original.svg" alt="TypeScript" width="30" height="30"/>
+  <img src="https://raw.githubusercontent.com/devicons/devicon/icons/react/react-original.svg" alt="React" width="30" height="30"/>
+  <img src="https://raw.githubusercontent.com/devicons/devicon/icons/chrome/chrome-original.svg" alt="Chrome" width="30" height="30"/>
 </p>
