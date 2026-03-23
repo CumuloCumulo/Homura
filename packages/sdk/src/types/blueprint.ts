@@ -20,20 +20,27 @@ import type {
  *
  * A Blueprint contains everything needed to automate a workflow:
  * - Meta information (name, version, description)
- * - Skills collection (reusable atomic tools)
+ * - Skills collection (reusable atomic tools) - DEPRECATED: Use toolkitId instead
+ * - Toolkit reference (preferred over direct skills)
  * - Rule Book (natural language rules for AI Agent)
  * - Agent Config (execution configuration)
  * - Maintenance Info (health check and changelog)
  */
 export interface Blueprint {
-  /** Meta information */
-  meta: BlueprintMeta;
+  /** Unique identifier (for Dashboard management) */
+  meta: BlueprintMeta & { id?: string };
 
-  /** Skills collection (atomic tools) */
+  /** Skills collection (atomic tools) - DEPRECATED: Use toolkitId instead */
   skills: AtomicTool[];
+
+  /** Toolkit reference (preferred over skills for better reusability) */
+  toolkitId?: string;
 
   /** Rule Book (Markdown format) */
   rules: string;
+
+  /** Optional: Tags for categorization and filtering */
+  tags?: string[];
 
   /** Optional: Agent configuration */
   agentConfig?: AgentConfig;

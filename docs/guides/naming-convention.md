@@ -108,13 +108,24 @@
 
 \`\`\`typescript
 interface Blueprint {
-  meta: BlueprintMeta;        // Meta 信息
-  skills: AtomicTool[];       // Skills 集合
-  rules: string;              // Rule Book (Markdown)
+  meta: BlueprintMeta & { id?: string };  // Meta 信息 + ID
+  toolkitId?: string;      // 工具集引用（推荐）
+  skills: AtomicTool[];    // Skills 集合（已废弃，保留向后兼容）
+  rules: string;           // Rule Book (Markdown)
+  tags?: string[];         // 标签（用于分类和搜索）
   agentConfig?: AgentConfig;  // Agent 配置
   maintenance?: MaintenanceInfo; // 维护信息
 }
 \`\`\`
+
+**分层架构（v1.1）**：
+```
+Layer 1: Atomic Tools (原子工具) - 最小操作单元
+    ↓ 组合
+Layer 2: Toolkit (工具集) - 工具的有序组合
+    ↓ 引用 + 配置
+Layer 3: Blueprint (蓝图) - toolkitId + Rule Book
+```
 
 **命名规范**：
 - ✅ \`skills\` - 复数形式，表示集合

@@ -255,6 +255,67 @@ export function RecordingPanel() {
     }
   };
 
+  const handleSaveToDashboard = async () => {
+    if (recordedActions.length === 0) {
+      addLog({
+        timestamp: Date.now(),
+        level: 'error',
+        message: '没有可用的录制操作',
+      });
+      return;
+    }
+
+    setProcessing(true);
+    addLog({
+      timestamp: Date.now(),
+      level: 'info',
+      message: '正在保存到 Dashboard...',
+    });
+
+    try {
+      // Get current tab URL
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+
+      // Import the storage functions
+      const { createRecordingData, saveRecordingToStorage } =
+        await import('@shared/storage/recordingStorage');
+
+      // Create recording data
+      const recordingData = createRecordingData(
+        recordedActions,
+        undefined,
+        tab?.url,
+      );
+
+      // Save to storage
+      await saveRecordingToStorage(recordingData);
+
+      addLog({
+        timestamp: Date.now(),
+        level: 'info',
+        message: `已保存 ${recordedActions.length} 个操作到 Dashboard`,
+      });
+
+      // Show success notification
+      addLog({
+        timestamp: Date.now(),
+        level: 'info',
+        message: '在 Dashboard 中点击"导入录制"查看',
+      });
+    } catch (error) {
+      addLog({
+        timestamp: Date.now(),
+        level: 'error',
+        message: `保存失败: ${error}`,
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Control Panel */}
@@ -301,13 +362,52 @@ export function RecordingPanel() {
 
       {/* Generate Button */}
       {recordedActions.length > 0 && !isRecording && (
-        <div className="p-3 border-t border-white/5">
+        <div className="p-3 border-t border-white/5 space-y-2">
+          {/* Save to Dashboard Button */}
+          <button
+            onClick={handleSaveToDashboard}
+            disabled={isProcessing}
+            className="
+              w-full h-9 flex items-center justify-center gap-2
+              bg-zinc-800 border border-violet-500/30
+              rounded-lg text-xs font-medium text-violet-400
+              hover:bg-violet-500/10
+              disabled:opacity-50 disabled:cursor-not-allowed
+              transition-all duration-200
+            "
+          >
+            {isProcessing ? (
+              <>
+                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                <span>保存中...</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                  />
+                </svg>
+                <span>保存到 Dashboard</span>
+              </>
+            )}
+          </button>
+
+          {/* AI Generate Button */}
           <button
             onClick={handleGenerateTool}
             disabled={isProcessing}
             className="
               w-full h-9 flex items-center justify-center gap-2
-              bg-gradient-to-r from-violet-600/90 to-fuchsia-600/90 
+              bg-gradient-to-r from-violet-600/90 to-fuchsia-600/90
               rounded-lg text-xs font-medium text-white
               hover:from-violet-500 hover:to-fuchsia-500 hover:shadow-neon
               disabled:opacity-50 disabled:cursor-not-allowed

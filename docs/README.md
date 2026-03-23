@@ -1,45 +1,39 @@
-# 📚 Homura Documentation
+# 📚 Homura 文档
 
 > 🔥 **Next-Gen AI Browser Automation Agent**
 
 ---
 
-## 📖 Documentation Index
+## 📖 文档导航
 
-### Getting Started
+### 🚀 快速开始
 
-| Document | Description |
-|----------|-------------|
-| [Project Vision](./project-vision.md) | Core philosophy and design principles |
-| [Quick Start](../README.md) | Installation and basic usage |
+| 文档 | 说明 |
+|------|------|
+| [项目 README](../README.md) | 安装和基本使用 |
+| [项目愿景](./guides/vision.md) | 核心哲学和设计理念 |
 
-### Core Concepts
+### 📋 开发指南
 
-| Document | Description |
-|----------|-------------|
-| [Selector System](./selector.md) | UnifiedSelector schema and dual-strategy routing |
-| [AI Constraints](./ai-constraints.md) | Primitives and sandboxed execution model |
-| [Blueprint Schema](./blueprint-schema.md) | Data structures and validation rules |
+| 文档 | 说明 |
+|------|------|
+| [开发规范](./DEVELOPMENT.md) | **核心开发文档** - 项目结构、SDK 使用、工具链 |
+| [命名规范](./guides/naming-convention.md) | 统一术语和命名约定 |
 
-### SDK & Extension
+### 📐 技术规范
 
-| Document | Description |
-|----------|-------------|
-| [SDK Architecture](./sdk-architecture.md) | **@homura/sdk** module structure and API |
-| [AI Agent Mode](./ai-agent-mode.md) | Skills + Rules → Autonomous execution |
-| [Plugin Maintenance](./plugin-maintenance.md) | Runtime self-healing and hot-reload |
-
-### Development
-
-| Document | Description |
-|----------|-------------|
-| [Development Guide](./DEVELOPMENT.md) | Project structure and development workflow |
-| [UI Design](./UI-DESIGN.md) | Component specs and UX guidelines |
-| [Key Considerations](./key-considerations.md) | Important development notes |
+| 分类 | 文档 | 说明 |
+|------|------|------|
+| **架构** | [SDK 架构](./specs/architecture/sdk-architecture.md) | SDK 模块划分 |
+| **架构** | [Blueprint Schema](./specs/architecture/blueprint-schema.md) | Blueprint 数据结构 |
+| **架构** | [选择器系统](./specs/architecture/selector.md) | 选择器生成和验证 |
+| **功能** | [Toolkit](./specs/features/toolkit.md) | 工具集规范 |
+| **功能** | [Dashboard 编排](./specs/features/dashboard-orchestration.md) | 分层编排架构 |
+| **UI** | [UI 设计](./specs/ui/UI-DESIGN.md) | Deep Space 设计规范 |
 
 ---
 
-## 🏗️ Architecture Overview
+## 🏗️ 架构概览
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -51,9 +45,9 @@
 │  └─────────────┘  └─────────────┘                      │
 ├─────────────────────────────────────────────────────────┤
 │                   Intelligence Layer                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐   │
-│  │ AI Service  │  │ Smart Route │  │ Tool Builder │   │
-│  └─────────────┘  └─────────────┘  └──────────────┘   │
+│  ┌─────────────┐  ┌─────────────┐                      │
+│  │ AI Service  │  │ Smart Route │                      │
+│  └─────────────┘  └─────────────┘                      │
 ├─────────────────────────────────────────────────────────┤
 │                    Execution Layer                     │
 │  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐   │
@@ -65,71 +59,20 @@
 
 ---
 
-## 🔑 Core Concepts
+## 🗺️ 开发路线
 
-### UnifiedSelector
-
-Homura uses a unified selector schema that supports multiple strategies:
-
-```typescript
-interface UnifiedSelector {
-  id: string;                    // Unique ID
-  strategy: 'path' | 'scope_anchor_target' | 'direct';
-  fullSelector: string;          // Final CSS selector
-  confidence: number;            // 0-1 confidence score
-
-  // Path Strategy Data
-  pathData?: {
-    root: string;                // Semantic root
-    intermediates: string[];     // Path nodes
-    target: string;              // Target selector
-  };
-
-  // Structure Strategy Data
-  structureData?: {
-    scope: { selector: string; type: 'container_list' | 'single_container' };
-    anchor?: { selector: string; type: 'text_match' | 'attribute_match'; value: string };
-    target: { selector: string };
-  };
-
-  action: { type: 'CLICK' | 'INPUT' | 'EXTRACT_TEXT' | 'WAIT_FOR' | 'NAVIGATE'; params?: object };
-}
-```
-
-### Strategy Selection
-
-| Scenario | Strategy | Example |
-|----------|----------|---------|
-| Repeating elements (tables, lists) | `scope_anchor_target` | Click button in specific table row |
-| Single nested element | `path` | Click submit button in form |
-| Simple unique element | `direct` | Click element with unique ID |
-
-### Five Primitives
-
-| Primitive | Description | Modifiable |
-|-----------|-------------|------------|
-| `CLICK` | Click an element | ❌ |
-| `INPUT` | Input text | ❌ |
-| `EXTRACT_TEXT` | Extract text content | ❌ |
-| `WAIT_FOR` | Wait for element | ❌ |
-| `NAVIGATE` | Navigate to URL | ❌ |
-
----
-
-## 🗺️ Roadmap
-
-| Version | Goal | Status |
-|---------|------|--------|
+| 版本 | 目标 | 状态 |
+|------|------|------|
 | MVP | Execution engine + Scope/Anchor/Target | ✅ |
 | v0.5 | Selector generation + DOM analysis | ✅ |
 | v0.6 | Path selector + AI routing | ✅ |
 | v0.7 | UnifiedSelector + dual-mode UI | ✅ |
 | v0.7.1 | High-entropy anchors + split tables | ✅ |
 | v0.7.2 | Cross-page + cross-tab recording | ✅ |
-| **v1.0** | **SDK extraction + AI Agent** | ✅ |
-| v1.5 | Blueprint export + plugin ecosystem | 📋 Planned |
-| v2.0 | Self-healing selectors | 📋 Planned |
+| **v1.0** | **SDK extraction + layered orchestration** | ✅ |
+| v1.5 | AI Agent + Blueprint export | 📋 计划中 |
+| v2.0 | Self-healing selectors | 📋 计划中 |
 
 ---
 
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-23*

@@ -15,5 +15,8 @@ export * from './selector.js';
 // Execution
 export * from './execution.js';
 
+// Toolkit
+export * from './toolkit.js';
+
 // Blueprint
 export * from './blueprint.js';

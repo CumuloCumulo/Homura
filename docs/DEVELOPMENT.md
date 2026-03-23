@@ -55,13 +55,27 @@ homura/
     │       └── ensureContentScript.ts # Content Script 注入工具
     │
     ├── dashboard/             # 管理中心 UI (React)
-    │   ├── App.tsx            # 主布局
+    │   ├── App.tsx            # 主布局（Tab 切换：工具集/蓝图）
     │   ├── components/
-    │   │   ├── ToolLibrary.tsx    # 工具库卡片列表
-    │   │   ├── RuleBookEditor.tsx # Markdown 规则编辑器
-    │   │   └── ExecutionLog.tsx   # 执行日志面板
+    │   │   ├── ui/               # 共享 UI 组件
+    │   │   │   ├── ViewButton.tsx
+    │   │   │   └── index.ts
+    │   │   ├── toolkit/          # 工具集编排组件
+    │   │   │   ├── ToolkitEditor.tsx
+    │   │   │   ├── ToolkitLibrary.tsx
+    │   │   │   ├── ToolkitSequencePanel.tsx
+    │   │   │   ├── ToolDetailEditor.tsx
+    │   │   │   └── LightweightTestPanel.tsx
+    │   │   └── blueprint/        # 蓝图编排组件
+    │   │       ├── BlueprintEditor.tsx
+    │   │       ├── BlueprintLibrary.tsx
+    │   │       ├── RuleBookEditor.tsx
+    │   │       ├── ToolkitSelector.tsx
+    │   │       └── BlueprintTestPanel.tsx
     │   └── stores/
-    │       └── toolStore.ts       # 工具库状态（持久化）
+    │       ├── toolStore.ts      # 工具库状态
+    │       ├── toolkitStore.ts   # 工具集状态
+    │       └── blueprintStore.ts # 蓝图状态
     │
     ├── services/              # 外部服务模块
     │   └── ai/                # AI 服务
@@ -101,6 +115,7 @@ homura/
 | Utils | `@shared/utils` | Chrome 扩展工具函数（sendMessageToContent, getActiveTab） |
 | Constants | `@shared/constants` | 扩展常量（STORAGE_KEYS, EXTENSION_IDS） |
 | SelectorBuilder | `@shared/selectorBuilder` | 录制状态类型（RecordingState, RecordedAction） |
+| Components | `@shared/components` | 共享 UI 组件（ActionIcon） |
 
 ---
 
@@ -162,6 +177,9 @@ import type { HomuraMessage, MessageType } from '@shared/types';
 import { sendMessageToContent, getActiveTab } from '@shared/utils';
 import { STORAGE_KEYS, EXTENSION_IDS } from '@shared/constants';
 import type { RecordingState, RecordedAction } from '@shared/selectorBuilder';
+
+// ✅ 正确：共享 UI 组件从 @shared/components 导入
+import { ActionIcon } from '@shared/components';
 
 // ❌ 错误：不要从 @shared 导入 SDK 功能
 import type { UnifiedSelector } from '@shared/types'; // 已废弃
@@ -576,6 +594,161 @@ div.section (score: 0.6) ← 保留
 ├── 动效：transition-all duration-200 ease-out
 ├── 辉光：shadow-neon（hover 时）
 └── 收折：渐进式披露，默认收起卡片
+```
+
+---
+
+## 🧩 UI 组件规范
+
+> 统一组件放置位置、避免重复定义、明确共享规则
+
+### 组件目录层次
+
+```
+src/
+├── shared/
+│   └── components/
+│       ├── ActionIcon.tsx      # 共享：动作类型图标
+│       └── index.ts            # 统一导出
+│
+├── dashboard/
+│   └── components/
+│       ├── ui/
+│       │   ├── ViewButton.tsx  # Dashboard UI 组件
+│       │   └── index.ts        # 统一导出
+│       ├── toolkit/            # 工具集编排组件
+│       │   ├── ToolkitEditor.tsx
+│       │   ├── ToolkitLibrary.tsx
+│       │   ├── ToolkitSequencePanel.tsx
+│       │   ├── ToolDetailEditor.tsx
+│       │   └── LightweightTestPanel.tsx
+│       └── blueprint/          # 蓝图编排组件
+│           ├── BlueprintEditor.tsx
+│           ├── BlueprintLibrary.tsx
+│           ├── RuleBookEditor.tsx
+│           ├── ToolkitSelector.tsx
+│           └── BlueprintTestPanel.tsx
+│
+└── sidepanel/
+    └── components/
+        ├── ToolCard.tsx        # SidePanel 专用
+        ├── InspectMode.tsx
+        ├── PathVisualizer.tsx
+        └── ...
+```
+
+### 组件放置规则
+
+| 规则 | 说明 | 示例 |
+|------|------|------|
+| **@shared/components** | Dashboard 和 SidePanel 都用到的组件 | `ActionIcon` |
+| **dashboard/components/ui** | 仅 Dashboard 内部使用的 UI 组件 | `ViewButton` |
+| **dashboard/components/toolkit** | 工具集编排相关组件 | `ToolkitEditor` |
+| **dashboard/components/blueprint** | 蓝图编排相关组件 | `BlueprintEditor` |
+| **sidepanel/components** | 仅 SidePanel 使用 | `ToolCard`, `InspectMode` |
+
+### 共享组件使用规范
+
+```typescript
+// ✅ 正确：从共享位置导入
+import { ActionIcon } from "@shared/components";
+
+// ✅ 正确：Dashboard 内部 UI 组件
+import { ViewButton } from "@/dashboard/components/ui";
+
+// ❌ 错误：不要创建重复的 ActionIcon
+// 如果需要在 Dashboard 使用，直接从 @shared/components 导入
+```
+
+### 组件创建流程
+
+1. **检查是否已存在**
+   - 搜索 `@shared/components` 是否有类似组件
+   - 搜索 `dashboard/components/ui` 是否有类似组件
+
+2. **确定放置位置**
+   - 两处都用 → `@shared/components`
+   - 仅 Dashboard → `dashboard/components/ui`
+   - 仅 SidePanel → `sidepanel/components`
+
+3. **更新 index.ts**
+   - 在对应目录的 `index.ts` 中添加导出
+
+### 反模式（避免）
+
+| 反模式 | 问题 | 正确做法 |
+|--------|------|----------|
+| 复制粘贴组件代码 | 维护困难、不一致 | 使用共享组件 |
+| 在多个位置定义相同组件 | 类型不统一 | 从单一位置导入 |
+| 混用不同的图标实现 | 视觉不一致 | 统一使用 ActionIcon |
+
+---
+
+## 🏗️ 数据结构规范
+
+> 类型定义位置、ID 命名、Store 职责分离
+
+### 类型定义位置规则
+
+| 类型 | 位置 | 说明 |
+|------|------|------|
+| **SDK 通用类型** | `packages/sdk/src/types/` | 跨项目使用 |
+| **扩展特定类型** | `src/shared/types.ts` | Chrome 扩展消息类型 |
+| **Dashboard 类型** | `src/dashboard/types.ts` | Dashboard 状态类型 |
+| **局部类型** | 文件内部 `type ... =` | 仅单文件使用 |
+
+### ID 字段命名规范
+
+| 类型 | ID 字段 | 示例 |
+|------|--------|------|
+| **AtomicTool** | `tool_id` | `tool_1234567890` |
+| **Toolkit** | `id` | `tk_1234567890` |
+| **Blueprint** | `meta.id` | `bp_1234567890` |
+| **Recording** | `id` | `rec_1234567890` |
+
+### Store 职责分离
+
+| Store | 职责 | 存储内容 |
+|------|------|----------|
+| **toolStore** | 原子工具库 | 所有 AtomicTool（全局可用） |
+| **toolkitStore** | 工具集管理 | Toolkit CRUD、搜索过滤 |
+| **blueprintStore** | 蓝图管理 | Blueprint CRUD、搜索过滤 |
+| **recordingStore** | 录制状态 | 当前录制会话状态 |
+
+**关键原则**：
+- `toolStore` 存储所有原子工具（可被多个 toolkit 引用）
+- `toolkit` 通过 `tool_id` 引用原子工具
+- `blueprint` 通过 `toolkitId` 引用工具集（而非直接包含 skills）
+
+### 分层架构数据流
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 1: AtomicTool (原子工具)                               │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ tool_id: "click_submit"                                 │ │
+│ │ name: "Click Submit Button"                             │ │
+│ │ selector_logic: { target: { selector: "...", action }} │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                        ↓ 存储于 toolStore                   │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 2: Toolkit (工具集)                                   │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ id: "tk_login_flow"                                     │ │
+│ │ name: "Login Flow"                                      │ │
+│ │ tools: [tool_id1, tool_id2, tool_id3]                   │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                        ↓ 存储于 toolkitStore                │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 3: Blueprint (蓝图)                                   │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ meta.id: "bp_student_audit"                             │ │
+│ │ name: "Student Audit Blueprint"                         │ │
+│ │ toolkitId: "tk_login_flow"  // 引用工具集               │ │
+│ │ rules: "# Rule Book markdown..."                        │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                        ↓ 存储于 blueprintStore              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---

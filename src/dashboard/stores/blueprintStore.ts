@@ -21,6 +21,12 @@ interface BlueprintStore {
   /** Currently selected Blueprint */
   selectedBlueprint: Blueprint | null;
 
+  /** Search query for filtering */
+  searchQuery: string;
+
+  /** Selected tags for filtering */
+  selectedTags: string[];
+
   /** Export dialog state */
   exportDialogOpen: boolean;
 
@@ -92,6 +98,18 @@ interface BlueprintStore {
     progress?: number,
   ) => void;
 
+  /** Set search query */
+  setSearchQuery: (query: string) => void;
+
+  /** Set selected tags */
+  setSelectedTags: (tags: string[]) => void;
+
+  /** Get filtered blueprints */
+  getFilteredBlueprints: () => Blueprint[];
+
+  /** Load blueprints from storage */
+  loadBlueprints: () => Promise<void>;
+
   /** Import Blueprints with conflict resolution */
   importBlueprints: (
     blueprints: Blueprint[],
@@ -111,6 +129,8 @@ export const useBlueprintStore = create<BlueprintStore>()(
       // Initial state
       blueprints: [],
       selectedBlueprint: null,
+      searchQuery: '',
+      selectedTags: [],
       exportDialogOpen: false,
       importDialogOpen: false,
       pendingImports: [],
@@ -128,19 +148,19 @@ export const useBlueprintStore = create<BlueprintStore>()(
       updateBlueprint: (id, updates) =>
         set((state) => ({
           blueprints: state.blueprints.map((bp) =>
-            bp.meta.name === id ? { ...bp, ...updates } : bp,
+            bp.meta.id === id ? { ...bp, ...updates } : bp,
           ),
           selectedBlueprint:
-            state.selectedBlueprint?.meta.name === id
+            state.selectedBlueprint?.meta.id === id
               ? { ...state.selectedBlueprint, ...updates }
               : state.selectedBlueprint,
         })),
 
       removeBlueprint: (id) =>
         set((state) => ({
-          blueprints: state.blueprints.filter((bp) => bp.meta.name !== id),
+          blueprints: state.blueprints.filter((bp) => bp.meta.id !== id),
           selectedBlueprint:
-            state.selectedBlueprint?.meta.name === id
+            state.selectedBlueprint?.meta.id === id
               ? null
               : state.selectedBlueprint,
         })),
@@ -148,7 +168,7 @@ export const useBlueprintStore = create<BlueprintStore>()(
       selectBlueprint: (blueprint) => set({ selectedBlueprint: blueprint }),
 
       getBlueprintById: (id) => {
-        return get().blueprints.find((bp) => bp.meta.name === id);
+        return get().blueprints.find((bp) => bp.meta.id === id);
       },
 
       getBlueprintByNameAndVersion: (name, version) => {
@@ -208,6 +228,36 @@ export const useBlueprintStore = create<BlueprintStore>()(
           pendingImports: [],
           conflicts: [],
         }),
+
+      setSearchQuery: (query) => set({ searchQuery: query }),
+
+      setSelectedTags: (tags) => set({ selectedTags: tags }),
+
+      getFilteredBlueprints: () => {
+        const state = get();
+        return state.blueprints.filter((blueprint) => {
+          const matchesSearch =
+            !state.searchQuery ||
+            blueprint.meta.name
+              .toLowerCase()
+              .includes(state.searchQuery.toLowerCase()) ||
+            blueprint.meta.description
+              ?.toLowerCase()
+              .includes(state.searchQuery.toLowerCase());
+
+          const matchesTags =
+            state.selectedTags.length === 0 ||
+            blueprint.tags?.some((tag) => state.selectedTags.includes(tag));
+
+          return matchesSearch && matchesTags;
+        });
+      },
+
+      loadBlueprints: async () => {
+        // Load from Chrome storage or zustand persist
+        // This is a no-op since zustand persist handles loading
+        // But we can add additional logic here if needed
+      },
 
       setProcessing: (isProcessing, message = '', progress = 0) =>
         set({

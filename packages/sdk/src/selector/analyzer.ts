@@ -15,7 +15,8 @@ import type {
 } from './types.js';
 
 // Check if we're in a browser environment
-const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+const isBrowser =
+  typeof window !== 'undefined' && typeof document !== 'undefined';
 
 // Export a flag for runtime environment checking
 export const BROWSER_REQUIRED = true;
@@ -36,19 +37,88 @@ const SEMANTIC_ATTRIBUTES = ['role', 'aria-label', 'title', 'data-testid'];
  */
 const LOW_ENTROPY_WORDS = new Set([
   // Status labels
-  'pending', 'approved', 'rejected', 'active', 'inactive', 'completed', 'processing',
-  'success', 'failed', 'error', 'warning', 'info', 'done', 'cancelled', 'expired',
-  'open', 'closed', 'draft', 'published', 'archived',
+  'pending',
+  'approved',
+  'rejected',
+  'active',
+  'inactive',
+  'completed',
+  'processing',
+  'success',
+  'failed',
+  'error',
+  'warning',
+  'info',
+  'done',
+  'cancelled',
+  'expired',
+  'open',
+  'closed',
+  'draft',
+  'published',
+  'archived',
   // Actions
-  'edit', 'delete', 'remove', 'add', 'save', 'cancel', 'submit', 'confirm', 'approve',
-  'reject', 'view', 'details', 'more', 'expand', 'collapse', 'refresh', 'update',
-  'download', 'upload', 'export', 'import', 'copy', 'share', 'print',
+  'edit',
+  'delete',
+  'remove',
+  'add',
+  'save',
+  'cancel',
+  'submit',
+  'confirm',
+  'approve',
+  'reject',
+  'view',
+  'details',
+  'more',
+  'expand',
+  'collapse',
+  'refresh',
+  'update',
+  'download',
+  'upload',
+  'export',
+  'import',
+  'copy',
+  'share',
+  'print',
   // Common labels
-  'status', 'action', 'actions', 'name', 'date', 'time', 'type', 'category',
-  'description', 'notes', 'comment', 'comments', 'amount', 'total', 'price', 'quantity',
-  'yes', 'no', 'true', 'false', 'n/a', '-', '—', '...', '•',
+  'status',
+  'action',
+  'actions',
+  'name',
+  'date',
+  'time',
+  'type',
+  'category',
+  'description',
+  'notes',
+  'comment',
+  'comments',
+  'amount',
+  'total',
+  'price',
+  'quantity',
+  'yes',
+  'no',
+  'true',
+  'false',
+  'n/a',
+  '-',
+  '—',
+  '...',
+  '•',
   // Numbers and symbols
-  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  '0',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
 ]);
 
 /**
@@ -67,12 +137,15 @@ function isLowEntropyText(text: string): boolean {
  * Get sibling containers for cross-row uniqueness validation.
  * Samples up to maxSiblings containers to avoid performance issues.
  */
-function getSiblingContainers(container: HTMLElement, maxSiblings = 6): HTMLElement[] {
+function getSiblingContainers(
+  container: HTMLElement,
+  maxSiblings = 6,
+): HTMLElement[] {
   const parent = container.parentElement;
   if (!parent) return [];
 
   const siblings = Array.from(parent.children).filter(
-    child => child.tagName === container.tagName && child !== container
+    (child) => child.tagName === container.tagName && child !== container,
   ) as HTMLElement[];
 
   if (siblings.length <= maxSiblings) {
@@ -81,10 +154,7 @@ function getSiblingContainers(container: HTMLElement, maxSiblings = 6): HTMLElem
 
   // Sample: first 3 + last 3
   const half = Math.floor(maxSiblings / 2);
-  return [
-    ...siblings.slice(0, half),
-    ...siblings.slice(-half),
-  ];
+  return [...siblings.slice(0, half), ...siblings.slice(-half)];
 }
 
 /**
@@ -95,7 +165,7 @@ function countSiblingMatches(
   selector: string,
   matchType: 'text' | 'attribute',
   matchValue: string,
-  attributeName?: string
+  attributeName?: string,
 ): number {
   let count = 0;
 
@@ -106,7 +176,10 @@ function countSiblingMatches(
 
       if (matchType === 'text') {
         const text = getDirectTextContent(element as HTMLElement);
-        if (text && text.toLowerCase().trim() === matchValue.toLowerCase().trim()) {
+        if (
+          text &&
+          text.toLowerCase().trim() === matchValue.toLowerCase().trim()
+        ) {
           count++;
         }
       } else if (matchType === 'attribute' && attributeName) {
@@ -126,12 +199,15 @@ function countSiblingMatches(
 /**
  * Calculate uniqueness score based on sibling frequency.
  */
-function calculateUniquenessScore(siblingFrequency: number, totalSiblings: number): number {
+function calculateUniquenessScore(
+  siblingFrequency: number,
+  totalSiblings: number,
+): number {
   if (totalSiblings === 0) return 1.0;
   if (siblingFrequency === 0) return 1.0;
 
   const ratio = siblingFrequency / totalSiblings;
-  return Math.max(0.1, 1.0 - (ratio * 0.9));
+  return Math.max(0.1, 1.0 - ratio * 0.9);
 }
 
 // Patterns for identifying semantic class names (stable container identifiers)
@@ -162,12 +238,16 @@ const SKIP_CLASS_PATTERNS = [
  * Check if a CSS class name is safe to use in selectors.
  */
 function isSafeCssClass(className: string): boolean {
-  if (className.match(/\d{5,}|active|hover|focus|selected|disabled|ng-|vue-|react-/i)) {
+  if (
+    className.match(
+      /\d{5,}|active|hover|focus|selected|disabled|ng-|vue-|react-/i,
+    )
+  ) {
     return false;
   }
 
   // Filter out Tailwind special patterns
-  if (/[\[\]():\/]/.test(className)) {
+  if (/[\]():/[]/.test(className)) {
     return false;
   }
 
@@ -181,7 +261,10 @@ const SEMANTIC_SCORE_PATTERNS: Array<{ pattern: RegExp; score: number }> = [
   { pattern: /^(official|custom|primary|main|secondary)/i, score: 0.9 },
   { pattern: /(-header|-footer|-sidebar|-content|-main)$/i, score: 0.9 },
   { pattern: /^(header|footer|sidebar|navigation|breadcrumb)/i, score: 0.85 },
-  { pattern: /(-search|-login|-register|-checkout|-cart|-profile)/i, score: 0.85 },
+  {
+    pattern: /(-search|-login|-register|-checkout|-cart|-profile)/i,
+    score: 0.85,
+  },
   { pattern: /(-form|-modal|-dialog|-popup|-dropdown)/i, score: 0.8 },
   { pattern: /(-bar|-panel|-section|-area|-zone)/i, score: 0.75 },
   { pattern: /(-card|-list|-table|-grid)/i, score: 0.7 },
@@ -192,13 +275,20 @@ const SEMANTIC_SCORE_PATTERNS: Array<{ pattern: RegExp; score: number }> = [
 /**
  * Global container IDs that should be avoided as roots
  */
-const GLOBAL_CONTAINER_IDS = ['app', 'root', 'main', 'content', '__next', '__nuxt'];
+const GLOBAL_CONTAINER_IDS = [
+  'app',
+  'root',
+  'main',
+  'content',
+  '__next',
+  '__nuxt',
+];
 
 /**
  * Calculate semantic score for a class name (0-1)
  */
 function calculateClassSemanticScore(className: string): number {
-  if (SKIP_CLASS_PATTERNS.some(pattern => pattern.test(className))) {
+  if (SKIP_CLASS_PATTERNS.some((pattern) => pattern.test(className))) {
     return 0;
   }
 
@@ -222,7 +312,10 @@ function calculateElementSemanticScore(element: HTMLElement): number {
   const classes = Array.from(element.classList);
 
   if (classes.length === 0) {
-    if (element.id && !GLOBAL_CONTAINER_IDS.includes(element.id.toLowerCase())) {
+    if (
+      element.id &&
+      !GLOBAL_CONTAINER_IDS.includes(element.id.toLowerCase())
+    ) {
       if (!element.id.match(/\d{5,}|uid|uuid|random/i)) {
         return 0.85;
       }
@@ -240,7 +333,9 @@ function calculateElementSemanticScore(element: HTMLElement): number {
  */
 export function analyzeElement(element: HTMLElement): ElementAnalysis {
   if (!isBrowser) {
-    throw new Error('[Homura SDK] analyzeElement requires a browser environment (window, document)');
+    throw new Error(
+      '[Homura SDK] analyzeElement requires a browser environment (window, document)',
+    );
   }
 
   // 1. Find repeating container
@@ -256,9 +351,7 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
   const containerType = container ? detectContainerType(container) : 'single';
 
   // 5. Find anchor candidates
-  const anchorCandidates = container
-    ? findAnchorCandidates(container)
-    : [];
+  const anchorCandidates = container ? findAnchorCandidates(container) : [];
 
   // 6. Build relative selector
   const relativeSelector = container
@@ -269,8 +362,12 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
   const targetSelector = buildMinimalSelector(element, container || undefined);
 
   // 8. Build serializable container info
-  const containerSelector = container ? buildMinimalSelector(container) : undefined;
-  const containerTagName = container ? container.tagName.toLowerCase() : undefined;
+  const containerSelector = container
+    ? buildMinimalSelector(container)
+    : undefined;
+  const containerTagName = container
+    ? container.tagName.toLowerCase()
+    : undefined;
 
   // 9. Build scoped selector
   const scopedSelector = containerSelector
@@ -307,9 +404,14 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
 /**
  * Collect ancestor path from target element upward to semantic root
  */
-export function collectAncestorPath(element: HTMLElement, maxDepth = 6): AncestorInfo[] {
+export function collectAncestorPath(
+  element: HTMLElement,
+  maxDepth = 6,
+): AncestorInfo[] {
   if (!isBrowser) {
-    throw new Error('[Homura SDK] collectAncestorPath requires a browser environment');
+    throw new Error(
+      '[Homura SDK] collectAncestorPath requires a browser environment',
+    );
   }
 
   const path: AncestorInfo[] = [];
@@ -319,11 +421,13 @@ export function collectAncestorPath(element: HTMLElement, maxDepth = 6): Ancesto
   while (current && current !== document.body && depth < maxDepth) {
     const semanticScore = calculateElementSemanticScore(current);
     const classes = Array.from(current.classList);
-    const id = current.id && !GLOBAL_CONTAINER_IDS.includes(current.id.toLowerCase())
-      ? current.id
-      : undefined;
+    const id =
+      current.id && !GLOBAL_CONTAINER_IDS.includes(current.id.toLowerCase())
+        ? current.id
+        : undefined;
 
-    const isSemanticRoot = semanticScore >= 0.7 ||
+    const isSemanticRoot =
+      semanticScore >= 0.7 ||
       (id !== undefined && !id.match(/\d{5,}|uid|uuid|random/i));
 
     const selector = buildAncestorSelector(current);
@@ -371,17 +475,18 @@ function buildAncestorSelector(element: HTMLElement): string {
   const classes = Array.from(element.classList);
   const scoredClasses = classes
     .filter(isSafeCssClass)
-    .map(c => ({ cls: c, score: calculateClassSemanticScore(c) }))
-    .filter(x => x.score >= 0.5)
+    .map((c) => ({ cls: c, score: calculateClassSemanticScore(c) }))
+    .filter((x) => x.score >= 0.5)
     .sort((a, b) => b.score - a.score);
 
   if (scoredClasses.length > 0) {
     return `${tag}.${scoredClasses[0].cls}`;
   }
 
-  const validClasses = classes.filter(c =>
-    isSafeCssClass(c) &&
-    !SKIP_CLASS_PATTERNS.some(pattern => pattern.test(c))
+  const validClasses = classes.filter(
+    (c) =>
+      isSafeCssClass(c) &&
+      !SKIP_CLASS_PATTERNS.some((pattern) => pattern.test(c)),
   );
   if (validClasses.length > 0) {
     return `${tag}.${validClasses[0]}`;
@@ -410,12 +515,15 @@ function truncateOuterHTML(element: HTMLElement, maxLength: number): string {
 /**
  * Build path-based selector from ancestor path
  */
-export function buildPathSelector(ancestorPath: AncestorInfo[], targetSelector: string): string {
+export function buildPathSelector(
+  ancestorPath: AncestorInfo[],
+  targetSelector: string,
+): string {
   if (ancestorPath.length === 0) {
     return targetSelector;
   }
 
-  let rootIndex = ancestorPath.findIndex(a => a.isSemanticRoot);
+  let rootIndex = ancestorPath.findIndex((a) => a.isSemanticRoot);
   if (rootIndex === -1) {
     let maxScore = 0;
     ancestorPath.forEach((a, i) => {
@@ -445,7 +553,16 @@ export function buildPathSelector(ancestorPath: AncestorInfo[], targetSelector: 
   return parts.join(' ');
 }
 
-const SKIP_AS_CONTAINER = ['TD', 'TH', 'SPAN', 'STRONG', 'EM', 'B', 'I', 'LABEL'];
+const SKIP_AS_CONTAINER = [
+  'TD',
+  'TH',
+  'SPAN',
+  'STRONG',
+  'EM',
+  'B',
+  'I',
+  'LABEL',
+];
 const PREFERRED_CONTAINERS = ['TR', 'LI', 'ARTICLE', 'SECTION'];
 const VALID_GRID_ITEMS = ['A', 'DIV', 'ARTICLE', 'SECTION', 'LI'];
 
@@ -475,28 +592,43 @@ function isButtonToolbar(element: HTMLElement | null): boolean {
   if (!element) return false;
 
   const className = element.className || '';
-  return /\b(btn-group|buttons|toolbar|btn-toolbar|actions|button-group|bh-buttons)\b/i.test(className);
+  return /\b(btn-group|buttons|toolbar|btn-toolbar|actions|button-group|bh-buttons)\b/i.test(
+    className,
+  );
 }
 
 /**
  * Find the nearest repeating container
  */
-export function findRepeatingContainer(element: HTMLElement): HTMLElement | null {
+export function findRepeatingContainer(
+  element: HTMLElement,
+): HTMLElement | null {
   const elementParent = element.parentElement;
   if (elementParent) {
-    const elementSiblings = Array.from(elementParent.children).filter(child => {
-      if (child.tagName !== element.tagName) return false;
-      if (['A', 'DIV'].includes(child.tagName)) {
-        const elementClasses = new Set(element.className.split(/\s+/));
-        const childClasses = new Set((child as HTMLElement).className.split(/\s+/));
-        const overlap = [...elementClasses].filter(c => childClasses.has(c)).length;
-        return overlap >= Math.min(elementClasses.size, childClasses.size) * 0.5;
-      }
-      return true;
-    });
+    const elementSiblings = Array.from(elementParent.children).filter(
+      (child) => {
+        if (child.tagName !== element.tagName) return false;
+        if (['A', 'DIV'].includes(child.tagName)) {
+          const elementClasses = new Set(element.className.split(/\s+/));
+          const childClasses = new Set(
+            (child as HTMLElement).className.split(/\s+/),
+          );
+          const overlap = [...elementClasses].filter((c) =>
+            childClasses.has(c),
+          ).length;
+          return (
+            overlap >= Math.min(elementClasses.size, childClasses.size) * 0.5
+          );
+        }
+        return true;
+      },
+    );
 
     if (elementSiblings.length >= 2) {
-      if (isGridOrFlexContainer(elementParent) && VALID_GRID_ITEMS.includes(element.tagName)) {
+      if (
+        isGridOrFlexContainer(elementParent) &&
+        VALID_GRID_ITEMS.includes(element.tagName)
+      ) {
         return element;
       }
       if (PREFERRED_CONTAINERS.includes(element.tagName)) {
@@ -519,19 +651,28 @@ export function findRepeatingContainer(element: HTMLElement): HTMLElement | null
     const parent = current.parentElement;
     if (!parent) break;
 
-    const siblings = Array.from(parent.children).filter(child => {
+    const siblings = Array.from(parent.children).filter((child) => {
       if (child.tagName !== current!.tagName) return false;
       if (child.tagName === 'DIV') {
         const currentClasses = new Set(current!.className.split(/\s+/));
-        const childClasses = new Set((child as HTMLElement).className.split(/\s+/));
-        const overlap = [...currentClasses].filter(c => childClasses.has(c)).length;
-        return overlap >= Math.min(currentClasses.size, childClasses.size) * 0.5;
+        const childClasses = new Set(
+          (child as HTMLElement).className.split(/\s+/),
+        );
+        const overlap = [...currentClasses].filter((c) =>
+          childClasses.has(c),
+        ).length;
+        return (
+          overlap >= Math.min(currentClasses.size, childClasses.size) * 0.5
+        );
       }
       return true;
     });
 
     if (siblings.length >= 2) {
-      if (isGridOrFlexContainer(parent) && VALID_GRID_ITEMS.includes(current.tagName)) {
+      if (
+        isGridOrFlexContainer(parent) &&
+        VALID_GRID_ITEMS.includes(current.tagName)
+      ) {
         return current;
       }
 
@@ -559,11 +700,16 @@ export function findRepeatingContainer(element: HTMLElement): HTMLElement | null
 /**
  * Find the nearest ancestor with semantic class/id
  */
-export function findSemanticContainer(element: HTMLElement): HTMLElement | null {
+export function findSemanticContainer(
+  element: HTMLElement,
+): HTMLElement | null {
   let current = element.parentElement;
 
   while (current && current !== document.body) {
-    if (current.id && !current.id.match(/\d{5,}|uid|uuid|random|react|vue|ng-/i)) {
+    if (
+      current.id &&
+      !current.id.match(/\d{5,}|uid|uuid|random|react|vue|ng-/i)
+    ) {
       return current;
     }
 
@@ -571,16 +717,28 @@ export function findSemanticContainer(element: HTMLElement): HTMLElement | null 
       return current;
     }
 
-    const hasSemanticClass = Array.from(current.classList).some(cls =>
-      SEMANTIC_CLASS_PATTERNS.some(pattern => pattern.test(cls))
+    const hasSemanticClass = Array.from(current.classList).some((cls) =>
+      SEMANTIC_CLASS_PATTERNS.some((pattern) => pattern.test(cls)),
     );
 
     if (hasSemanticClass) {
       return current;
     }
 
-    const semanticTags = ['FORM', 'NAV', 'HEADER', 'FOOTER', 'ASIDE', 'MAIN', 'SECTION', 'ARTICLE'];
-    if (semanticTags.includes(current.tagName) && current.classList.length > 0) {
+    const semanticTags = [
+      'FORM',
+      'NAV',
+      'HEADER',
+      'FOOTER',
+      'ASIDE',
+      'MAIN',
+      'SECTION',
+      'ARTICLE',
+    ];
+    if (
+      semanticTags.includes(current.tagName) &&
+      current.classList.length > 0
+    ) {
       return current;
     }
 
@@ -616,7 +774,9 @@ function detectContainerType(container: HTMLElement): ContainerType {
 /**
  * Find anchor candidates within a container
  */
-export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] {
+export function findAnchorCandidates(
+  container: HTMLElement,
+): AnchorCandidate[] {
   const candidates: AnchorCandidate[] = [];
 
   const siblings = getSiblingContainers(container);
@@ -625,7 +785,7 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
   const textElements = container.querySelectorAll('*');
   const textsFound = new Map<string, HTMLElement>();
 
-  textElements.forEach(el => {
+  textElements.forEach((el) => {
     const htmlEl = el as HTMLElement;
     const directText = getDirectTextContent(htmlEl);
 
@@ -650,7 +810,10 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
 
     if (hasSiblings) {
       siblingFrequency = countSiblingMatches(siblings, selector, 'text', text);
-      const uniquenessScore = calculateUniquenessScore(siblingFrequency, siblings.length);
+      const uniquenessScore = calculateUniquenessScore(
+        siblingFrequency,
+        siblings.length,
+      );
 
       isUnique = siblingFrequency === 0;
       confidence *= uniquenessScore;
@@ -676,7 +839,7 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
     });
   });
 
-  textElements.forEach(el => {
+  textElements.forEach((el) => {
     if (el === container) return;
 
     for (const attr of SEMANTIC_ATTRIBUTES) {
@@ -693,8 +856,17 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
 
         let siblingFrequency = 0;
         if (hasSiblings) {
-          siblingFrequency = countSiblingMatches(siblings, selector, 'attribute', value, attr);
-          const uniquenessScore = calculateUniquenessScore(siblingFrequency, siblings.length);
+          siblingFrequency = countSiblingMatches(
+            siblings,
+            selector,
+            'attribute',
+            value,
+            attr,
+          );
+          const uniquenessScore = calculateUniquenessScore(
+            siblingFrequency,
+            siblings.length,
+          );
 
           isUnique = siblingFrequency === 0;
           confidence *= uniquenessScore;
@@ -750,7 +922,7 @@ export function findAnchorCandidates(container: HTMLElement): AnchorCandidate[] 
  */
 function getDirectTextContent(element: HTMLElement): string {
   const clone = element.cloneNode(true) as HTMLElement;
-  Array.from(clone.children).forEach(child => child.remove());
+  Array.from(clone.children).forEach((child) => child.remove());
   return clone.textContent?.trim() || '';
 }
 
@@ -795,7 +967,7 @@ function isLikelyUnique(text: string): boolean {
  */
 export function buildMinimalSelector(
   element: HTMLElement,
-  context?: HTMLElement
+  context?: HTMLElement,
 ): string {
   const tag = element.tagName.toLowerCase();
   const parent = context || element.parentElement;
@@ -828,7 +1000,18 @@ export function buildMinimalSelector(
       baseSelector = `${tag}[role="${role}"]`;
     } else {
       const type = element.getAttribute('type');
-      if (type && ['button', 'submit', 'text', 'checkbox', 'radio', 'email', 'password'].includes(type)) {
+      if (
+        type &&
+        [
+          'button',
+          'submit',
+          'text',
+          'checkbox',
+          'radio',
+          'email',
+          'password',
+        ].includes(type)
+      ) {
         baseSelector = `${tag}[type="${type}"]`;
       }
     }
@@ -856,7 +1039,7 @@ export function buildMinimalSelector(
  */
 export function buildRelativeSelector(
   target: HTMLElement,
-  container: HTMLElement
+  container: HTMLElement,
 ): string {
   const path: string[] = [];
   let current: HTMLElement | null = target;
@@ -877,10 +1060,13 @@ export function buildRelativeSelector(
 /**
  * Get a simplified HTML representation of an element
  */
-export function getElementHtml(element: HTMLElement, maxLength: number = 200): string {
+export function getElementHtml(
+  element: HTMLElement,
+  maxLength: number = 200,
+): string {
   const clone = element.cloneNode(true) as HTMLElement;
 
-  clone.querySelectorAll('script, style').forEach(el => el.remove());
+  clone.querySelectorAll('script, style').forEach((el) => el.remove());
 
   const html = clone.outerHTML;
   if (html.length > maxLength) {
@@ -893,12 +1079,17 @@ export function getElementHtml(element: HTMLElement, maxLength: number = 200): s
 /**
  * Get container HTML with context
  */
-export function getContainerContext(container: HTMLElement, maxLength: number = 500): string {
+export function getContainerContext(
+  container: HTMLElement,
+  maxLength: number = 500,
+): string {
   const parent = container.parentElement;
   if (!parent) {
     return getElementHtml(container, maxLength);
   }
 
   const siblings = Array.from(parent.children).slice(0, 3);
-  return siblings.map(el => getElementHtml(el as HTMLElement, maxLength / 3)).join('\n');
+  return siblings
+    .map((el) => getElementHtml(el as HTMLElement, maxLength / 3))
+    .join('\n');
 }

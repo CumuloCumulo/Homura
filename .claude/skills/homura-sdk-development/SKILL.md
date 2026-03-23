@@ -158,6 +158,6 @@ export default function analyzeElement() { ... }
 
 ## 相关文档
 
-- [SDK 架构文档](../../docs/sdk-architecture.md)
+- [SDK 架构文档](../../docs/specs/architecture/sdk-architecture.md)
 - [开发规范](../../docs/DEVELOPMENT.md)
 - [项目 CLAUDE.md](../../CLAUDE.md)

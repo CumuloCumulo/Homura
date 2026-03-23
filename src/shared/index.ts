@@ -32,6 +32,16 @@ export type {
   ToolParameter,
   AtomicTool,
 
+  // Toolkit
+  Toolkit,
+  ToolkitMeta,
+  ToolkitImportOptions,
+  ToolkitExportOptions,
+  ToolkitValidationError,
+  ToolkitValidationResult,
+  ToolkitOperation,
+  ToolkitOperationResult,
+
   // Execution
   ExecuteToolRequest,
   ExecuteToolResult,
@@ -79,28 +89,64 @@ export type {
 } from './types';
 
 // =============================================================================
+// SHARED UI COMPONENTS
+// =============================================================================
+
+export { ActionIcon } from './components';
+
+// =============================================================================
 // EXTENSION-SPECIFIC UTILITIES
 // =============================================================================
 
-export {
-  sendMessageToContent,
-  getActiveTab,
-} from './utils';
+export { sendMessageToContent, getActiveTab } from './utils';
 
 // =============================================================================
 // EXTENSION-SPECIFIC CONSTANTS
 // =============================================================================
 
-export {
-  STORAGE_KEYS,
-  EXTENSION_IDS,
-} from './constants';
+export { STORAGE_KEYS, EXTENSION_IDS } from './constants';
 
 // =============================================================================
 // EXTENSION-SPECIFIC SELECTOR BUILDER
 // =============================================================================
 
+export type { RecordingState, RecordedAction } from './selectorBuilder';
+
+// =============================================================================
+// EXTENSION-SPECIFIC STORAGE
+// =============================================================================
+
 export type {
-  RecordingState,
-  RecordedAction,
-} from './selectorBuilder';
+  RecordingData,
+  SerializableRecordedAction,
+  SerializableElementAnalysis,
+  AnchorCandidateSerializable,
+} from './storage/recordingStorage';
+
+export {
+  saveRecordingToStorage,
+  getRecordingsFromStorage,
+  getRecordingById,
+  deleteRecordingFromStorage,
+  markRecordingAsImported,
+  clearAllRecordings,
+  getUnimportedCount,
+  generateRecordingId,
+  createRecordingData,
+} from './storage/recordingStorage';
+
+// Toolkit Storage
+export {
+  saveToolkitToStorage,
+  saveToolkitsToStorage,
+  getToolkitsFromStorage,
+  getToolkitById,
+  deleteToolkitFromStorage,
+  deleteToolkitsFromStorage,
+  toolkitExists,
+  getToolkitCount,
+  clearAllToolkits,
+  generateToolkitId,
+  createToolkit,
+  cloneToolkit,
+} from './storage/toolkitStorage';

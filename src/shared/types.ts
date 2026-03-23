@@ -26,7 +26,13 @@ export type MessageType =
   | 'HIGHLIGHT_ELEMENT' // Background -> Content: Highlight for debug
   | 'CLEAR_HIGHLIGHTS' // Background -> Content: Clear debug highlights
   | 'GET_PAGE_STATE' // Background -> Content: Get DOM summary
-  | 'PAGE_STATE'; // Content -> Background: DOM summary response
+  | 'PAGE_STATE' // Content -> Background: DOM summary response
+  // Test-related messages (Dashboard <-> SidePanel)
+  | 'TEST_TOOLKIT' // Dashboard -> SidePanel: Test a toolkit
+  | 'TEST_BLUEPRINT' // Dashboard -> SidePanel: Test a blueprint
+  | 'TEST_PROGRESS' // SidePanel -> Dashboard: Test execution progress
+  | 'TEST_RESULT' // SidePanel -> Dashboard: Test execution result
+  | 'STOP_TEST'; // Dashboard -> SidePanel: Stop running test
 
 /**
  * Base message structure
@@ -58,7 +64,123 @@ export type HomuraMessage =
   | ExecuteToolMessage
   | ExecutionResultMessage
   | HighlightElementMessage
-  | ClearHighlightsMessage;
+  | ClearHighlightsMessage
+  | TestToolkitMessage
+  | TestBlueprintMessage
+  | TestProgressMessage
+  | TestResultMessage
+  | StopTestMessage;
+
+// =============================================================================
+// TEST MESSAGE TYPES - Dashboard <-> SidePanel communication
+// =============================================================================
+
+/**
+ * Test toolkit request message
+ */
+export interface TestToolkitMessage {
+  type: 'TEST_TOOLKIT';
+  payload: {
+    toolkit: import('@homura/sdk/types').Toolkit;
+    tabId: number;
+    /** Runtime parameter substitution */
+    params?: Record<string, unknown>;
+    /** Execution options */
+    options?: {
+      /** Whether to pause execution */
+      pause?: boolean;
+      /** Execution interval (ms) */
+      interval?: number;
+      /** Timeout (ms) */
+      timeout?: number;
+    };
+  };
+  messageId?: string;
+}
+
+/**
+ * Test blueprint request message
+ */
+export interface TestBlueprintMessage {
+  type: 'TEST_BLUEPRINT';
+  payload: {
+    blueprint: import('@homura/sdk/types').Blueprint;
+    tabId: number;
+    /** Test target URL */
+    testUrl?: string;
+    /** Runtime parameter substitution */
+    params?: Record<string, unknown>;
+    /** Execution options */
+    options?: {
+      /** Whether to pause execution */
+      pause?: boolean;
+      /** Timeout (ms) */
+      timeout?: number;
+    };
+  };
+  messageId?: string;
+}
+
+/**
+ * Test progress update message
+ */
+export interface TestProgressMessage {
+  type: 'TEST_PROGRESS';
+  payload: {
+    testId: string;
+    currentStep: number;
+    totalSteps: number;
+    currentToolName: string;
+    currentToolId?: string;
+    /** Current action description */
+    action?: string;
+  };
+  messageId?: string;
+  requestMessageId?: string;
+}
+
+/**
+ * Tool execution result within a test
+ */
+export interface ToolExecutionResult {
+  toolId: string;
+  toolName: string;
+  success: boolean;
+  result: unknown;
+  error?: string;
+  timestamp: string;
+  duration?: number;
+}
+
+/**
+ * Test result message
+ */
+export interface TestResultMessage {
+  type: 'TEST_RESULT';
+  payload: {
+    testId: string;
+    success: boolean;
+    results: ToolExecutionResult[];
+    logs: LogEntry[];
+    error?: string;
+    totalTime: number;
+    /** Test type (toolkit or blueprint) */
+    testType: 'toolkit' | 'blueprint';
+  };
+  messageId?: string;
+  requestMessageId?: string;
+}
+
+/**
+ * Stop test message
+ */
+export interface StopTestMessage {
+  type: 'STOP_TEST';
+  payload: {
+    testId: string;
+  };
+  messageId?: string;
+}
 
 // =============================================================================
 // MISSION & RULE BOOK TYPES (for future AI integration)

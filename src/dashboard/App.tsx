@@ -3,50 +3,63 @@
  * Homura Dashboard - Main Application
  * =============================================================================
  *
- * Dashboard for tool management and rule book editing
- * Reference: docs/UI-DESIGN.md
+ * Dashboard for toolkit and blueprint orchestration
+ * Two tabs:
+ *   1. 工具集编排 - Combine and modify atomic tools into toolkits
+ *   2. 蓝图编排 - Write Rule Books + select toolkits for complete automation
+ * Reference: docs/specs/dashboard-orchestration.md
  */
 
-import React, { useState } from 'react';
-import { ToolLibrary } from './components/ToolLibrary';
-import { RuleBookEditor } from './components/RuleBookEditor';
-import { ExecutionLog } from './components/ExecutionLog';
-import { BlueprintExportDialog } from './components/BlueprintExportDialog';
-import { BlueprintImportDialog } from './components/BlueprintImportDialog';
-import { BlueprintLibrary } from './components/BlueprintLibrary';
-import { BlueprintDetailView } from './components/BlueprintDetailView';
+import React, { useEffect } from 'react';
+import { ToolkitEditor } from './components/toolkit/ToolkitEditor';
+import { BlueprintEditor } from './components/blueprint/BlueprintEditor';
+import { RecordingImportDialog } from './components/RecordingImportDialog';
 import { useToolStore } from './stores/toolStore';
-import { useBlueprintStore } from './stores/blueprintStore';
+import { useToolkitStore } from './stores/toolkitStore';
 import { TEST_TOOLS } from '@sidepanel/testMission';
+import { getUnimportedCount } from '@shared/storage/recordingStorage';
 
-type DashboardView = 'tools' | 'blueprints';
+type DashboardTab = 'toolkit' | 'blueprint';
 
 export default function App() {
   const { tools, addTool } = useToolStore();
-  const { selectedBlueprint } = useBlueprintStore();
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [currentView, setCurrentView] = useState<DashboardView>('tools');
+  const { loadToolkits } = useToolkitStore();
+  const [currentTab, setCurrentTab] = React.useState<DashboardTab>('toolkit');
+  const [recordingImportOpen, setRecordingImportOpen] = React.useState(false);
+  const [unimportedCount, setUnimportedCount] = React.useState(0);
 
   // Load test tools if library is empty
-  React.useEffect(() => {
+  useEffect(() => {
     if (tools.length === 0) {
       TEST_TOOLS.forEach((tool) => addTool(tool));
     }
   }, []);
 
+  // Load toolkits on mount
+  useEffect(() => {
+    loadToolkits();
+  }, [loadToolkits]);
+
   // Listen for custom events to open dialogs
-  React.useEffect(() => {
-    const handleOpenExport = () => setExportDialogOpen(true);
-    const handleOpenImport = () => setImportDialogOpen(true);
-
-    window.addEventListener('open-export-dialog', handleOpenExport);
-    window.addEventListener('open-import-dialog', handleOpenImport);
-
+  useEffect(() => {
+    const handleOpenRecordingImport = () => setRecordingImportOpen(true);
+    window.addEventListener('open-recording-import-dialog', handleOpenRecordingImport);
     return () => {
-      window.removeEventListener('open-export-dialog', handleOpenExport);
-      window.removeEventListener('open-import-dialog', handleOpenImport);
+      window.removeEventListener('open-recording-import-dialog', handleOpenRecordingImport);
     };
+  }, []);
+
+  // Check for unimported recordings
+  useEffect(() => {
+    const checkUnimported = async () => {
+      const count = await getUnimportedCount();
+      setUnimportedCount(count);
+    };
+    checkUnimported();
+
+    // Poll for updates (in case user saves from SidePanel)
+    const interval = setInterval(checkUnimported, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -65,37 +78,25 @@ export default function App() {
             <h1 className="text-lg font-semibold text-zinc-100">
               Homura Dashboard
             </h1>
-            <p className="text-[11px] text-zinc-500">AI 浏览器自动化编排中心</p>
+            <p className="text-[11px] text-zinc-500">分层编排架构</p>
           </div>
 
-          {/* View Toggle */}
+          {/* Tab Toggle */}
           <div className="flex items-center gap-1 bg-zinc-900/80 rounded-lg border border-white/5 p-0.5">
-            <button
-              onClick={() => setCurrentView('tools')}
-              className={`
-                px-3 py-1.5 text-xs font-medium rounded transition-colors
-                ${
-                  currentView === 'tools'
-                    ? 'bg-violet-500/20 text-violet-400'
-                    : 'text-zinc-500 hover:text-zinc-400'
-                }
-              `}
+            <TabButton
+              tab="toolkit"
+              currentTab={currentTab}
+              onClick={() => setCurrentTab('toolkit')}
             >
-              工具库
-            </button>
-            <button
-              onClick={() => setCurrentView('blueprints')}
-              className={`
-                px-3 py-1.5 text-xs font-medium rounded transition-colors
-                ${
-                  currentView === 'blueprints'
-                    ? 'bg-violet-500/20 text-violet-400'
-                    : 'text-zinc-500 hover:text-zinc-400'
-                }
-              `}
+              工具集编排
+            </TabButton>
+            <TabButton
+              tab="blueprint"
+              currentTab={currentTab}
+              onClick={() => setCurrentTab('blueprint')}
             >
-              Blueprint 库
-            </button>
+              蓝图编排
+            </TabButton>
           </div>
 
           {/* Spacer */}
@@ -103,18 +104,35 @@ export default function App() {
 
           {/* Status */}
           <div className="flex items-center gap-3">
-            <span className="text-[10px] text-zinc-600">
-              {currentView === 'tools'
-                ? `${tools.length} 个工具`
-                : `${selectedBlueprint ? '已选择' : '未选择'}`}
-            </span>
+            {/* Recording Import Notification */}
+            {unimportedCount > 0 && (
+              <button
+                onClick={() => setRecordingImportOpen(true)}
+                className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-[10px] text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>{unimportedCount} 个待导入录制</span>
+              </button>
+            )}
+
+            {/* Layer indicator */}
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-900/80 border border-white/5 rounded text-[10px] text-zinc-500">
+              <span>
+                {currentTab === 'toolkit'
+                  ? 'Layer 2: 工具集组合'
+                  : 'Layer 3: 蓝图编排'}
+              </span>
+            </div>
+
             <div className="w-px h-4 bg-white/10" />
+
             <a
               href="#"
               className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
               onClick={(e) => {
                 e.preventDefault();
-                // Open sidepanel
                 chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
               }}
             >
@@ -125,48 +143,25 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {currentView === 'tools' ? (
-          <>
-            {/* Left: Tool Library */}
-            <aside className="w-72 shrink-0 border-r border-white/5 overflow-hidden">
-              <ToolLibrary />
-            </aside>
-
-            {/* Center: Rule Book + Logs */}
-            <main className="flex-1 flex flex-col overflow-hidden">
-              {/* Rule Book Editor */}
-              <div className="flex-1 overflow-hidden">
-                <RuleBookEditor />
-              </div>
-
-              {/* Execution Log */}
-              <div className="shrink-0 h-48 border-t border-white/5">
-                <ExecutionLog />
-              </div>
-            </main>
-          </>
+      <div className="flex-1 overflow-hidden">
+        {currentTab === 'toolkit' ? (
+          <ToolkitEditor />
         ) : (
-          <>
-            {/* Left: Blueprint Library */}
-            <aside className="w-80 shrink-0 border-r border-white/5 overflow-hidden">
-              <BlueprintLibrary />
-            </aside>
-
-            {/* Right: Blueprint Detail */}
-            <main className="flex-1 overflow-hidden">
-              <BlueprintDetailView />
-            </main>
-          </>
+          <BlueprintEditor />
         )}
       </div>
 
       {/* Footer */}
       <footer className="shrink-0 px-6 py-2 border-t border-white/5 bg-zinc-900/50">
         <div className="flex items-center justify-between">
-          <span className="text-[9px] text-zinc-600 font-mono">
-            homura.v0.1.0
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-[9px] text-zinc-600 font-mono">
+              homura.v0.1.0
+            </span>
+            <span className="text-[9px] text-zinc-700">
+              Layer 1: 原子工具 → Layer 2: 工具集 → Layer 3: 蓝图
+            </span>
+          </div>
           <div className="flex items-center gap-4">
             <span className="text-[9px] text-zinc-600">
               Powered by AI × Declarative Automation
@@ -176,14 +171,38 @@ export default function App() {
       </footer>
 
       {/* Dialogs */}
-      <BlueprintExportDialog
-        open={exportDialogOpen}
-        onClose={() => setExportDialogOpen(false)}
-      />
-      <BlueprintImportDialog
-        open={importDialogOpen}
-        onClose={() => setImportDialogOpen(false)}
+      <RecordingImportDialog
+        isOpen={recordingImportOpen}
+        onClose={() => setRecordingImportOpen(false)}
       />
     </div>
+  );
+}
+
+interface TabButtonProps {
+  tab: DashboardTab;
+  currentTab: DashboardTab;
+  onClick: () => void;
+  children: string;
+}
+
+function TabButton({ tab, currentTab, onClick, children }: TabButtonProps) {
+  const isActive = currentTab === tab;
+  const color = tab === 'toolkit' ? 'violet' : 'fuchsia';
+
+  return (
+    <button
+      onClick={onClick}
+      className={`
+        px-3 py-1.5 text-xs font-medium rounded transition-colors
+        ${
+          isActive
+            ? `bg-${color}-500/20 text-${color}-400`
+            : 'text-zinc-500 hover:text-zinc-400'
+        }
+      `}
+    >
+      {children}
+    </button>
   );
 }

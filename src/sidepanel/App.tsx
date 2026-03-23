@@ -2,7 +2,7 @@
  * =============================================================================
  * Homura SidePanel - Main Application
  * =============================================================================
- * 
+ *
  * Recording assistant for element inspection and selector building
  * Reference: docs/project-vision.md, docs/UI-DESIGN.md
  */
@@ -12,30 +12,87 @@ import { Header } from './components/Header';
 import { LogViewer } from './components/LogViewer';
 import { InspectMode } from './components/InspectMode';
 import { RecordingPanel } from './components/RecordingPanel';
+import { TestPanel } from './components/TestPanel';
 import { useRecordingStore } from './stores/recordingStore';
+
+type SidePanelMode = 'inspect' | 'record' | 'test';
 
 // Tab icons
 const InspectIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.5}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+    />
   </svg>
 );
 
 const RecordIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.5}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+    />
+  </svg>
+);
+
+const TestIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.5}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
   </svg>
 );
 
 const LogsIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.5}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"
+    />
   </svg>
 );
 
 export default function App() {
-  const { mode, setMode, logs, clearLogs, isInspecting, isRecording } = useRecordingStore();
+  const { setMode, logs, clearLogs, isInspecting, isRecording } =
+    useRecordingStore();
   const [showLogs, setShowLogs] = React.useState(false);
+  const [currentMode, setCurrentMode] =
+    React.useState<SidePanelMode>('inspect');
 
   // Listen for messages from content script
   React.useEffect(() => {
@@ -45,7 +102,12 @@ export default function App() {
         useRecordingStore.getState().setAnalysis(message.payload as never);
       } else if (message.type === 'ACTION_RECORDED') {
         // Handle recorded action from content script
-        useRecordingStore.getState().addRecordedAction(message.payload as never);
+        useRecordingStore
+          .getState()
+          .addRecordedAction(message.payload as never);
+      } else if (message.type === 'START_TEST_MODE') {
+        // Auto-switch to test mode when receiving test request
+        setCurrentMode('test');
       }
     };
 
@@ -60,18 +122,30 @@ export default function App() {
       {/* Mode Tabs */}
       <div className="flex items-center gap-1 px-3 py-2 border-b border-white/5">
         <TabButton
-          active={mode === 'inspect'}
-          onClick={() => setMode('inspect')}
+          active={currentMode === 'inspect'}
+          onClick={() => {
+            setCurrentMode('inspect');
+            setMode('inspect');
+          }}
           icon={<InspectIcon />}
           label="检查"
           indicator={isInspecting ? 'active' : undefined}
         />
         <TabButton
-          active={mode === 'record'}
-          onClick={() => setMode('record')}
+          active={currentMode === 'record'}
+          onClick={() => {
+            setCurrentMode('record');
+            setMode('record');
+          }}
           icon={<RecordIcon />}
           label="录制"
           indicator={isRecording ? 'recording' : undefined}
+        />
+        <TabButton
+          active={currentMode === 'test'}
+          onClick={() => setCurrentMode('test')}
+          icon={<TestIcon />}
+          label="测试"
         />
 
         {/* Spacer */}
@@ -83,9 +157,10 @@ export default function App() {
           className={`
             flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium
             transition-all duration-200
-            ${showLogs
-              ? 'bg-violet-500/15 text-violet-400'
-              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+            ${
+              showLogs
+                ? 'bg-violet-500/15 text-violet-400'
+                : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
             }
           `}
         >
@@ -118,8 +193,9 @@ export default function App() {
           </div>
         ) : (
           <>
-            {mode === 'inspect' && <InspectMode />}
-            {mode === 'record' && <RecordingPanel />}
+            {currentMode === 'inspect' && <InspectMode />}
+            {currentMode === 'record' && <RecordingPanel />}
+            {currentMode === 'test' && <TestPanel />}
           </>
         )}
       </div>
@@ -127,9 +203,14 @@ export default function App() {
       {/* Footer */}
       <footer className="px-3 py-1.5 border-t border-white/5 bg-zinc-900/50">
         <div className="flex items-center justify-between">
-          <span className="text-[9px] text-zinc-600 font-mono">homura.v0.1.0</span>
+          <span className="text-[9px] text-zinc-600 font-mono">
+            homura.v0.1.0
+          </span>
           <div className="flex items-center gap-1.5">
-            <StatusIndicator isInspecting={isInspecting} isRecording={isRecording} />
+            <StatusIndicator
+              isInspecting={isInspecting}
+              isRecording={isRecording}
+            />
           </div>
         </div>
       </footer>
@@ -145,33 +226,48 @@ interface TabButtonProps {
   indicator?: 'active' | 'recording';
 }
 
-function TabButton({ active, onClick, icon, label, indicator }: TabButtonProps) {
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+  indicator,
+}: TabButtonProps) {
   return (
     <button
       onClick={onClick}
       className={`
         relative flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium
         transition-all duration-200
-        ${active
-          ? 'bg-violet-500/15 text-violet-400'
-          : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+        ${
+          active
+            ? 'bg-violet-500/15 text-violet-400'
+            : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
         }
       `}
     >
       {icon}
       <span>{label}</span>
       {indicator && (
-        <div className={`
+        <div
+          className={`
           absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full
           ${indicator === 'recording' ? 'bg-rose-500' : 'bg-emerald-500'}
           animate-pulse
-        `} />
+        `}
+        />
       )}
     </button>
   );
 }
 
-function StatusIndicator({ isInspecting, isRecording }: { isInspecting: boolean; isRecording: boolean }) {
+function StatusIndicator({
+  isInspecting,
+  isRecording,
+}: {
+  isInspecting: boolean;
+  isRecording: boolean;
+}) {
   if (isRecording) {
     return (
       <>

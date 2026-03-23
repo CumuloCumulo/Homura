@@ -3,7 +3,11 @@
  * Homura Dashboard - Tool Store
  * =============================================================================
  *
- * State management for tool library
+ * State management for atomic tool library
+ *
+ * NOTE: This store manages the atomic tool library only.
+ * - For toolkits (ordered tool sequences), use toolkitStore
+ * - For blueprints (toolkits + rule books), use blueprintStore
  */
 
 import { create } from 'zustand';
@@ -38,7 +42,7 @@ interface ToolStore {
   clearLogs: () => void;
   setRunning: (running: boolean) => void;
 
-  // Blueprint actions
+  // Blueprint export actions (for exporting tools as blueprint)
   exportAsBlueprint: (
     meta: Omit<BlueprintMeta, 'skillsHash' | 'createdAt' | 'updatedAt'>,
   ) => Blueprint;
@@ -108,7 +112,6 @@ export const useToolStore = create<ToolStore>()(
 
       // Blueprint actions
       exportAsBlueprint: (meta) => {
-        // Get current state using store reference
         const state = useToolStore.getState();
         const blueprint = createBlueprintUtil(
           meta,
@@ -117,6 +120,11 @@ export const useToolStore = create<ToolStore>()(
           undefined, // agentConfig
         );
 
+        // Ensure blueprint has an id
+        if (!blueprint.meta.id) {
+          blueprint.meta.id = `bp_${Date.now()}`;
+        }
+
         // Recalculate skills hash
         blueprint.meta.skillsHash = calculateSkillsHash(state.tools);
 
@@ -124,10 +132,10 @@ export const useToolStore = create<ToolStore>()(
       },
 
       getBlueprintFromState: () => {
-        // Get current state using store reference
         const state = useToolStore.getState();
         const blueprint: Blueprint = {
           meta: {
+            id: `bp_${Date.now()}`,
             name: 'untitled-blueprint',
             version: '1.0.0',
             description: 'Exported from Homura',
