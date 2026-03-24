@@ -15,7 +15,7 @@
  * - Dashboard ToolDetailEditor (NAVIGATE 工具编辑)
  */
 
-import { useState } from "react";
+import { useState } from 'react';
 
 // =============================================================================
 // TYPES
@@ -40,7 +40,7 @@ export interface NavigateConfigPanelProps {
   /** 日志回调 */
   onLog?: (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => void;
 
@@ -121,14 +121,14 @@ function Toggle({ checked, onChange, disabled }: ToggleProps) {
       onClick={() => onChange(!checked)}
       className={`
         relative inline-flex h-5 w-9 items-center rounded-full transition-colors
-        ${checked ? "bg-violet-500" : "bg-zinc-700"}
-        ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+        ${checked ? 'bg-violet-500' : 'bg-zinc-700'}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
       `}
     >
       <span
         className={`
           inline-block h-3.5 w-3.5 transform rounded-full bg-white transition
-          ${checked ? "translate-x-5" : "translate-x-1"}
+          ${checked ? 'translate-x-5' : 'translate-x-1'}
         `}
       />
     </button>
@@ -151,11 +151,11 @@ export function NavigateConfigPanel({
   compact: _compact = false, // 保留接口兼容性，暂未使用
   readOnly = false,
 }: NavigateConfigPanelProps) {
-  const [isTesting, setIsTesting] = useState<"current" | "new" | null>(null);
+  const [isTesting, setIsTesting] = useState<'current' | 'new' | null>(null);
 
   const handleTestCurrentTab = async () => {
     if (isTesting) return;
-    setIsTesting("current");
+    setIsTesting('current');
     try {
       await onTestCurrentTab();
     } finally {
@@ -165,7 +165,7 @@ export function NavigateConfigPanel({
 
   const handleTestNewTab = async () => {
     if (isTesting) return;
-    setIsTesting("new");
+    setIsTesting('new');
     try {
       await onTestNewTab();
     } finally {
@@ -207,7 +207,7 @@ export function NavigateConfigPanel({
           <div className="flex flex-col gap-0.5">
             <span className="text-[11px] text-zinc-300">在新标签页打开</span>
             <span className="text-[9px] text-zinc-500">
-              {newTab ? "每次执行创建新标签页" : "在当前标签页跳转"}
+              {newTab ? '每次执行创建新标签页' : '在当前标签页跳转'}
             </span>
           </div>
           <Toggle checked={newTab} onChange={onNewTabChange} />
@@ -223,14 +223,14 @@ export function NavigateConfigPanel({
             flex-1 h-8 flex items-center justify-center gap-1.5 px-2 rounded-lg
             text-[10px] font-medium border transition-all duration-200
             ${
-              isTesting === "current"
-                ? "bg-blue-600/30 text-blue-400 border-blue-500/30"
-                : "bg-blue-600/10 text-blue-400 border-blue-500/20 hover:bg-blue-600/20"
+              isTesting === 'current'
+                ? 'bg-blue-600/30 text-blue-400 border-blue-500/30'
+                : 'bg-blue-600/10 text-blue-400 border-blue-500/20 hover:bg-blue-600/20'
             }
-            ${readOnly ? "opacity-50 cursor-not-allowed" : ""}
+            ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}
           `}
         >
-          {isTesting === "current" ? (
+          {isTesting === 'current' ? (
             <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
           ) : (
             <RefreshIcon />
@@ -244,14 +244,14 @@ export function NavigateConfigPanel({
             flex-1 h-8 flex items-center justify-center gap-1.5 px-2 rounded-lg
             text-[10px] font-medium border transition-all duration-200
             ${
-              isTesting === "new"
-                ? "bg-violet-600/30 text-violet-400 border-violet-500/30"
-                : "bg-violet-600/10 text-violet-400 border-violet-500/20 hover:bg-violet-600/20"
+              isTesting === 'new'
+                ? 'bg-violet-600/30 text-violet-400 border-violet-500/30'
+                : 'bg-violet-600/10 text-violet-400 border-violet-500/20 hover:bg-violet-600/20'
             }
-            ${readOnly ? "opacity-50 cursor-not-allowed" : ""}
+            ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}
           `}
         >
-          {isTesting === "new" ? (
+          {isTesting === 'new' ? (
             <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
           ) : (
             <NewTabIcon />

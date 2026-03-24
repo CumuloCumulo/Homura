@@ -6,10 +6,10 @@
  * Type definitions for the selector builder module
  */
 
-import type { UnifiedSelector } from "@homura/sdk/types";
+import type { UnifiedSelector } from '@homura/sdk/types';
 
 // Import and re-export SDK selector types to avoid duplication
-import type { SelectorDraft, ValidationResult } from "@homura/sdk/selector";
+import type { SelectorDraft, ValidationResult } from '@homura/sdk/selector';
 
 // Make types available for use in this file
 export type { SelectorDraft, ValidationResult };
@@ -97,17 +97,17 @@ export interface AncestorInfo {
 }
 
 export type ContainerType =
-  | "table" // Table row (tr)
-  | "list" // List item (li, ol, ul)
-  | "grid" // Grid/flex item
-  | "card" // Card container
-  | "single"; // No repeating container
+  | 'table' // Table row (tr)
+  | 'list' // List item (li, ol, ul)
+  | 'grid' // Grid/flex item
+  | 'card' // Card container
+  | 'single'; // No repeating container
 
 export interface AnchorCandidate {
   /** CSS selector within container */
   selector: string;
   /** Anchor type */
-  type: "text_match" | "attribute_match";
+  type: 'text_match' | 'attribute_match';
   /** Text content (for text_match) */
   text?: string;
   /** Attribute info (for attribute_match) */
@@ -191,7 +191,7 @@ export interface RecordingState {
 /**
  * Navigation type for recorded actions
  */
-export type NavigationType = "link" | "form" | "direct" | "reload" | "typed";
+export type NavigationType = 'link' | 'form' | 'direct' | 'reload' | 'typed';
 
 export interface RecordedAction {
   /** Unique identifier */
@@ -199,7 +199,7 @@ export interface RecordedAction {
   /** User-defined name for this action */
   name?: string;
   /** Action type */
-  type: "click" | "input" | "select" | "scroll" | "navigate";
+  type: 'click' | 'input' | 'select' | 'scroll' | 'navigate';
   /** Timestamp */
   timestamp: number;
   /** Target element analysis (not present for navigate actions) */

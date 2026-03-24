@@ -7,13 +7,13 @@
  * Uses shared components from @shared/components/tool-editor
  */
 
-import { useState, useEffect } from "react";
-import { useToolkitStore } from "../../stores/toolkitStore";
-import type { AtomicTool } from "@homura/sdk/types";
+import { useState, useEffect } from 'react';
+import { useToolkitStore } from '../../stores/toolkitStore';
+import type { AtomicTool } from '@homura/sdk/types';
 import {
   NavigateConfigPanel,
   SelectorEditorPanel,
-} from "@shared/components/tool-editor";
+} from '@shared/components/tool-editor';
 
 interface ToolDetailEditorProps {
   toolkitId: string | null;
@@ -27,7 +27,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
   const [logs, setLogs] = useState<
     Array<{
       timestamp: number;
-      level: "info" | "error";
+      level: 'info' | 'error';
       message: string;
     }>
   >([]);
@@ -45,7 +45,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
     const params = tool.selector_logic.target.actionParams as
       | { url?: string }
       | undefined;
-    return params?.url || "";
+    return params?.url || '';
   };
 
   const getNavigateNewTab = (tool: AtomicTool): boolean => {
@@ -69,7 +69,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
     anchor?: {
       selector: string;
       value: string;
-      matchMode: "contains" | "exact" | "startsWith" | "endsWith";
+      matchMode: 'contains' | 'exact' | 'startsWith' | 'endsWith';
     };
     target: string;
   } => {
@@ -85,7 +85,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
       result.anchor = {
         selector: tool.selector_logic.anchor.selector,
         value: tool.selector_logic.anchor.value,
-        matchMode: tool.selector_logic.anchor.matchMode || "contains",
+        matchMode: tool.selector_logic.anchor.matchMode || 'contains',
       };
     }
 
@@ -128,7 +128,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
   };
 
   const handleNavigateParamChange = (
-    key: "url" | "newTab" | "waitForLoad",
+    key: 'url' | 'newTab' | 'waitForLoad',
     value: string | boolean,
   ) => {
     if (!editingTool) return;
@@ -143,7 +143,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
       newTab?: boolean;
       waitForLoad?: boolean;
     } = {
-      url: newParams.url || "",
+      url: newParams.url || '',
       newTab: newParams.newTab,
       waitForLoad: newParams.waitForLoad,
     };
@@ -176,13 +176,13 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
         },
         ...(selector.scope && {
           scope: {
-            type: editingTool.selector_logic.scope?.type || "container_list",
+            type: editingTool.selector_logic.scope?.type || 'container_list',
             selector: selector.scope,
           },
         }),
         ...(selector.anchor && {
           anchor: {
-            type: editingTool.selector_logic.anchor?.type || "text_match",
+            type: editingTool.selector_logic.anchor?.type || 'text_match',
             selector: selector.anchor.selector,
             value: selector.anchor.value,
             matchMode: selector.anchor.matchMode,
@@ -200,32 +200,32 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
 
     addLog({
       timestamp: Date.now(),
-      level: "info",
+      level: 'info',
       message: `正在跳转到: ${url}`,
     });
 
     try {
       const result = await chrome.runtime.sendMessage({
-        type: "EXECUTE_NAVIGATE",
+        type: 'EXECUTE_NAVIGATE',
         payload: { url, newTab: false },
       });
       if (result.success) {
         addLog({
           timestamp: Date.now(),
-          level: "info",
-          message: "跳转成功",
+          level: 'info',
+          message: '跳转成功',
         });
       } else {
         addLog({
           timestamp: Date.now(),
-          level: "error",
+          level: 'error',
           message: `跳转失败: ${result.error}`,
         });
       }
     } catch (error) {
       addLog({
         timestamp: Date.now(),
-        level: "error",
+        level: 'error',
         message: `跳转错误: ${error}`,
       });
     }
@@ -238,32 +238,32 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
 
     addLog({
       timestamp: Date.now(),
-      level: "info",
+      level: 'info',
       message: `正在新标签页打开: ${url}`,
     });
 
     try {
       const result = await chrome.runtime.sendMessage({
-        type: "EXECUTE_NAVIGATE",
+        type: 'EXECUTE_NAVIGATE',
         payload: { url, newTab: true },
       });
       if (result.success) {
         addLog({
           timestamp: Date.now(),
-          level: "info",
-          message: "新标签页已打开",
+          level: 'info',
+          message: '新标签页已打开',
         });
       } else {
         addLog({
           timestamp: Date.now(),
-          level: "error",
+          level: 'error',
           message: `打开失败: ${result.error}`,
         });
       }
     } catch (error) {
       addLog({
         timestamp: Date.now(),
-        level: "error",
+        level: 'error',
         message: `错误: ${error}`,
       });
     }
@@ -271,7 +271,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
 
   const addLog = (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => {
     setLogs((prev) => [...prev.slice(-5), log]); // Keep last 5 logs
@@ -280,7 +280,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
 
   const handleLog = (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => {
     addLog(log);
@@ -367,7 +367,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
           />
           <FormField
             label="描述"
-            value={editingTool.description || ""}
+            value={editingTool.description || ''}
             onChange={(value) => {
               setEditingTool({ ...editingTool, description: value });
               setHasChanges(true);
@@ -377,15 +377,15 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
         </Section>
 
         {/* Selector / Navigate Config */}
-        {action === "NAVIGATE" ? (
+        {action === 'NAVIGATE' ? (
           <Section title="导航配置">
             <NavigateConfigPanel
               url={getNavigateUrl(editingTool)}
               newTab={getNavigateNewTab(editingTool)}
               waitForLoad={getNavigateWaitForLoad(editingTool)}
-              onUrlChange={(url) => handleNavigateParamChange("url", url)}
+              onUrlChange={(url) => handleNavigateParamChange('url', url)}
               onNewTabChange={(newTab) =>
-                handleNavigateParamChange("newTab", newTab)
+                handleNavigateParamChange('newTab', newTab)
               }
               onTestCurrentTab={handleTestNavigateCurrentTab}
               onTestNewTab={handleTestNavigateNewTab}
@@ -420,15 +420,15 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-[10px] text-zinc-400 font-mono">{`{{${key}}}`}</label>
                     <span
-                      className={`text-[9px] ${param.required ? "text-rose-400" : "text-zinc-600"}`}
+                      className={`text-[9px] ${param.required ? 'text-rose-400' : 'text-zinc-600'}`}
                     >
-                      {param.required ? "必需" : "可选"}
+                      {param.required ? '必需' : '可选'}
                     </span>
                   </div>
                   <input
                     type="text"
-                    value={String(param.default ?? "")}
-                    placeholder={param.description || "默认值"}
+                    value={String(param.default ?? '')}
+                    placeholder={param.description || '默认值'}
                     onChange={(e) => handleParameterChange(key, e.target.value)}
                     className="w-full h-8 px-3 text-xs bg-zinc-900/80 border border-white/5 rounded text-zinc-300 focus:border-violet-500/30 focus:outline-none"
                   />
@@ -452,7 +452,7 @@ export function ToolDetailEditor({ toolkitId, tool }: ToolDetailEditorProps) {
                 <div
                   key={i}
                   className={`text-[9px] ${
-                    log.level === "error" ? "text-rose-400" : "text-zinc-400"
+                    log.level === 'error' ? 'text-rose-400' : 'text-zinc-400'
                   }`}
                 >
                   [{new Date(log.timestamp).toLocaleTimeString()}] {log.message}

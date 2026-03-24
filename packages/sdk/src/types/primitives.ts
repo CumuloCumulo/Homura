@@ -11,11 +11,11 @@
  * Primitive action types - the only allowed actions in the system.
  */
 export type PrimitiveAction =
-  | "CLICK" // Click on an element
-  | "INPUT" // Input text into a field
-  | "EXTRACT_TEXT" // Extract text content from element(s)
-  | "WAIT_FOR" // Wait for an element to appear
-  | "NAVIGATE"; // Navigate to a URL
+  | 'CLICK' // Click on an element
+  | 'INPUT' // Input text into a field
+  | 'EXTRACT_TEXT' // Extract text content from element(s)
+  | 'WAIT_FOR' // Wait for an element to appear
+  | 'NAVIGATE'; // Navigate to a URL
 
 /**
  * Parameters for CLICK action

@@ -14,7 +14,7 @@
  * - Dashboard ToolDetailEditor (非 NAVIGATE 工具编辑)
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback } from 'react';
 
 // =============================================================================
 // TYPES
@@ -27,7 +27,7 @@ export interface SelectorEditorPanelProps {
     anchor?: {
       selector: string;
       value: string;
-      matchMode: "contains" | "exact" | "startsWith" | "endsWith";
+      matchMode: 'contains' | 'exact' | 'startsWith' | 'endsWith';
     };
     target: string;
   };
@@ -40,18 +40,18 @@ export interface SelectorEditorPanelProps {
   }>;
 
   /** 事件回调 */
-  onChange: (selector: SelectorEditorPanelProps["selector"]) => void;
+  onChange: (selector: SelectorEditorPanelProps['selector']) => void;
 
   /** 测试回调 (可选) */
   onTest?: (
-    action: "highlight" | "click" | "extract",
+    action: 'highlight' | 'click' | 'extract',
     value?: string,
   ) => Promise<void>;
 
   /** 日志回调 */
   onLog?: (log: {
     timestamp: number;
-    level: "info" | "error";
+    level: 'info' | 'error';
     message: string;
   }) => void;
 
@@ -68,7 +68,7 @@ export interface SelectorEditorPanelProps {
 interface SelectorSectionProps {
   label: string;
   sublabel: string;
-  color: "blue" | "emerald" | "violet";
+  color: 'blue' | 'emerald' | 'violet';
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
@@ -84,19 +84,19 @@ function SelectorSection({
 }: SelectorSectionProps) {
   const colorStyles = {
     blue: {
-      border: "border-blue-500/20",
-      text: "text-blue-400",
-      focus: "focus:border-blue-500/50",
+      border: 'border-blue-500/20',
+      text: 'text-blue-400',
+      focus: 'focus:border-blue-500/50',
     },
     emerald: {
-      border: "border-emerald-500/20",
-      text: "text-emerald-400",
-      focus: "focus:border-emerald-500/50",
+      border: 'border-emerald-500/20',
+      text: 'text-emerald-400',
+      focus: 'focus:border-emerald-500/50',
     },
     violet: {
-      border: "border-violet-500/20",
-      text: "text-violet-400",
-      focus: "focus:border-violet-500/50",
+      border: 'border-violet-500/20',
+      text: 'text-violet-400',
+      focus: 'focus:border-violet-500/50',
     },
   };
 
@@ -114,7 +114,7 @@ function SelectorSection({
         <code
           className={`block text-[10px] font-mono ${styles.text} break-all leading-relaxed`}
         >
-          {value || "(未设置)"}
+          {value || '(未设置)'}
         </code>
       ) : (
         <input
@@ -142,11 +142,11 @@ function SelectorSection({
 interface AnchorSectionProps {
   selector: string;
   value: string;
-  matchMode: "contains" | "exact" | "startsWith" | "endsWith";
+  matchMode: 'contains' | 'exact' | 'startsWith' | 'endsWith';
   onSelectorChange: (value: string) => void;
   onValueChange: (value: string) => void;
   onMatchModeChange: (
-    mode: "contains" | "exact" | "startsWith" | "endsWith",
+    mode: 'contains' | 'exact' | 'startsWith' | 'endsWith',
   ) => void;
   readOnly?: boolean;
 }
@@ -174,7 +174,7 @@ function AnchorSection({
           </label>
           {readOnly ? (
             <code className="block text-[10px] font-mono text-emerald-400 break-all">
-              {selector || "(未设置)"}
+              {selector || '(未设置)'}
             </code>
           ) : (
             <input
@@ -200,7 +200,7 @@ function AnchorSection({
             </label>
             {readOnly ? (
               <code className="block text-[10px] font-mono text-emerald-300 break-all">
-                {value || "(未设置)"}
+                {value || '(未设置)'}
               </code>
             ) : (
               <input
@@ -224,13 +224,13 @@ function AnchorSection({
             </label>
             {readOnly ? (
               <div className="h-7 px-2 flex items-center text-[10px] text-zinc-400">
-                {matchMode === "contains"
-                  ? "包含"
-                  : matchMode === "exact"
-                    ? "精确"
-                    : matchMode === "startsWith"
-                      ? "开头"
-                      : "结尾"}
+                {matchMode === 'contains'
+                  ? '包含'
+                  : matchMode === 'exact'
+                    ? '精确'
+                    : matchMode === 'startsWith'
+                      ? '开头'
+                      : '结尾'}
               </div>
             ) : (
               <select
@@ -238,10 +238,10 @@ function AnchorSection({
                 onChange={(e) =>
                   onMatchModeChange(
                     e.target.value as
-                      | "contains"
-                      | "exact"
-                      | "startsWith"
-                      | "endsWith",
+                      | 'contains'
+                      | 'exact'
+                      | 'startsWith'
+                      | 'endsWith',
                   )
                 }
                 className="
@@ -301,8 +301,8 @@ export function SelectorEditorPanel({
       handleChange({
         anchor: {
           selector: candidate.selector,
-          value: candidate.text || candidate.attribute?.value || "",
-          matchMode: "contains",
+          value: candidate.text || candidate.attribute?.value || '',
+          matchMode: 'contains',
         },
       });
     },
@@ -365,10 +365,10 @@ export function SelectorEditorPanel({
           <div className="flex flex-wrap gap-1.5">
             {anchorCandidates.slice(0, 6).map((candidate, i) => {
               const displayText =
-                candidate.text || candidate.attribute?.value || "";
+                candidate.text || candidate.attribute?.value || '';
               const truncated =
                 displayText.length > 15
-                  ? displayText.slice(0, 15) + "..."
+                  ? displayText.slice(0, 15) + '...'
                   : displayText;
 
               return (
