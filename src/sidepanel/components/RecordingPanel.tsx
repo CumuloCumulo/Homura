@@ -20,13 +20,17 @@ import React from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { useRecordingStore } from '../stores/recordingStore';
 import { sendToContentScript } from '../utils/ensureContentScript';
+import {
+  recordedActionToTool,
+  sendRecordedToolsToDashboard,
+} from '../utils/recordingToTool';
 import type {
   RecordedAction,
   SelectorDraft,
   ElementAnalysis,
   AnchorCandidate,
 } from '@shared/selectorBuilder/types';
-import type { UnifiedSelector } from '@homura/sdk/types';
+import type { UnifiedSelector, AtomicTool } from '@homura/sdk/types';
 import { QuickActionPanel } from './QuickActionPanel';
 
 // =============================================================================
@@ -191,6 +195,53 @@ export function RecordingPanel() {
         level: 'info',
         message: `录制结束，共 ${recordedActions.length} 个操作`,
       });
+
+      // Auto-send all recorded actions to Dashboard (方案b)
+      if (recordedActions.length > 0) {
+        const tools: AtomicTool[] = [];
+        for (const action of recordedActions) {
+          // navigate 操作只需要 URL，其他操作需要 selector
+          const isValid =
+            action.type === 'navigate'
+              ? !!action.url
+              : !!(action.elementAnalysis || action.unifiedSelector);
+
+          if (isValid) {
+            try {
+              const tool = recordedActionToTool(action);
+              tools.push(tool);
+            } catch (error) {
+              console.error('Convert action to tool error:', error);
+            }
+          } else {
+            console.warn('Action has insufficient data:', action);
+          }
+        }
+
+        if (tools.length > 0) {
+          try {
+            await sendRecordedToolsToDashboard(tools);
+            addLog({
+              timestamp: Date.now(),
+              level: 'info',
+              message: `已发送 ${tools.length} 个工具到 Dashboard`,
+            });
+          } catch (error) {
+            console.error('Send tools to Dashboard error:', error);
+            addLog({
+              timestamp: Date.now(),
+              level: 'error',
+              message: `发送工具失败: ${error}`,
+            });
+          }
+        } else {
+          addLog({
+            timestamp: Date.now(),
+            level: 'warn',
+            message: '没有有效的操作可以发送',
+          });
+        }
+      }
     } catch (error) {
       console.error('Stop recording error:', error);
       // Ensure background state is cleared even if content script fails
@@ -255,67 +306,6 @@ export function RecordingPanel() {
     }
   };
 
-  const handleSaveToDashboard = async () => {
-    if (recordedActions.length === 0) {
-      addLog({
-        timestamp: Date.now(),
-        level: 'error',
-        message: '没有可用的录制操作',
-      });
-      return;
-    }
-
-    setProcessing(true);
-    addLog({
-      timestamp: Date.now(),
-      level: 'info',
-      message: '正在保存到 Dashboard...',
-    });
-
-    try {
-      // Get current tab URL
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      // Import the storage functions
-      const { createRecordingData, saveRecordingToStorage } =
-        await import('@shared/storage/recordingStorage');
-
-      // Create recording data
-      const recordingData = createRecordingData(
-        recordedActions,
-        undefined,
-        tab?.url,
-      );
-
-      // Save to storage
-      await saveRecordingToStorage(recordingData);
-
-      addLog({
-        timestamp: Date.now(),
-        level: 'info',
-        message: `已保存 ${recordedActions.length} 个操作到 Dashboard`,
-      });
-
-      // Show success notification
-      addLog({
-        timestamp: Date.now(),
-        level: 'info',
-        message: '在 Dashboard 中点击"导入录制"查看',
-      });
-    } catch (error) {
-      addLog({
-        timestamp: Date.now(),
-        level: 'error',
-        message: `保存失败: ${error}`,
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   return (
     <div className="flex flex-col h-full">
       {/* Control Panel */}
@@ -362,45 +352,7 @@ export function RecordingPanel() {
 
       {/* Generate Button */}
       {recordedActions.length > 0 && !isRecording && (
-        <div className="p-3 border-t border-white/5 space-y-2">
-          {/* Save to Dashboard Button */}
-          <button
-            onClick={handleSaveToDashboard}
-            disabled={isProcessing}
-            className="
-              w-full h-9 flex items-center justify-center gap-2
-              bg-zinc-800 border border-violet-500/30
-              rounded-lg text-xs font-medium text-violet-400
-              hover:bg-violet-500/10
-              disabled:opacity-50 disabled:cursor-not-allowed
-              transition-all duration-200
-            "
-          >
-            {isProcessing ? (
-              <>
-                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                <span>保存中...</span>
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                  />
-                </svg>
-                <span>保存到 Dashboard</span>
-              </>
-            )}
-          </button>
-
+        <div className="p-3 border-t border-white/5">
           {/* AI Generate Button */}
           <button
             onClick={handleGenerateTool}

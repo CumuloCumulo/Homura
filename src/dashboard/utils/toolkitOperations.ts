@@ -127,10 +127,7 @@ export function updateToolsInToolkit(
  * @param newName - 新名称
  * @returns 克隆的工具集
  */
-export function cloneToolkitData(
-  toolkit: Toolkit,
-  newName?: string,
-): Toolkit {
+export function cloneToolkitData(toolkit: Toolkit, newName?: string): Toolkit {
   const now = new Date().toISOString();
 
   // 生成新 ID
@@ -193,9 +190,7 @@ export function mergeToolkits(
  * @param toolkit - 工具集对象
  * @returns 验证结果
  */
-export function validateToolkit(
-  toolkit: Toolkit,
-): ToolkitValidationResult {
+export function validateToolkit(toolkit: Toolkit): ToolkitValidationResult {
   const errors: ToolkitValidationError[] = [];
   const warnings: string[] = [];
 
@@ -361,10 +356,7 @@ export function filterToolkitsByTag(
  * @param query - 搜索关键词
  * @returns 匹配的工具集列表
  */
-export function searchToolkits(
-  toolkits: Toolkit[],
-  query: string,
-): Toolkit[] {
+export function searchToolkits(toolkits: Toolkit[], query: string): Toolkit[] {
   const lowerQuery = query.toLowerCase();
 
   return toolkits.filter(
@@ -392,4 +384,79 @@ export function getAllTags(toolkits: Toolkit[]): string[] {
   }
 
   return Array.from(tagSet).sort();
+}
+
+// =============================================================================
+// DASHBOARD ↔ SIDEPANEL BRIDGE
+// =============================================================================
+
+/**
+ * 存储键名常量
+ */
+const STORAGE_KEYS = {
+  CURRENT_TOOLKIT: 'homura_current_toolkit',
+} as const;
+
+/**
+ * 存储的工具集数据结构
+ */
+interface StoredToolkitData {
+  toolkitId: string;
+  toolkitName: string;
+  tools: AtomicTool[];
+  timestamp: string;
+  version: string;
+}
+
+/**
+ * 发送工具集到 SidePanel（通过共享存储）
+ *
+ * 方案3：混合方案（存储 + 事件通知）
+ * 1. 将 toolkit 数据写入 chrome.storage.local
+ * 2. SidePanel 通过 onChanged 事件自动接收
+ * 3. 如果 SidePanel 未打开，数据持久保存，打开时自动加载
+ *
+ * @param toolkit - 工具集对象
+ * @returns Promise<void>
+ * @throws Error 当发送失败时
+ */
+export async function sendToolkitToSidePanel(toolkit: Toolkit): Promise<void> {
+  // 检查工具集是否有工具
+  if (!toolkit.tools || toolkit.tools.length === 0) {
+    throw new Error('工具集没有包含任何工具');
+  }
+
+  // 构建存储数据
+  const data: StoredToolkitData = {
+    toolkitId: toolkit.id,
+    toolkitName: toolkit.name,
+    tools: toolkit.tools,
+    timestamp: new Date().toISOString(),
+    version: '1.0',
+  };
+
+  try {
+    // 写入 chrome.storage.local
+    // 这会触发 onChanged 事件，SidePanel 监听该事件自动接收
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.CURRENT_TOOLKIT]: data,
+    });
+  } catch (error) {
+    throw new Error(
+      `发送工具集失败: ${error instanceof Error ? error.message : '未知错误'}`,
+    );
+  }
+}
+
+/**
+ * 请求打开 SidePanel
+ * @returns Promise<void>
+ */
+export async function openSidePanel(): Promise<void> {
+  try {
+    // 尝试通过 runtime 发送消息来打开 SidePanel
+    await chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
+  } catch (error) {
+    console.error('打开 SidePanel 失败:', error);
+  }
 }

@@ -16,24 +16,28 @@ import { BlueprintEditor } from './components/blueprint/BlueprintEditor';
 import { RecordingImportDialog } from './components/RecordingImportDialog';
 import { useToolStore } from './stores/toolStore';
 import { useToolkitStore } from './stores/toolkitStore';
-import { TEST_TOOLS } from '@sidepanel/testMission';
 import { getUnimportedCount } from '@shared/storage/recordingStorage';
+import type { AtomicTool } from '@homura/sdk/types';
+
+// Storage keys for listening to recorded tools
+const STORAGE_KEYS = {
+  RECORDED_TOOLS: 'homura_recorded_tools',
+} as const;
+
+interface RecordedToolsData {
+  tools: AtomicTool[];
+  timestamp: string;
+  version: string;
+}
 
 type DashboardTab = 'toolkit' | 'blueprint';
 
 export default function App() {
-  const { tools, addTool } = useToolStore();
+  const { tools, addTool, updateTool } = useToolStore();
   const { loadToolkits } = useToolkitStore();
   const [currentTab, setCurrentTab] = React.useState<DashboardTab>('toolkit');
   const [recordingImportOpen, setRecordingImportOpen] = React.useState(false);
   const [unimportedCount, setUnimportedCount] = React.useState(0);
-
-  // Load test tools if library is empty
-  useEffect(() => {
-    if (tools.length === 0) {
-      TEST_TOOLS.forEach((tool) => addTool(tool));
-    }
-  }, []);
 
   // Load toolkits on mount
   useEffect(() => {
@@ -43,9 +47,15 @@ export default function App() {
   // Listen for custom events to open dialogs
   useEffect(() => {
     const handleOpenRecordingImport = () => setRecordingImportOpen(true);
-    window.addEventListener('open-recording-import-dialog', handleOpenRecordingImport);
+    window.addEventListener(
+      'open-recording-import-dialog',
+      handleOpenRecordingImport,
+    );
     return () => {
-      window.removeEventListener('open-recording-import-dialog', handleOpenRecordingImport);
+      window.removeEventListener(
+        'open-recording-import-dialog',
+        handleOpenRecordingImport,
+      );
     };
   }, []);
 
@@ -61,6 +71,76 @@ export default function App() {
     const interval = setInterval(checkUnimported, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  // Check for existing recorded tools on mount (in case Dashboard opened after recording)
+  useEffect(() => {
+    const checkRecordedTools = async () => {
+      const result = await chrome.storage.local.get(
+        STORAGE_KEYS.RECORDED_TOOLS,
+      );
+      const data = result[STORAGE_KEYS.RECORDED_TOOLS] as
+        | RecordedToolsData
+        | undefined;
+
+      if (data?.tools && data.tools.length > 0) {
+        console.log('[Dashboard] Found existing tools in storage:', data.tools);
+        for (const tool of data.tools) {
+          const existingTool = tools.find((t) => t.tool_id === tool.tool_id);
+          if (!existingTool) {
+            addTool(tool);
+          }
+        }
+        console.log(`[Dashboard] Loaded ${data.tools.length} existing tools`);
+      }
+    };
+    checkRecordedTools();
+  }, []);
+
+  // Listen for recorded tools from SidePanel (方案b)
+  useEffect(() => {
+    const handleStorageChange = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      areaName: string,
+    ) => {
+      console.log('[Dashboard] Storage changed:', { areaName, changes });
+
+      if (areaName === 'local' && changes[STORAGE_KEYS.RECORDED_TOOLS]) {
+        const newData = changes[STORAGE_KEYS.RECORDED_TOOLS].newValue as
+          | RecordedToolsData
+          | undefined;
+        console.log('[Dashboard] Received tools data:', newData);
+
+        if (newData?.tools) {
+          let addedCount = 0;
+          let updatedCount = 0;
+
+          for (const tool of newData.tools) {
+            const existingTool = tools.find((t) => t.tool_id === tool.tool_id);
+
+            if (existingTool) {
+              // Update existing tool, preserve source
+              updateTool(tool.tool_id, {
+                ...tool,
+                source: existingTool.source || tool.source,
+              });
+              updatedCount++;
+            } else {
+              // Add new tool
+              addTool(tool);
+              addedCount++;
+            }
+          }
+          console.log(
+            `[Dashboard] Added ${addedCount} new tools, updated ${updatedCount} existing tools`,
+          );
+        }
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    console.log('[Dashboard] Storage listener registered');
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+  }, [tools, addTool, updateTool]);
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-300 antialiased selection:bg-violet-500/30">
@@ -110,8 +190,18 @@ export default function App() {
                 onClick={() => setRecordingImportOpen(true)}
                 className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-[10px] text-emerald-400 hover:bg-emerald-500/20 transition-colors"
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
                 </svg>
                 <span>{unimportedCount} 个待导入录制</span>
               </button>
@@ -144,11 +234,7 @@ export default function App() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
-        {currentTab === 'toolkit' ? (
-          <ToolkitEditor />
-        ) : (
-          <BlueprintEditor />
-        )}
+        {currentTab === 'toolkit' ? <ToolkitEditor /> : <BlueprintEditor />}
       </div>
 
       {/* Footer */}

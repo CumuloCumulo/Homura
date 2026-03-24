@@ -28,11 +28,12 @@ export type MessageType =
   | 'GET_PAGE_STATE' // Background -> Content: Get DOM summary
   | 'PAGE_STATE' // Content -> Background: DOM summary response
   // Test-related messages (Dashboard <-> SidePanel)
-  | 'TEST_TOOLKIT' // Dashboard -> SidePanel: Test a toolkit
+  | 'TEST_TOOLKIT' // Dashboard -> SidePanel: Test a toolkit (deprecated, use SEND_TOOLKIT_TO_SIDEPANEL)
   | 'TEST_BLUEPRINT' // Dashboard -> SidePanel: Test a blueprint
   | 'TEST_PROGRESS' // SidePanel -> Dashboard: Test execution progress
   | 'TEST_RESULT' // SidePanel -> Dashboard: Test execution result
-  | 'STOP_TEST'; // Dashboard -> SidePanel: Stop running test
+  | 'STOP_TEST' // Dashboard -> SidePanel: Stop running test
+  | 'SEND_TOOLKIT_TO_SIDEPANEL'; // Dashboard -> SidePanel: Send toolkit for manual testing
 
 /**
  * Base message structure
@@ -211,3 +212,49 @@ export interface LogEntry {
   toolId?: string;
   data?: unknown;
 }
+
+// =============================================================================
+// DASHBOARD ↔ SIDEPANEL BRIDGE TYPES
+// =============================================================================
+
+/**
+ * Send toolkit to SidePanel message
+ * Dashboard sends toolkit data to SidePanel for manual testing
+ */
+export interface SendToolkitToSidepanelMessage {
+  type: 'SEND_TOOLKIT_TO_SIDEPANEL';
+  payload: {
+    toolkitId: string;
+    toolkitName: string;
+    tools: import('@homura/sdk/types').AtomicTool[];
+  };
+  messageId?: string;
+}
+
+/**
+ * SidePanel test state (internal to SidePanel)
+ */
+export interface SidePanelTestState {
+  toolkitId: string | null;
+  toolkitName: string;
+  tools: import('@homura/sdk/types').AtomicTool[];
+  currentIndex: number; // Currently selected tool for single tool testing
+}
+
+/**
+ * Tool test result (internal to SidePanel)
+ */
+export interface ToolTestResult {
+  toolId: string;
+  toolName: string;
+  success: boolean;
+  duration: number;
+  data?: unknown;
+  error?: string;
+  timestamp: string;
+}
+
+// Add new message types to the union
+export type ExtendedHomuraMessage =
+  | HomuraMessage
+  | SendToolkitToSidepanelMessage;

@@ -35,6 +35,8 @@ interface ToolStore {
   addTool: (tool: AtomicTool) => void;
   updateTool: (toolId: string, updates: Partial<AtomicTool>) => void;
   removeTool: (toolId: string) => void;
+  /** Save a recorded tool to manual (long-term) library */
+  saveTool: (toolId: string) => void;
   selectTool: (tool: AtomicTool | null) => void;
   setRuleBook: (content: string) => void;
   setMission: (mission: Mission | null) => void;
@@ -93,6 +95,13 @@ export const useToolStore = create<ToolStore>()(
           tools: state.tools.filter((t) => t.tool_id !== toolId),
           selectedTool:
             state.selectedTool?.tool_id === toolId ? null : state.selectedTool,
+        })),
+
+      saveTool: (toolId) =>
+        set((state) => ({
+          tools: state.tools.map((t) =>
+            t.tool_id === toolId ? { ...t, source: 'manual' as const } : t,
+          ),
         })),
 
       selectTool: (tool) => set({ selectedTool: tool }),

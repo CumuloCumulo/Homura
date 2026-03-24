@@ -3,317 +3,261 @@
  * Homura SidePanel - Test Panel
  * =============================================================================
  *
- * Receives and executes toolkit/blueprint tests from Dashboard
+ * Receives toolkit from Dashboard and allows manual testing
  */
 
-import { useState, useEffect } from 'react';
-import type { Toolkit, Blueprint } from '@homura/sdk/types';
+import { useState } from 'react';
+import type { SidePanelTestState, ToolTestResult } from '@shared/types';
+import type { AtomicTool } from '@homura/sdk/types';
+import { sendToContentScript } from '../utils/ensureContentScript';
 
-interface TestProgress {
-  currentStep: number;
-  totalSteps: number;
-  currentToolName: string;
-}
-
-interface TestResult {
-  toolName: string;
-  success: boolean;
-  duration?: number;
-  error?: string;
-}
-
-interface TestLog {
-  timestamp: number;
-  level: 'info' | 'warn' | 'error';
-  message: string;
+interface TestPanelProps {
+  testState: SidePanelTestState;
+  setTestState: React.Dispatch<React.SetStateAction<SidePanelTestState>>;
 }
 
 type TestStatus = 'idle' | 'running' | 'completed' | 'failed';
 
-export function TestPanel() {
+// Action icon component
+function ActionIcon({ action }: { action: string }) {
+  const icons: Record<string, JSX.Element> = {
+    CLICK: (
+      <svg
+        className="w-3.5 h-3.5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+        />
+      </svg>
+    ),
+    INPUT: (
+      <svg
+        className="w-3.5 h-3.5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-4h3"
+        />
+      </svg>
+    ),
+    SELECT: (
+      <svg
+        className="w-3.5 h-3.5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4 6h16M4 12h16M4 18h16"
+        />
+      </svg>
+    ),
+    EXTRACT_TEXT: (
+      <svg
+        className="w-3.5 h-3.5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.5a2 2 0 012 2v14a2 2 0 01-2 2h-5.5a2 2 0 01-2-2z"
+        />
+      </svg>
+    ),
+    WAIT_FOR: (
+      <svg
+        className="w-3.5 h-3.5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+    ),
+    NAVIGATE: (
+      <svg
+        className="w-3.5 h-3.5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102 1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+        />
+      </svg>
+    ),
+  };
+
+  return icons[action] || icons.CLICK;
+}
+
+export function TestPanel({ testState }: TestPanelProps) {
   const [testStatus, setTestStatus] = useState<TestStatus>('idle');
-  const [progress, setProgress] = useState<TestProgress>({
-    currentStep: 0,
-    totalSteps: 0,
-    currentToolName: '',
-  });
-  const [results, setResults] = useState<TestResult[]>([]);
-  const [logs, setLogs] = useState<TestLog[]>([]);
-  const [currentTest, setCurrentTest] = useState<{
-    type: 'toolkit' | 'blueprint';
-    name: string;
-  } | null>(null);
+  const [currentToolIndex, setCurrentToolIndex] = useState<number>(-1);
+  const [results, setResults] = useState<ToolTestResult[]>([]);
 
-  // Listen for test requests from Dashboard
-  useEffect(() => {
-    const handleMessage = (message: MessageEvent) => {
-      if (message.data.type === 'TEST_TOOLKIT') {
-        handleToolkitTest(message.data.payload);
-      } else if (message.data.type === 'TEST_BLUEPRINT') {
-        handleBlueprintTest(message.data.payload);
-      } else if (message.data.type === 'STOP_TEST') {
-        handleStopTest();
-      }
-    };
+  const hasTools = testState.tools.length > 0;
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  const handleToolkitTest = async (payload: {
-    toolkit: Toolkit;
-    tabId: number;
-  }) => {
-    setCurrentTest({ type: 'toolkit', name: payload.toolkit.name });
+  // 测试单个工具
+  const testSingleTool = async (tool: AtomicTool, index: number) => {
+    setCurrentToolIndex(index);
     setTestStatus('running');
-    setResults([]);
-    setLogs([]);
-    setProgress({
-      currentStep: 0,
-      totalSteps: payload.toolkit.tools.length,
-      currentToolName: '准备中...',
-    });
 
-    // Navigate to target URL if specified
-    if (payload.toolkit.targetUrl) {
-      await addLog('info', `导航到: ${payload.toolkit.targetUrl}`);
-      try {
-        await chrome.tabs.update(payload.tabId, {
-          url: payload.toolkit.targetUrl,
-        });
-        await addLog('info', '等待页面加载...');
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      } catch (error) {
-        await addLog(
-          'error',
-          `导航失败: ${error instanceof Error ? error.message : '未知错误'}`,
-        );
-        setTestStatus('failed');
-        sendResults(payload.tabId, []);
-        return;
-      }
-    }
-
-    // Execute each tool in sequence
-    const testResults: TestResult[] = [];
-    for (let i = 0; i < payload.toolkit.tools.length; i++) {
-      const tool = payload.toolkit.tools[i];
-      setProgress({
-        currentStep: i + 1,
-        totalSteps: payload.toolkit.tools.length,
-        currentToolName: tool.name,
+    const startTime = Date.now();
+    try {
+      const response = await sendToContentScript<{
+        success: boolean;
+        data?: unknown;
+        error?: string;
+      }>({
+        type: 'EXECUTE_TOOL',
+        payload: { tool },
       });
 
-      await addLog('info', `执行: ${tool.name}`);
+      const duration = Date.now() - startTime;
+
+      const result: ToolTestResult = {
+        toolId: tool.tool_id,
+        toolName: tool.name,
+        success: response?.success || false,
+        duration,
+        data: response?.data,
+        error: response?.error,
+        timestamp: new Date().toISOString(),
+      };
+
+      setResults((prev) => {
+        const newResults = [
+          ...prev.filter((r) => r.toolId !== tool.tool_id),
+          result,
+        ];
+        return newResults;
+      });
+
+      setTestStatus(response?.success ? 'completed' : 'failed');
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const result: ToolTestResult = {
+        toolId: tool.tool_id,
+        toolName: tool.name,
+        success: false,
+        duration,
+        error: error instanceof Error ? error.message : '未知错误',
+        timestamp: new Date().toISOString(),
+      };
+
+      setResults((prev) => [...prev, result]);
+      setTestStatus('failed');
+    } finally {
+      setTimeout(() => {
+        setCurrentToolIndex(-1);
+        setTestStatus('idle');
+      }, 1000);
+    }
+  };
+
+  // 连贯测试所有工具
+  const testSequence = async () => {
+    if (testState.tools.length === 0) return;
+
+    setTestStatus('running');
+    setResults([]);
+    setCurrentToolIndex(-1);
+
+    const sequenceResults: ToolTestResult[] = [];
+
+    for (let i = 0; i < testState.tools.length; i++) {
+      const tool = testState.tools[i];
+      setCurrentToolIndex(i);
 
       const startTime = Date.now();
       try {
-        // Send execution request to content script
-        const response = await chrome.tabs.sendMessage(payload.tabId, {
+        const response = await sendToContentScript<{
+          success: boolean;
+          data?: unknown;
+          error?: string;
+        }>({
           type: 'EXECUTE_TOOL',
           payload: { tool },
         });
 
         const duration = Date.now() - startTime;
 
-        if (response?.success) {
-          await addLog('info', `✓ ${tool.name} 完成 (${duration}ms)`);
-          testResults.push({
-            toolName: tool.name,
-            success: true,
-            duration,
-          });
-        } else {
-          await addLog(
-            'error',
-            `✗ ${tool.name} 失败: ${response?.error || '未知错误'}`,
-          );
-          testResults.push({
-            toolName: tool.name,
-            success: false,
-            duration,
-            error: response?.error || '未知错误',
-          });
+        const result: ToolTestResult = {
+          toolId: tool.tool_id,
+          toolName: tool.name,
+          success: response?.success || false,
+          duration,
+          data: response?.data,
+          error: response?.error,
+          timestamp: new Date().toISOString(),
+        };
+
+        sequenceResults.push(result);
+
+        // 如果失败了，停止测试
+        if (!response?.success) {
+          break;
         }
+
+        // 工具之间延迟
+        await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (error) {
         const duration = Date.now() - startTime;
-        const errorMsg = error instanceof Error ? error.message : '未知错误';
-        await addLog('error', `✗ ${tool.name} 错误: ${errorMsg}`);
-        testResults.push({
+        const result: ToolTestResult = {
+          toolId: tool.tool_id,
           toolName: tool.name,
           success: false,
           duration,
-          error: errorMsg,
-        });
-      }
+          error: error instanceof Error ? error.message : '未知错误',
+          timestamp: new Date().toISOString(),
+        };
 
-      // Small delay between steps
-      await new Promise((resolve) => setTimeout(resolve, 500));
+        sequenceResults.push(result);
+        break;
+      }
     }
 
-    setResults(testResults);
-    setTestStatus(testResults.every((r) => r.success) ? 'completed' : 'failed');
+    setResults(sequenceResults);
+    setTestStatus(
+      sequenceResults.every((r) => r.success) ? 'completed' : 'failed',
+    );
+    setCurrentToolIndex(-1);
 
-    // Send results back to Dashboard
-    sendResults(payload.tabId, testResults);
+    setTimeout(() => {
+      setTestStatus('idle');
+    }, 2000);
   };
 
-  const handleBlueprintTest = async (payload: {
-    blueprint: Blueprint;
-    tabId: number;
-    testUrl?: string;
-  }) => {
-    setCurrentTest({ type: 'blueprint', name: payload.blueprint.meta.name });
-    setTestStatus('running');
+  // 清除结果
+  const clearResults = () => {
     setResults([]);
-    setLogs([]);
-
-    const toolsToExecute = payload.blueprint.toolkitId
-      ? [] // TODO: Load toolkit by ID
-      : payload.blueprint.skills;
-
-    setProgress({
-      currentStep: 0,
-      totalSteps: toolsToExecute.length,
-      currentToolName: '准备中...',
-    });
-
-    // Navigate to test URL if provided
-    const targetUrl = payload.testUrl || payload.blueprint.meta.targetUrl;
-    if (targetUrl) {
-      await addLog('info', `导航到: ${targetUrl}`);
-      try {
-        await chrome.tabs.update(payload.tabId, { url: targetUrl });
-        await addLog('info', '等待页面加载...');
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      } catch (error) {
-        await addLog(
-          'error',
-          `导航失败: ${error instanceof Error ? error.message : '未知错误'}`,
-        );
-        setTestStatus('failed');
-        sendResults(payload.tabId, []);
-        return;
-      }
-    }
-
-    // Execute tools
-    const testResults: TestResult[] = [];
-    for (let i = 0; i < toolsToExecute.length; i++) {
-      const tool = toolsToExecute[i];
-      setProgress({
-        currentStep: i + 1,
-        totalSteps: toolsToExecute.length,
-        currentToolName: tool.name,
-      });
-
-      await addLog('info', `执行: ${tool.name}`);
-
-      const startTime = Date.now();
-      try {
-        const response = await chrome.tabs.sendMessage(payload.tabId, {
-          type: 'EXECUTE_TOOL',
-          payload: { tool },
-        });
-
-        const duration = Date.now() - startTime;
-
-        if (response?.success) {
-          await addLog('info', `✓ ${tool.name} 完成 (${duration}ms)`);
-          testResults.push({
-            toolName: tool.name,
-            success: true,
-            duration,
-          });
-        } else {
-          await addLog(
-            'error',
-            `✗ ${tool.name} 失败: ${response?.error || '未知错误'}`,
-          );
-          testResults.push({
-            toolName: tool.name,
-            success: false,
-            duration,
-            error: response?.error || '未知错误',
-          });
-        }
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        const errorMsg = error instanceof Error ? error.message : '未知错误';
-        await addLog('error', `✗ ${tool.name} 错误: ${errorMsg}`);
-        testResults.push({
-          toolName: tool.name,
-          success: false,
-          duration,
-          error: errorMsg,
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-
-    setResults(testResults);
-    setTestStatus(testResults.every((r) => r.success) ? 'completed' : 'failed');
-    sendResults(payload.tabId, testResults);
-  };
-
-  const handleStopTest = () => {
-    setTestStatus('failed');
-    setProgress({
-      currentStep: 0,
-      totalSteps: 0,
-      currentToolName: '已停止',
-    });
-    addLog('warn', '测试已停止');
-  };
-
-  const addLog = async (level: 'info' | 'warn' | 'error', message: string) => {
-    const log: TestLog = {
-      timestamp: Date.now(),
-      level,
-      message,
-    };
-    setLogs((prev) => [...prev, log]);
-  };
-
-  const sendResults = (_tabId: number, results: TestResult[]) => {
-    // Get Dashboard tab to send results
-    chrome.tabs
-      .query({ url: 'chrome-extension://*/dashboard.html' })
-      .then((tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            type: 'TEST_RESULT',
-            payload: { results, logs },
-          });
-        }
-      });
-  };
-
-  const getStatusColor = () => {
-    switch (testStatus) {
-      case 'running':
-        return 'text-amber-400';
-      case 'completed':
-        return 'text-emerald-400';
-      case 'failed':
-        return 'text-rose-400';
-      default:
-        return 'text-zinc-600';
-    }
-  };
-
-  const getStatusText = () => {
-    switch (testStatus) {
-      case 'running':
-        return '执行中...';
-      case 'completed':
-        return '已完成';
-      case 'failed':
-        return '失败';
-      default:
-        return '等待测试';
-    }
+    setTestStatus('idle');
   };
 
   return (
@@ -321,167 +265,263 @@ export function TestPanel() {
       {/* Header */}
       <div className="p-4 border-b border-white/5">
         <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-sm font-medium text-zinc-200">测试面板</h3>
-            <p className="text-[10px] text-zinc-500 mt-1">
-              接收来自 Dashboard 的测试请求
-            </p>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium text-zinc-200 truncate">
+              测试模式
+            </h3>
+            {hasTools && (
+              <p className="text-[10px] text-zinc-500 mt-1">
+                {testState.toolkitName || '未命名工具集'} (
+                {testState.tools.length} 个工具)
+              </p>
+            )}
           </div>
-          <div className="flex items-center gap-1.5">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                testStatus === 'running'
-                  ? 'bg-amber-400 animate-pulse'
-                  : testStatus === 'completed'
-                    ? 'bg-emerald-400'
-                    : testStatus === 'failed'
-                      ? 'bg-rose-400'
-                      : 'bg-zinc-700'
-              }`}
-            />
-            <span className={`text-[10px] ${getStatusColor()}`}>
-              {getStatusText()}
-            </span>
-          </div>
+          {results.length > 0 && (
+            <button
+              onClick={clearResults}
+              className="text-[9px] text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              清除结果
+            </button>
+          )}
         </div>
 
-        {/* Current Test Info */}
-        {currentTest && (
-          <div className="p-3 bg-zinc-900/50 rounded border border-white/5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`px-2 py-0.5 text-[9px] rounded ${
-                    currentTest.type === 'toolkit'
-                      ? 'bg-violet-500/20 text-violet-400'
-                      : 'bg-fuchsia-500/20 text-fuchsia-400'
-                  }`}
+        {hasTools && (
+          <button
+            onClick={testSequence}
+            disabled={testStatus === 'running'}
+            className={`
+              w-full h-8 flex items-center justify-center gap-2 rounded text-xs font-medium
+              transition-all duration-200
+              ${
+                testStatus === 'running'
+                  ? 'bg-violet-500/20 text-violet-400 cursor-wait'
+                  : 'bg-violet-600/90 text-white hover:bg-violet-500 hover:shadow-neon'
+              }
+            `}
+          >
+            {testStatus === 'running' ? (
+              <>
+                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <span>测试中...</span>
+              </>
+            ) : testStatus === 'completed' ? (
+              <>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
-                  {currentTest.type === 'toolkit' ? '工具集' : '蓝图'}
-                </span>
-                <span className="text-xs text-zinc-300">
-                  {currentTest.name}
-                </span>
-              </div>
-            </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span>测试完成</span>
+              </>
+            ) : testStatus === 'failed' ? (
+              <>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+                <span>测试失败</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span>连贯测试全部工具</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Tools List or Empty State */}
+      <div className="flex-1 overflow-y-auto p-3">
+        {!hasTools ? (
+          <div className="flex flex-col items-center justify-center h-full text-center py-8">
+            <svg
+              className="w-12 h-12 text-zinc-700 mb-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <p className="text-xs text-zinc-600">
+              在 Dashboard 中编排工具集后发送到这里进行测试
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {testState.tools.map((tool, index) => {
+              const toolResult = results.find((r) => r.toolId === tool.tool_id);
+              const isRunning =
+                testStatus === 'running' && currentToolIndex === index;
+              const wasTested = results.some((r) => r.toolId === tool.tool_id);
+
+              return (
+                <div
+                  key={tool.tool_id}
+                  className={`
+                    p-3 rounded-lg border transition-all duration-200
+                    ${
+                      isRunning
+                        ? 'bg-amber-500/10 border-amber-500/30'
+                        : toolResult?.success
+                          ? 'bg-emerald-500/10 border-emerald-500/20'
+                          : toolResult?.error
+                            ? 'bg-rose-500/10 border-rose-500/20'
+                            : 'bg-zinc-900/50 border-white/5 hover:border-white/10'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Index */}
+                    <span className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-zinc-800 text-[9px] text-zinc-500">
+                      {index + 1}
+                    </span>
+
+                    {/* Icon */}
+                    <ActionIcon action={tool.selector_logic.target.action} />
+
+                    {/* Tool Info */}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-medium text-zinc-300 truncate">
+                        {tool.name}
+                      </h4>
+                      <p className="text-[9px] text-zinc-600 truncate font-mono">
+                        {tool.selector_logic.target.selector}
+                      </p>
+                    </div>
+
+                    {/* Status / Test Button */}
+                    <div className="flex items-center gap-2">
+                      {isRunning ? (
+                        <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                      ) : toolResult ? (
+                        toolResult.success ? (
+                          <svg
+                            className="w-4 h-4 text-emerald-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className="w-4 h-4 text-rose-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        )
+                      ) : (
+                        <button
+                          onClick={() => testSingleTool(tool, index)}
+                          disabled={testStatus === 'running'}
+                          className={`
+                            px-3 py-1 rounded text-[10px] font-medium transition-colors
+                            ${
+                              testStatus === 'running'
+                                ? 'opacity-50 cursor-wait'
+                                : 'bg-violet-500/20 text-violet-400 hover:bg-violet-500/30'
+                            }
+                          `}
+                        >
+                          {wasTested ? '重测' : '测试'}
+                        </button>
+                      )}
+
+                      {toolResult && (
+                        <span className="text-[9px] text-zinc-500">
+                          {toolResult.duration}ms
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Error message */}
+                  {toolResult?.error && (
+                    <p className="text-[9px] text-rose-400 mt-2">
+                      {toolResult.error}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Progress */}
-      {testStatus === 'running' && (
-        <div className="px-4 py-3 border-b border-white/5">
-          <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-2">
-            <span className="truncate max-w-[150px]">
-              {progress.currentToolName}
-            </span>
-            <span>
-              {progress.currentStep} / {progress.totalSteps}
-            </span>
-          </div>
-          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-300"
-              style={{
-                width: `${(progress.currentStep / progress.totalSteps) * 100}%`,
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Results */}
+      {/* Results Summary */}
       {results.length > 0 && (
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="space-y-2">
-            {results.map((result, index) => (
-              <div
-                key={index}
-                className={`p-3 rounded border transition-all ${
-                  result.success
-                    ? 'bg-emerald-500/5 border-emerald-500/20'
-                    : 'bg-rose-500/5 border-rose-500/20'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {result.success ? (
-                    <svg
-                      className="w-4 h-4 text-emerald-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-4 h-4 text-rose-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  )}
-                  <span className="text-xs text-zinc-300">
-                    {result.toolName}
-                  </span>
-                  {result.duration && (
-                    <span className="text-[9px] text-zinc-600 ml-auto">
-                      {result.duration}ms
-                    </span>
-                  )}
-                </div>
-                {result.error && (
-                  <p className="text-[10px] text-rose-400 mt-1">
-                    {result.error}
-                  </p>
-                )}
-              </div>
-            ))}
+        <div className="border-t border-white/5 p-3 bg-zinc-900/30">
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-zinc-500">
+              成功: {results.filter((r) => r.success).length} / {results.length}
+            </span>
+            <span className="text-zinc-600">
+              总耗时: {results.reduce((sum, r) => sum + r.duration, 0)}ms
+            </span>
           </div>
         </div>
       )}
-
-      {/* Logs */}
-      <div className="border-t border-white/5 max-h-48 overflow-y-auto">
-        <div className="p-3 border-b border-white/5">
-          <h4 className="text-[10px] text-zinc-500">执行日志</h4>
-        </div>
-        <div className="p-3 space-y-1">
-          {logs.length === 0 ? (
-            <p className="text-[10px] text-zinc-600 text-center py-4">
-              等待测试开始...
-            </p>
-          ) : (
-            logs.map((log, index) => (
-              <div key={index} className="text-[9px] font-mono">
-                <span
-                  className={`${
-                    log.level === 'error'
-                      ? 'text-rose-400'
-                      : log.level === 'warn'
-                        ? 'text-amber-400'
-                        : 'text-zinc-500'
-                  }`}
-                >
-                  [{log.level.toUpperCase()}] {log.message}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
     </div>
   );
 }

@@ -31,6 +31,8 @@ docs/specs/
 |------|------|--------|------|
 | [Toolkit](./features/toolkit.md) | ✅ Implemented | P0 | 工具集类型定义和编排 |
 | [Dashboard Orchestration](./features/dashboard-orchestration.md) | ✅ Implemented | P0 | Dashboard 分层编排架构 |
+| [Auto Tool Sync](./features/auto-tool-sync.md) | ✅ Implemented | P1 | SidePanel ↔ Dashboard 工具自动同步 |
+| [Dashboard-SidePanel Bridge](./features/dashboard-sidepanel-bridge.md) | 📋 Proposed | P1 | Dashboard-SidePanel 联动架构 |
 | [Recording Import](./features/recording-import.md) | 📋 Proposed | P1 | 录制数据导入流程 |
 | [AI Agent Mode](./features/ai-agent-mode.md) | 📋 Proposed | P1 | AI Agent 决策模式 |
 

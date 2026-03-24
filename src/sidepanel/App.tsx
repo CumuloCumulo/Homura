@@ -14,6 +14,8 @@ import { InspectMode } from './components/InspectMode';
 import { RecordingPanel } from './components/RecordingPanel';
 import { TestPanel } from './components/TestPanel';
 import { useRecordingStore } from './stores/recordingStore';
+import type { SidePanelTestState } from '@shared/types';
+import type { AtomicTool } from '@homura/sdk/types';
 
 type SidePanelMode = 'inspect' | 'record' | 'test';
 
@@ -88,13 +90,102 @@ const LogsIcon = () => (
 );
 
 export default function App() {
-  const { setMode, logs, clearLogs, isInspecting, isRecording } =
+  const { setMode, logs, clearLogs, isInspecting, isRecording, addLog } =
     useRecordingStore();
   const [showLogs, setShowLogs] = React.useState(false);
   const [currentMode, setCurrentMode] =
     React.useState<SidePanelMode>('inspect');
 
-  // Listen for messages from content script
+  // 接收来自 Dashboard 的工具集
+  const [testState, setTestState] = React.useState<SidePanelTestState>({
+    toolkitId: null,
+    toolkitName: '',
+    tools: [],
+    currentIndex: 0,
+  });
+
+  // 存储键名常量
+  const STORAGE_KEY = 'homura_current_toolkit';
+
+  // 存储的工具集数据结构
+  interface StoredToolkitData {
+    toolkitId: string;
+    toolkitName: string;
+    tools: AtomicTool[];
+    timestamp: string;
+    version: string;
+  }
+
+  // 初始化：从 storage 加载工具集
+  React.useEffect(() => {
+    const loadStoredToolkit = async () => {
+      try {
+        const result = await chrome.storage.local.get(STORAGE_KEY);
+        const data = result[STORAGE_KEY] as StoredToolkitData | undefined;
+
+        if (data && data.tools && data.tools.length > 0) {
+          setTestState({
+            toolkitId: data.toolkitId,
+            toolkitName: data.toolkitName,
+            tools: data.tools,
+            currentIndex: 0,
+          });
+          setCurrentMode('test');
+          addLog({
+            timestamp: Date.now(),
+            level: 'info',
+            message: `已加载工具集: ${data.toolkitName} (${data.tools.length} 个工具)`,
+          });
+        }
+      } catch (error) {
+        console.error('加载存储的工具集失败:', error);
+      }
+    };
+
+    loadStoredToolkit();
+  }, []);
+
+  // 监听 storage 变化
+  React.useEffect(() => {
+    const handleStorageChange = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      areaName: string,
+    ) => {
+      if (areaName === 'local' && changes[STORAGE_KEY]) {
+        const newData = changes[STORAGE_KEY].newValue as
+          | StoredToolkitData
+          | undefined;
+
+        if (newData && newData.tools && newData.tools.length > 0) {
+          setTestState({
+            toolkitId: newData.toolkitId,
+            toolkitName: newData.toolkitName,
+            tools: newData.tools,
+            currentIndex: 0,
+          });
+          setCurrentMode('test');
+          addLog({
+            timestamp: Date.now(),
+            level: 'info',
+            message: `已接收工具集: ${newData.toolkitName} (${newData.tools.length} 个工具)`,
+          });
+        } else {
+          // 清空工具集
+          setTestState({
+            toolkitId: null,
+            toolkitName: '',
+            tools: [],
+            currentIndex: 0,
+          });
+        }
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+  }, []);
+
+  // Listen for messages from content script and Dashboard
   React.useEffect(() => {
     const handleMessage = (message: { type: string; payload?: unknown }) => {
       if (message.type === 'ELEMENT_SELECTED') {
@@ -195,7 +286,9 @@ export default function App() {
           <>
             {currentMode === 'inspect' && <InspectMode />}
             {currentMode === 'record' && <RecordingPanel />}
-            {currentMode === 'test' && <TestPanel />}
+            {currentMode === 'test' && (
+              <TestPanel testState={testState} setTestState={setTestState} />
+            )}
           </>
         )}
       </div>

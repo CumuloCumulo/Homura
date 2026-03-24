@@ -4,13 +4,23 @@
  * =============================================================================
  *
  * Left panel showing all available toolkits
+ * - Collapsible: Supports collapsed (icons only) and expanded modes
+ * - Mindful Interaction: Progressive disclosure
  */
 
 import React from 'react';
 import { useToolkitStore } from '../../stores/toolkitStore';
 import type { Toolkit } from '@homura/sdk/types';
 
-export function ToolkitLibrary() {
+interface ToolkitLibraryProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export function ToolkitLibrary({
+  isCollapsed = false,
+  onToggleCollapse,
+}: ToolkitLibraryProps) {
   const {
     toolkits,
     selectedToolkit,
@@ -46,6 +56,66 @@ export function ToolkitLibrary() {
     selectToolkit(newToolkit);
   };
 
+  // Collapsed mode - Icon only sidebar
+  if (isCollapsed) {
+    return (
+      <div className="flex flex-col h-full py-3">
+        {/* Collapse Toggle */}
+        <div className="flex justify-center mb-3">
+          <button
+            onClick={onToggleCollapse}
+            className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
+            title="展开工具集库"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Toolkit Icons */}
+        <div className="flex-1 overflow-y-auto space-y-1 px-1">
+          {filteredToolkits.map((toolkit) => (
+            <button
+              key={toolkit.id}
+              onClick={() => selectToolkit(toolkit)}
+              className={`w-full p-2 rounded-lg transition-all duration-200 ${
+                selectedToolkit?.id === toolkit.id
+                  ? 'bg-violet-500/20 text-violet-400'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+              }`}
+              title={toolkit.name}
+            >
+              <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              {/* Tool count indicator */}
+              {toolkit.tools.length > 0 && (
+                <span className="block text-[8px] text-center mt-0.5 opacity-60">
+                  {toolkit.tools.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Add Button */}
+        <div className="px-1 pt-2 border-t border-white/5">
+          <button
+            onClick={handleCreateNew}
+            className="w-full p-2 rounded-lg text-zinc-500 hover:text-violet-400 hover:bg-zinc-800/50 transition-colors"
+            title="新建工具集"
+          >
+            <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Expanded mode - Full sidebar
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -53,6 +123,16 @@ export function ToolkitLibrary() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-zinc-100">工具集库</h2>
           <div className="flex items-center gap-2">
+            {/* Collapse Toggle */}
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 rounded-md bg-zinc-900/80 border border-white/5 text-zinc-500 hover:text-zinc-300 transition-colors"
+              title="收起"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
             {/* Import Button */}
             <button
               onClick={() => setImportDialogOpen(true)}
@@ -163,7 +243,12 @@ interface ToolkitCardProps {
   onDelete: () => void;
 }
 
-function ToolkitCard({ toolkit, isSelected, onSelect, onDelete }: ToolkitCardProps) {
+function ToolkitCard({
+  toolkit,
+  isSelected,
+  onSelect,
+  onDelete,
+}: ToolkitCardProps) {
   return (
     <div
       onClick={onSelect}
@@ -175,9 +260,13 @@ function ToolkitCard({ toolkit, isSelected, onSelect, onDelete }: ToolkitCardPro
     >
       <div className="flex items-start gap-2.5">
         {/* Icon */}
-        <div className={`shrink-0 w-8 h-8 rounded-md flex items-center justify-center ${
-          isSelected ? 'bg-violet-500/20 text-violet-400' : 'bg-zinc-800 text-zinc-400'
-        }`}>
+        <div
+          className={`shrink-0 w-8 h-8 rounded-md flex items-center justify-center ${
+            isSelected
+              ? 'bg-violet-500/20 text-violet-400'
+              : 'bg-zinc-800 text-zinc-400'
+          }`}
+        >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
@@ -185,11 +274,15 @@ function ToolkitCard({ toolkit, isSelected, onSelect, onDelete }: ToolkitCardPro
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <h3 className={`text-xs font-medium truncate ${isSelected ? 'text-zinc-100' : 'text-zinc-300'}`}>
+          <h3
+            className={`text-xs font-medium truncate ${isSelected ? 'text-zinc-100' : 'text-zinc-300'}`}
+          >
             {toolkit.name}
           </h3>
           {toolkit.description && (
-            <p className="text-[10px] text-zinc-500 truncate mt-0.5">{toolkit.description}</p>
+            <p className="text-[10px] text-zinc-500 truncate mt-0.5">
+              {toolkit.description}
+            </p>
           )}
           <div className="flex items-center gap-2 mt-1.5">
             <span className="text-[9px] text-zinc-600">
@@ -198,7 +291,9 @@ function ToolkitCard({ toolkit, isSelected, onSelect, onDelete }: ToolkitCardPro
             {toolkit.version && (
               <>
                 <span className="text-zinc-700">•</span>
-                <span className="text-[9px] text-zinc-600 font-mono">{toolkit.version}</span>
+                <span className="text-[9px] text-zinc-600 font-mono">
+                  {toolkit.version}
+                </span>
               </>
             )}
           </div>
@@ -206,12 +301,17 @@ function ToolkitCard({ toolkit, isSelected, onSelect, onDelete }: ToolkitCardPro
           {toolkit.tags && toolkit.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
               {toolkit.tags.slice(0, 2).map((tag) => (
-                <span key={tag} className="px-1.5 py-0.5 text-[9px] rounded bg-zinc-800 text-zinc-500">
+                <span
+                  key={tag}
+                  className="px-1.5 py-0.5 text-[9px] rounded bg-zinc-800 text-zinc-500"
+                >
                   {tag}
                 </span>
               ))}
               {toolkit.tags.length > 2 && (
-                <span className="text-[9px] text-zinc-600">+{toolkit.tags.length - 2}</span>
+                <span className="text-[9px] text-zinc-600">
+                  +{toolkit.tags.length - 2}
+                </span>
               )}
             </div>
           )}

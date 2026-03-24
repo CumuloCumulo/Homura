@@ -19,6 +19,11 @@ export interface ToolParameter {
 }
 
 /**
+ * Tool source type - indicates how the tool was created
+ */
+export type ToolSource = 'recorded' | 'manual' | 'imported';
+
+/**
  * Atomic Tool: A complete, reusable automation action
  *
  * This is what AI generates from user recordings or natural language.
@@ -35,6 +40,10 @@ export interface AtomicTool {
   parameters: Record<string, ToolParameter>;
   /** The selection and action logic */
   selector_logic: SelectorLogic;
+  /** Tool source - indicates how this tool was created */
+  source?: ToolSource;
+  /** Creation timestamp (ISO 8601) */
+  createdAt?: string;
 }
 
 /**
@@ -76,13 +85,13 @@ export interface ExecuteToolResult {
 export interface ExecutionError {
   /** Error code for programmatic handling */
   code:
-    | 'SCOPE_NOT_FOUND'      // Scope selector matched 0 elements
-    | 'ANCHOR_NOT_FOUND'     // No element in scope matched anchor
-    | 'TARGET_NOT_FOUND'     // Target selector not found in context
-    | 'ACTION_FAILED'        // Action execution failed
-    | 'TIMEOUT'              // Wait timeout exceeded
-    | 'INVALID_SELECTOR'     // CSS selector syntax error
-    | 'UNKNOWN';             // Unexpected error
+    | 'SCOPE_NOT_FOUND' // Scope selector matched 0 elements
+    | 'ANCHOR_NOT_FOUND' // No element in scope matched anchor
+    | 'TARGET_NOT_FOUND' // Target selector not found in context
+    | 'ACTION_FAILED' // Action execution failed
+    | 'TIMEOUT' // Wait timeout exceeded
+    | 'INVALID_SELECTOR' // CSS selector syntax error
+    | 'UNKNOWN'; // Unexpected error
   /** Human-readable message */
   message: string;
   /** The selector that failed (for self-healing) */
