@@ -11,11 +11,11 @@
  * Primitive action types - the only allowed actions in the system.
  */
 export type PrimitiveAction =
-  | 'CLICK'         // Click on an element
-  | 'INPUT'         // Input text into a field
-  | 'EXTRACT_TEXT'  // Extract text content from element(s)
-  | 'WAIT_FOR'      // Wait for an element to appear
-  | 'NAVIGATE';     // Navigate to a URL
+  | "CLICK" // Click on an element
+  | "INPUT" // Input text into a field
+  | "EXTRACT_TEXT" // Extract text content from element(s)
+  | "WAIT_FOR" // Wait for an element to appear
+  | "NAVIGATE"; // Navigate to a URL
 
 /**
  * Parameters for CLICK action
@@ -65,9 +65,16 @@ export interface NavigateParams {
   url: string;
   /** Whether to wait for page load to complete */
   waitForLoad?: boolean;
+  /** Whether to open in a new tab */
+  newTab?: boolean;
 }
 
 /**
  * Union type of all action parameters
  */
-export type ActionParams = ClickParams | InputParams | ExtractTextParams | WaitForParams | NavigateParams;
+export type ActionParams =
+  | ClickParams
+  | InputParams
+  | ExtractTextParams
+  | WaitForParams
+  | NavigateParams;
