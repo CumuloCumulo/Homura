@@ -6,10 +6,12 @@
  * Receives toolkit from Dashboard and allows manual testing
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { SidePanelTestState, ToolTestResult } from '@shared/types';
-import type { AtomicTool } from '@homura/sdk/types';
+import type { AtomicTool, ExecutionState } from '@homura/sdk/types';
 import { sendToContentScript } from '../utils/ensureContentScript';
+
+const EXECUTION_STATE_CHECK_INTERVAL = 500; // ms
 
 interface TestPanelProps {
   testState: SidePanelTestState;
@@ -120,8 +122,89 @@ export function TestPanel({ testState }: TestPanelProps) {
   const [testStatus, setTestStatus] = useState<TestStatus>('idle');
   const [currentToolIndex, setCurrentToolIndex] = useState<number>(-1);
   const [results, setResults] = useState<ToolTestResult[]>([]);
+  const [executionId, setExecutionId] = useState<string | null>(null);
 
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasTools = testState.tools.length > 0;
+
+  // 轮询执行状态
+  useEffect(() => {
+    if (!executionId || testStatus !== 'running') {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      return;
+    }
+
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'HOMURA_GET_STATE',
+        });
+
+        // 检查响应是否有效且 ID 匹配
+        if (!response) {
+          console.log('[TestPanel] No state in response yet, waiting...');
+          return;
+        }
+
+        if (response.id !== executionId) {
+          console.log(
+            '[TestPanel] State ID mismatch, waiting for correct state...',
+          );
+          return;
+        }
+
+        const state = response as ExecutionState;
+        console.log('[TestPanel] Poll result:', {
+          id: state.id,
+          status: state.status,
+          currentIndex: state.currentIndex,
+          historyLength: state.history.length,
+        });
+
+        // 更新当前工具索引
+        setCurrentToolIndex(state.currentIndex);
+
+        // 转换历史记录为测试结果
+        const newResults: ToolTestResult[] = state.history.map((h) => ({
+          toolId: h.toolId,
+          toolName: h.toolName,
+          success: h.result.success,
+          duration: h.result.metadata?.duration || 0,
+          data: h.result.data,
+          error: h.result.error?.message,
+          timestamp: h.timestamp,
+        }));
+        setResults(newResults);
+
+        // 检查执行状态
+        if (state.status === 'completed') {
+          setTestStatus('completed');
+          setExecutionId(null);
+          setCurrentToolIndex(-1);
+          setTimeout(() => setTestStatus('idle'), 2000);
+        } else if (state.status === 'failed') {
+          setTestStatus('failed');
+          setExecutionId(null);
+          setCurrentToolIndex(-1);
+          setTimeout(() => setTestStatus('idle'), 2000);
+        } else if (state.status === 'paused') {
+          // 页面跳转后暂停，等待恢复
+          setTestStatus('running');
+        }
+      } catch (error) {
+        console.error('[TestPanel] Failed to poll execution state:', error);
+      }
+    }, EXECUTION_STATE_CHECK_INTERVAL);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, [executionId, testStatus]);
 
   // 测试单个工具
   const testSingleTool = async (tool: AtomicTool, index: number) => {
@@ -181,7 +264,7 @@ export function TestPanel({ testState }: TestPanelProps) {
     }
   };
 
-  // 连贯测试所有工具
+  // 连贯测试所有工具（使用 Orchestrator 支持跨页面执行）
   const testSequence = async () => {
     if (testState.tools.length === 0) return;
 
@@ -189,69 +272,45 @@ export function TestPanel({ testState }: TestPanelProps) {
     setResults([]);
     setCurrentToolIndex(-1);
 
-    const sequenceResults: ToolTestResult[] = [];
-
-    for (let i = 0; i < testState.tools.length; i++) {
-      const tool = testState.tools[i];
-      setCurrentToolIndex(i);
-
-      const startTime = Date.now();
-      try {
-        const response = await sendToContentScript<{
-          success: boolean;
-          data?: unknown;
-          error?: string;
-        }>({
-          type: 'EXECUTE_TOOL',
-          payload: { tool },
-        });
-
-        const duration = Date.now() - startTime;
-
-        const result: ToolTestResult = {
-          toolId: tool.tool_id,
-          toolName: tool.name,
-          success: response?.success || false,
-          duration,
-          data: response?.data,
-          error: response?.error,
-          timestamp: new Date().toISOString(),
-        };
-
-        sequenceResults.push(result);
-
-        // 如果失败了，停止测试
-        if (!response?.success) {
-          break;
-        }
-
-        // 工具之间延迟
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        const result: ToolTestResult = {
-          toolId: tool.tool_id,
-          toolName: tool.name,
-          success: false,
-          duration,
-          error: error instanceof Error ? error.message : '未知错误',
-          timestamp: new Date().toISOString(),
-        };
-
-        sequenceResults.push(result);
-        break;
+    try {
+      // 获取当前活动 tab
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!tab?.id) {
+        setTestStatus('failed');
+        setTimeout(() => setTestStatus('idle'), 2000);
+        return;
       }
+
+      // 发送执行请求到 background orchestrator
+      const response = await chrome.runtime.sendMessage({
+        type: 'HOMURA_START_EXECUTION',
+        payload: {
+          tools: testState.tools.map((tool) => ({
+            tool,
+            params: {}, // TODO: 从测试面板获取参数
+          })),
+          tabId: tab.id,
+        },
+      });
+
+      console.log('[TestPanel] Start execution response:', response);
+
+      if (response && response.id) {
+        // 设置执行 ID，触发轮询
+        setExecutionId(response.id);
+      } else {
+        console.error('[TestPanel] No execution ID in response:', response);
+        setTestStatus('failed');
+        setTimeout(() => setTestStatus('idle'), 2000);
+      }
+    } catch (error) {
+      console.error('[TestPanel] Failed to start execution:', error);
+      setTestStatus('failed');
+      setTimeout(() => setTestStatus('idle'), 2000);
     }
-
-    setResults(sequenceResults);
-    setTestStatus(
-      sequenceResults.every((r) => r.success) ? 'completed' : 'failed',
-    );
-    setCurrentToolIndex(-1);
-
-    setTimeout(() => {
-      setTestStatus('idle');
-    }, 2000);
   };
 
   // 清除结果

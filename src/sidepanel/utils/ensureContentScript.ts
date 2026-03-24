@@ -2,7 +2,7 @@
  * =============================================================================
  * Homura - Content Script Injection Helper
  * =============================================================================
- * 
+ *
  * Ensures the content script is injected before sending messages
  */
 
@@ -12,13 +12,16 @@
  */
 export async function ensureContentScript(): Promise<number> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  
+
   if (!tab?.id) {
     throw new Error('未找到活动标签页');
   }
 
   // Check if we can access this tab
-  if (tab.url?.startsWith('chrome://') || tab.url?.startsWith('chrome-extension://')) {
+  if (
+    tab.url?.startsWith('chrome://') ||
+    tab.url?.startsWith('chrome-extension://')
+  ) {
     throw new Error('无法在 Chrome 内部页面上使用此功能');
   }
 
@@ -27,39 +30,36 @@ export async function ensureContentScript(): Promise<number> {
     await chrome.tabs.sendMessage(tab.id, { type: 'PING' });
     return tab.id;
   } catch {
-    // Content script not loaded, inject it
-    console.log('[Homura] Content script not responding, injecting...');
-  }
+    // Content script not loaded, try to reload the tab to trigger manifest injection
+    console.log(
+      '[Homura] Content script not responding, please refresh the page',
+    );
 
-  // Inject the content script
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['src/content/index.tsx.js'],
-    });
-  } catch (e) {
-    console.error('[Homura] Script injection failed:', e);
-    // Try with the bundled file name pattern
+    // Try injecting via scripting API with a simple script first
+    // This will fail on chrome:// pages but that's expected
     try {
-      // The actual file might have a different name after bundling
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
-          // Minimal inline script to check if already injected
-          if (!(window as Window & { __HOMURA_INJECTED__?: boolean }).__HOMURA_INJECTED__) {
-            console.log('[Homura] Content script needs to be loaded via manifest');
-          }
-        },
-      });
-    } catch (e2) {
-      throw new Error(`无法注入脚本: ${e2}`);
+      // Read the built manifest to get the correct content script path
+      const manifestUrl = chrome.runtime.getURL('manifest.json');
+      const response = await fetch(manifestUrl);
+      const manifest = await response.json();
+      const contentScript = manifest.content_scripts?.[0]?.js?.[0];
+
+      if (contentScript) {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: [contentScript],
+        });
+        // Wait for script to initialize
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return tab.id;
+      }
+    } catch (e) {
+      // Failed to inject, ask user to refresh
+      console.error('[Homura] Auto-injection failed:', e);
     }
+
+    throw new Error('Content script 未加载，请刷新页面');
   }
-
-  // Wait a bit for the script to initialize
-  await new Promise(resolve => setTimeout(resolve, 200));
-
-  return tab.id;
 }
 
 /**
@@ -67,7 +67,7 @@ export async function ensureContentScript(): Promise<number> {
  */
 export async function sendToContentScript<T>(
   message: { type: string; payload?: unknown },
-  retries = 2
+  retries = 2,
 ): Promise<T> {
   let lastError: Error | null = null;
 
@@ -78,10 +78,10 @@ export async function sendToContentScript<T>(
       return response as T;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      
+
       if (i < retries) {
         // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
     }
   }

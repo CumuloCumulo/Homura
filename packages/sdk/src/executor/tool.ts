@@ -28,6 +28,7 @@ import type {
   NavigateParams,
   ClickParams,
   ExecutorOptions,
+  ReadinessConfig,
 } from '../types/index.js';
 import {
   substituteVariables,
@@ -36,6 +37,7 @@ import {
   safeQuerySelectorAll,
   safeQuerySelector,
   sleep,
+  waitForReady,
 } from '../utils/index.js';
 import {
   executeClick,
@@ -76,6 +78,49 @@ export async function executeTool(
     // Substitute variables in selector logic
     const resolvedLogic = resolveVariables(tool.selector_logic, params);
 
+    // ============================================================================
+    // 等待页面就绪（四层等待机制）
+    // ============================================================================
+    // NAVIGATE 操作不需要等待（页面即将跳转）
+    if (resolvedLogic.target.action !== 'NAVIGATE') {
+      // 获取目标选择器用于预检
+      const targetSelector = resolvedLogic.target.selector || '';
+
+      // 构建等待配置
+      const readinessConfig: ReadinessConfig = {
+        skipWait: false,
+        domStabilityTimeout: 5000,
+        targetTimeout: 5000,
+        spaExtraWait: 2000,
+        pollInterval: 500,
+        verbose: debug,
+      };
+
+      console.log('[Homura SDK] Waiting for page readiness...');
+      const readinessResult = await waitForReady(
+        targetSelector,
+        readinessConfig,
+      );
+
+      if (!readinessResult.ready) {
+        const duration = Math.round(performance.now() - startTime);
+        return {
+          success: false,
+          error: {
+            code: 'TIMEOUT',
+            message: readinessResult.error || '页面未就绪',
+            domSnapshot: getDOMSnapshot(document.body),
+          },
+          metadata: { duration },
+        };
+      }
+
+      console.log(
+        `[Homura SDK] Page ready after ${readinessResult.duration}ms` +
+          ` (type: ${readinessResult.pageType}, layers: ${readinessResult.layers.join(', ')})`,
+      );
+    }
+
     // Execute the selector logic
     const result = await executeSelectionLogic(resolvedLogic, {
       debug,
@@ -92,6 +137,8 @@ export async function executeTool(
         duration,
         scopeMatchCount: result.scopeMatchCount,
         anchorMatchIndex: result.anchorMatchIndex,
+        pageNavigated: result.pageNavigated,
+        newUrl: result.newUrl,
       },
     };
   } catch (error) {
@@ -133,6 +180,8 @@ async function executeSelectionLogic(
   data?: string | string[];
   scopeMatchCount?: number;
   anchorMatchIndex?: number;
+  pageNavigated?: boolean;
+  newUrl?: string;
 }> {
   const { debug = false, debugDelay = 500, onDebugStep } = options;
 
@@ -232,6 +281,33 @@ async function executeSelectionLogic(
   // Step 3: Find and Execute Target
   // ==========================================================================
   const { target } = logic;
+
+  // NAVIGATE 操作不需要查找元素，直接执行
+  if (target.action === 'NAVIGATE') {
+    console.log('[Homura SDK] NAVIGATE action: skipping element lookup');
+
+    if (!target.actionParams) {
+      throw createError(
+        'ACTION_FAILED',
+        'NAVIGATE action requires url parameter',
+        '',
+        document.body,
+      );
+    }
+
+    const navigateParams = target.actionParams as NavigateParams;
+    const navResult = await executeNavigate(navigateParams);
+
+    return {
+      data: `Navigated to ${navigateParams.url}`,
+      scopeMatchCount,
+      anchorMatchIndex,
+      pageNavigated: navResult.navigated,
+      newUrl: navResult.newUrl,
+    };
+  }
+
+  // 其他操作需要查找元素
   let targetElement: HTMLElement | null = null;
 
   // Handle self-targeting (empty target selector)

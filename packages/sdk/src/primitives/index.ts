@@ -10,16 +10,29 @@
  */
 
 // CLICK
-export { executeClick, BROWSER_REQUIRED as CLICK_BROWSER_REQUIRED } from './click.js';
+export {
+  executeClick,
+  BROWSER_REQUIRED as CLICK_BROWSER_REQUIRED,
+} from './click.js';
 
 // INPUT
-export { executeInput, BROWSER_REQUIRED as INPUT_BROWSER_REQUIRED } from './input.js';
+export {
+  executeInput,
+  BROWSER_REQUIRED as INPUT_BROWSER_REQUIRED,
+} from './input.js';
 
 // EXTRACT_TEXT
 export { executeExtractText } from './extract.js';
 
 // WAIT_FOR
-export { executeWaitFor, BROWSER_REQUIRED as WAIT_BROWSER_REQUIRED } from './wait.js';
+export {
+  executeWaitFor,
+  BROWSER_REQUIRED as WAIT_BROWSER_REQUIRED,
+} from './wait.js';
 
 // NAVIGATE
-export { executeNavigate, BROWSER_REQUIRED as NAVIGATE_BROWSER_REQUIRED } from './navigate.js';
+export {
+  executeNavigate,
+  BROWSER_REQUIRED as NAVIGATE_BROWSER_REQUIRED,
+  type NavigateResult,
+} from './navigate.js';

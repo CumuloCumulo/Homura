@@ -58,10 +58,9 @@ export function recordedActionToTool(action: RecordedAction): AtomicTool {
         target: {
           selector: '',
           action: 'NAVIGATE',
-          params: { url: action.url || '' },
+          actionParams: { url: action.url || '', waitForLoad: false },
         },
-        strategy: 'direct',
-      } as AtomicTool['selector_logic'],
+      },
       source: 'recorded',
       createdAt: new Date().toISOString(),
     };
@@ -75,12 +74,8 @@ export function recordedActionToTool(action: RecordedAction): AtomicTool {
         action.elementAnalysis?.minimalSelector ||
         '',
       action: convertActionType(action.type),
-      params: action.value ? { value: action.value } : undefined,
+      actionParams: action.value ? { value: action.value } : undefined,
     },
-    strategy:
-      action.unifiedSelector?.strategy === 'path'
-        ? 'path_selector'
-        : 'scope_anchor_target',
   };
 
   return {

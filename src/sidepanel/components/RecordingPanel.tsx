@@ -250,7 +250,9 @@ export function RecordingPanel() {
           type: 'SET_RECORDING_STATE',
           payload: { isRecording: false },
         });
-      } catch {}
+      } catch {
+        // Ignore: extension may be unloaded
+      }
       setRecording(false);
     }
   };

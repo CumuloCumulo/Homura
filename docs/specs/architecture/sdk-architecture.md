@@ -38,7 +38,7 @@ packages/sdk/
 │   │   ├── index.ts
 │   │   ├── primitives.ts   # CLICK, INPUT, EXTRACT_TEXT, etc.
 │   │   ├── selector.ts     # SelectorScope, SelectorAnchor, etc.
-│   │   └── execution.ts    # ExecuteToolResult, ExecutionError, etc.
+│   │   └── execution.ts    # ExecuteToolResult, ExecutionError, ExecutionState, etc.
 │   ├── selector/           # Selector generation & validation
 │   │   ├── index.ts
 │   │   ├── analyzer.ts     # DOM analysis + semantic scoring
@@ -52,9 +52,13 @@ packages/sdk/
 │   │   ├── extract.ts
 │   │   ├── wait.ts
 │   │   └── navigate.ts
-│   ├── executor/           # Tool execution engine
+│   ├── executor/           # Single tool execution
 │   │   ├── index.ts
 │   │   └── tool.ts         # executeTool implementation
+│   ├── engine/             # Multi-tool execution engine (NEW)
+│   │   └── index.ts        # ExecutionEngine, state persistence
+│   ├── agent/              # AI Agent (NEW)
+│   │   └── index.ts        # AIAgent, autonomous decision making
 │   ├── utils/              # Utility functions
 │   │   ├── index.ts
 │   │   ├── variables.ts    # Variable substitution
@@ -62,7 +66,8 @@ packages/sdk/
 │   │   ├── truncate.ts     # String truncation
 │   │   ├── sleep.ts        # Async delays
 │   │   ├── messageId.ts    # Message ID generation
-│   │   └── dom.ts          # DOM utilities
+│   │   ├── dom.ts          # DOM utilities
+│   │   └── pageState.ts    # Page state extraction for AI (NEW)
 │   ├── constants.ts        # Shared constants
 │   └── index.ts            # Main entry point
 ├── dist/                   # Compiled output
@@ -205,6 +210,55 @@ const result = await executeTool(tool, { student_name: '张三' });
 // }
 ```
 
+### Execution Engine (Multi-tool)
+
+```typescript
+import { createExecutionEngine } from '@homura/sdk/engine';
+
+// Create engine with callbacks
+const engine = createExecutionEngine({
+  maxRetries: 3,
+  failureStrategy: 'continue',
+  onProgress: (state) => console.log('Progress:', state.currentIndex),
+  onComplete: (state) => console.log('Complete!'),
+  onError: (error, state) => console.error('Error:', error)
+});
+
+// Execute tool sequence
+const state = await engine.execute([
+  { tool: tool1, params: { name: 'test' } },
+  { tool: tool2, params: {} }
+]);
+
+// Resume after page navigation
+const resumedState = await engine.resume();
+```
+
+### AI Agent
+
+```typescript
+import { createAIAgent } from '@homura/sdk/agent';
+import type { LLMClient } from '@homura/sdk/agent';
+
+// Implement LLM client
+const llmClient: LLMClient = {
+  async chat(messages) {
+    // Call your LLM API
+    return { action: 'call_skill', skillId: '...', params: {} };
+  }
+};
+
+// Create agent
+const agent = createAIAgent(blueprint, {
+  llmClient,
+  maxIterations: 50,
+  onProgress: (state) => console.log('Agent progress:', state)
+});
+
+// Execute
+const result = await agent.execute({ studentName: '张三' });
+```
+
 ---
 
 ## 📦 Package Exports
@@ -218,6 +272,8 @@ const result = await executeTool(tool, { student_name: '张三' });
     "./primitives": "./dist/primitives/index.js",
     "./utils": "./dist/utils/index.js",
     "./executor": "./dist/executor/index.js",
+    "./engine": "./dist/engine/index.js",
+    "./agent": "./dist/agent/index.js",
     "./constants": "./dist/constants.js"
   }
 }
@@ -262,8 +318,23 @@ import { executeTool } from '@homura/sdk/executor';
 import {
   generateMessageId,
   sleep,
-  substituteVariables
+  substituteVariables,
+  getPageState
 } from '@homura/sdk/utils';
+
+// Engine (Multi-tool execution)
+import {
+  createExecutionEngine,
+  loadExecutionState,
+  clearExecutionState
+} from '@homura/sdk/engine';
+
+// Agent (AI autonomous execution)
+import {
+  createAIAgent,
+  type LLMClient,
+  type AIAgentConfig
+} from '@homura/sdk/agent';
 
 // Constants
 import { HIGHLIGHT_COLORS, TIMEOUTS } from '@homura/sdk/constants';
@@ -337,11 +408,16 @@ import type {
 - [x] TypeScript compilation passes
 - [x] Build succeeds
 
-### 📋 Phase 3: AI Agent (Planned)
+### ✅ Phase 3: AI Agent (Complete)
 
-- [ ] Implement `AIAgent` class
-- [ ] Implement Rule Book parser
-- [ ] Implement LLM dispatcher
+- [x] Implement `AIAgent` class
+- [x] Implement `ExecutionEngine` for state persistence
+- [x] Implement `getPageState` for page context extraction
+- [x] Implement cross-page execution recovery
+- [x] Update orchestrator for background coordination
+- [x] Navigate primitive refactored for background execution
+
+See: [ai-agent-mode.md](../features/ai-agent-mode.md), [execution-engine.md](./execution-engine.md)
 
 ### 📋 Phase 4: Advanced Features (Planned)
 
@@ -381,4 +457,4 @@ After building, load the extension:
 
 ---
 
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-24*

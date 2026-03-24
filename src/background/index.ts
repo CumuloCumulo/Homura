@@ -6,7 +6,9 @@
  * The orchestration layer that coordinates tool execution and AI operations.
  */
 
+import type { AtomicTool } from '@homura/sdk/types';
 import { initAIClient, isAIClientInitialized } from '@services/ai';
+import { initOrchestrator } from './orchestrator';
 
 // =============================================================================
 // INITIALIZATION
@@ -27,6 +29,9 @@ async function initializeAI(): Promise<void> {
 
 // Initialize on startup
 initializeAI();
+
+// Initialize orchestrator for cross-page execution
+initOrchestrator();
 
 // =============================================================================
 // SIDE PANEL MANAGEMENT
@@ -400,6 +405,27 @@ interface ExecuteNavigateMessage {
   };
 }
 
+interface HomuraStartExecutionMessage {
+  type: 'HOMURA_START_EXECUTION';
+  payload: {
+    tools: Array<{ tool: unknown; params: Record<string, unknown> }>;
+    tabId: number;
+  };
+}
+
+interface HomuraResumeExecutionMessage {
+  type: 'HOMURA_RESUME_EXECUTION';
+  payload: { tabId: number };
+}
+
+interface HomuraGetStateMessage {
+  type: 'HOMURA_GET_STATE';
+}
+
+interface HomuraCancelExecutionMessage {
+  type: 'HOMURA_CANCEL_EXECUTION';
+}
+
 type BackgroundMessage =
   | RunMissionMessage
   | OpenSidePanelMessage
@@ -410,7 +436,11 @@ type BackgroundMessage =
   | GetRecordingStateMessage
   | AIGeneratePathSelectorMessage
   | AIGenerateSmartSelectorMessage
-  | ExecuteNavigateMessage;
+  | ExecuteNavigateMessage
+  | HomuraStartExecutionMessage
+  | HomuraResumeExecutionMessage
+  | HomuraGetStateMessage
+  | HomuraCancelExecutionMessage;
 
 chrome.runtime.onMessage.addListener(
   (
@@ -488,6 +518,43 @@ async function handleMessage(
       break;
     }
 
+    // Orchestrator messages
+    case 'HOMURA_START_EXECUTION': {
+      const { startExecution, clearExecutionState } =
+        await import('./orchestrator');
+      await clearExecutionState();
+      const result = await startExecution(
+        message.payload.tools as Array<{
+          tool: AtomicTool;
+          params: Record<string, unknown>;
+        }>,
+        message.payload.tabId,
+      );
+      sendResponse(result);
+      break;
+    }
+
+    case 'HOMURA_RESUME_EXECUTION': {
+      const { resumeExecution } = await import('./orchestrator');
+      const result = await resumeExecution(message.payload.tabId);
+      sendResponse(result);
+      break;
+    }
+
+    case 'HOMURA_GET_STATE': {
+      const { loadExecutionState } = await import('./orchestrator');
+      const state = await loadExecutionState();
+      sendResponse(state);
+      break;
+    }
+
+    case 'HOMURA_CANCEL_EXECUTION': {
+      const { clearExecutionState } = await import('./orchestrator');
+      await clearExecutionState();
+      sendResponse({ success: true });
+      break;
+    }
+
     default:
       sendResponse({ success: false, error: 'Unknown message type' });
   }
@@ -501,15 +568,18 @@ async function handleRunMission(
   message: RunMissionMessage,
   sendResponse: (response: unknown) => void,
 ): Promise<void> {
-  const { runMission } = await import('./orchestrator');
-  const result = await runMission(
-    message.payload.tools as Parameters<typeof runMission>[0],
-    (context, result) => {
-      chrome.runtime.sendMessage({
-        type: 'MISSION_PROGRESS',
-        payload: { context, result },
-      });
-    },
+  const { startExecution } = await import('./orchestrator');
+
+  // 获取当前活动 tab
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    sendResponse({ error: 'No active tab found' });
+    return;
+  }
+
+  const result = await startExecution(
+    message.payload.tools as Parameters<typeof startExecution>[0],
+    tab.id,
   );
   sendResponse(result);
 }

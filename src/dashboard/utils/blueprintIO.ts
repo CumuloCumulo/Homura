@@ -6,7 +6,12 @@
  * Export and import functionality for Blueprint files
  */
 
-import type { Blueprint, BlueprintMeta } from '@homura/sdk/types';
+import type {
+  Blueprint,
+  BlueprintMeta,
+  AtomicTool,
+  AgentConfig,
+} from '@homura/sdk/types';
 import { validateBlueprint, calculateSkillsHash } from './blueprintValidator';
 
 /**
@@ -190,22 +195,22 @@ export async function importMultipleBlueprints(
  */
 export function createBlueprint(
   meta: Omit<BlueprintMeta, 'skillsHash' | 'createdAt' | 'updatedAt'>,
-  skills: unknown[],
+  skills: AtomicTool[],
   rules: string,
-  agentConfig?: unknown,
+  agentConfig?: AgentConfig,
 ): Blueprint {
   const now = new Date().toISOString();
 
   return {
     meta: {
       ...meta,
-      skillsHash: calculateSkillsHash(skills as any[]), // Will be recalculated properly
+      skillsHash: calculateSkillsHash(skills), // Will be recalculated properly
       createdAt: now,
       updatedAt: now,
     },
-    skills: skills as any[],
+    skills,
     rules,
-    agentConfig: agentConfig as any,
+    agentConfig,
   };
 }
 

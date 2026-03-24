@@ -1,110 +1,324 @@
 /**
  * =============================================================================
- * Homura - Orchestrator (MVP Mock)
+ * Background Orchestrator
  * =============================================================================
  *
- * In the full version, this would be the "brain" that uses an LLM to make
- * decisions based on Rule Books and page state.
- *
- * For MVP, we hardcode a simple decision flow to test the execution engine.
+ * 协调跨页面工具执行，处理 NAVIGATE 操作
+ * - 监听 tab 更新事件
+ * - 恢复跨页面中断的执行
+ * - 处理来自 content script 的导航请求
  */
 
-import type { AtomicTool, ExecuteToolResult } from '@homura/sdk/types';
-import type { LogEntry } from '@shared/types';
-import { executeToolOnActiveTab } from './messaging';
+import type {
+  ExecutionState,
+  AtomicTool,
+  ExecuteToolResult,
+} from '@homura/sdk/types';
+import { executeToolOnTab } from './messaging';
 
-export interface MissionContext {
-  /** Current step index */
-  currentStep: number;
-  /** Total steps */
-  totalSteps: number;
-  /** Execution logs */
-  logs: LogEntry[];
-  /** Variables collected during execution */
-  variables: Record<string, unknown>;
+const STORAGE_KEY = 'homura_execution_state';
+
+/**
+ * 初始化 Orchestrator
+ *
+ * 在 background script 中初始化，设置监听器
+ */
+export function initOrchestrator(): void {
+  // 监听 tab 更新（页面加载完成）
+  chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' && tab.url) {
+      // 检查是否有等待恢复的执行
+      const state = await loadExecutionState();
+      console.log(
+        `[Orchestrator] Tab ${tabId} loaded, state:`,
+        state ? `${state.status} (tabId: ${state.tabId})` : 'null',
+      );
+
+      if (state && state.status === 'paused') {
+        // 不再检查 tabId 匹配，因为页面跳转可能打开新 tab
+        // 只要状态是 paused，就在当前 tab 继续执行
+        console.log(
+          `[Orchestrator] Resuming execution on tab ${tabId}, was tracking tab ${state.tabId}`,
+        );
+        // 更新 tabId 为当前 tab
+        state.tabId = tabId;
+        await saveExecutionState(state);
+        await resumeExecution(tabId);
+      }
+    }
+  });
+
+  console.log('[Orchestrator] Initialized');
 }
 
 /**
- * Run a sequence of tools (MVP: hardcoded sequence)
+ * 开始执行工具集
  *
- * In the future, this will:
- * 1. Send page state to LLM
- * 2. LLM decides which tool to call next based on Rule Book
- * 3. Execute the tool
- * 4. Repeat until mission is complete
+ * @param tools - 工具列表
+ * @param tabId - Tab ID
+ * @returns 执行状态
  */
-export async function runMission(
-  tools: Array<{
-    tool: AtomicTool;
-    params: Record<string, string | number | boolean>;
-  }>,
-  onProgress?: (context: MissionContext, result: ExecuteToolResult) => void,
-): Promise<MissionContext> {
-  const context: MissionContext = {
-    currentStep: 0,
-    totalSteps: tools.length,
-    logs: [],
+async function startExecution(
+  tools: Array<{ tool: AtomicTool; params: Record<string, unknown> }>,
+  tabId: number,
+): Promise<ExecutionState> {
+  const id = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const state: ExecutionState = {
+    id,
+    mode: 'sequential',
+    currentIndex: 0,
+    tools: tools.map((t) => ({
+      tool: t.tool as AtomicTool,
+      params: t.params,
+      status: 'pending' as const,
+      retryCount: 0,
+    })),
     variables: {},
+    history: [],
+    status: 'running',
+    startTime: new Date().toISOString(),
+    lastUpdate: new Date().toISOString(),
+    currentUrl: undefined,
+    tabId,
   };
 
-  for (let i = 0; i < tools.length; i++) {
-    context.currentStep = i + 1;
+  await saveExecutionState(state);
 
-    const { tool, params } = tools[i];
+  // 开始执行第一个工具
+  await executeNextTool(tabId);
 
-    // Log start
-    context.logs.push({
-      timestamp: Date.now(),
-      level: 'info',
-      message: `Executing step ${i + 1}/${tools.length}: ${tool.name}`,
-      toolId: tool.tool_id,
+  return state;
+}
+
+/**
+ * 恢复执行
+ *
+ * @param tabId - Tab ID
+ * @returns 执行状态
+ */
+async function resumeExecution(tabId: number): Promise<ExecutionState> {
+  const state = await loadExecutionState();
+  if (!state) {
+    throw new Error('没有可恢复的执行状态');
+  }
+
+  if (state.status !== 'paused') {
+    return state;
+  }
+
+  state.status = 'running';
+  state.tabId = tabId;
+  await saveExecutionState(state);
+
+  // 继续执行
+  await executeNextTool(tabId);
+
+  return state;
+}
+
+/**
+ * 执行下一个工具
+ *
+ * @param tabId - Tab ID
+ */
+async function executeNextTool(tabId: number): Promise<void> {
+  const state = await loadExecutionState();
+  if (!state || state.status !== 'running') {
+    return;
+  }
+
+  // 找到下一个待执行的工具
+  const nextIndex = state.tools.findIndex((t) => t.status === 'pending');
+
+  if (nextIndex === -1) {
+    // 全部完成
+    state.status = 'completed';
+    await saveExecutionState(state);
+    console.log('[Orchestrator] Execution completed');
+    return;
+  }
+
+  const toolExec = state.tools[nextIndex];
+  console.log(
+    `[Orchestrator] Executing tool ${nextIndex + 1}/${state.tools.length}: ${toolExec.tool.name}`,
+  );
+
+  state.currentIndex = nextIndex;
+  toolExec.status = 'running';
+  await saveExecutionState(state);
+
+  try {
+    // 等待 content script 准备好（带重试）
+    const result = await executeToolWithRetry(
+      tabId,
+      toolExec.tool,
+      toolExec.params as Record<string, string | number | boolean>,
+    );
+
+    // 更新状态
+    toolExec.result = result;
+    toolExec.status = result.success ? 'completed' : 'failed';
+    toolExec.timestamp = new Date().toISOString();
+
+    state.history.push({
+      index: nextIndex,
+      toolId: toolExec.tool.tool_id,
+      toolName: toolExec.tool.name,
+      result,
+      timestamp: new Date().toISOString(),
     });
 
+    state.lastUpdate = new Date().toISOString();
+
+    // 检查页面跳转
+    if (result.metadata?.pageNavigated) {
+      state.currentUrl = result.metadata.newUrl;
+      state.status = 'paused';
+      // 保持 tabId 不变，因为是同一个 tab 跳转
+      await saveExecutionState(state);
+      console.log(
+        '[Orchestrator] Page navigation detected, execution paused. tabId:',
+        state.tabId,
+        'newUrl:',
+        result.metadata.newUrl,
+      );
+      return;
+    }
+
+    // 处理失败
+    if (!result.success) {
+      state.status = 'failed';
+      await saveExecutionState(state);
+      console.error('[Orchestrator] Execution failed:', result.error);
+      return;
+    }
+
+    await saveExecutionState(state);
+
+    // 工具间延迟：给页面变化（异步跳转、DOM 更新）留出时间
+    // 特别是点击操作可能触发异步导航或 SPA 路由变化
+    const toolDelay = 500;
+    console.log(`[Orchestrator] Waiting ${toolDelay}ms before next tool...`);
+    await new Promise((resolve) => setTimeout(resolve, toolDelay));
+
+    // 检测是否有新 tab 打开（点击可能触发 target="_blank" 等）
+    const allTabs = await chrome.tabs.query({});
+
+    // 找出比当前 tabId 更新的 tab（说明是工具执行过程中打开的）
+    const newerTabs = allTabs.filter((t) => t.id && t.id > tabId);
+    if (newerTabs.length > 0) {
+      // 按创建时间排序，取最新的
+      const newestTab = newerTabs.sort((a, b) => (b.id || 0) - (a.id || 0))[0];
+      if (newestTab.id && newestTab.id !== tabId) {
+        console.log(
+          `[Orchestrator] New tab detected: ${newestTab.id}, switching context from ${tabId}`,
+        );
+        // 更新状态中的 tabId
+        state.tabId = newestTab.id;
+        state.currentUrl = newestTab.url;
+        await saveExecutionState(state);
+        tabId = newestTab.id; // 更新本地变量
+      }
+    }
+
+    // 继续执行下一个工具
+    await executeNextTool(tabId);
+  } catch (error) {
+    console.error('[Orchestrator] Tool execution error:', error);
+    toolExec.status = 'failed';
+    toolExec.timestamp = new Date().toISOString();
+    state.status = 'failed';
+    await saveExecutionState(state);
+  }
+}
+
+/**
+ * 执行工具（带重试，等待 content script 准备好）
+ */
+async function executeToolWithRetry(
+  tabId: number,
+  tool: AtomicTool,
+  params: Record<string, string | number | boolean>,
+  maxRetries = 5,
+): Promise<ExecuteToolResult> {
+  const delays = [200, 400, 800, 1500, 3000];
+
+  for (let i = 0; i < maxRetries; i++) {
     try {
-      // Execute the tool
-      const result = await executeToolOnActiveTab(tool, params, true);
-
-      // Store extracted data
-      if (result.success && result.data !== undefined) {
-        context.variables[tool.tool_id] = result.data;
-      }
-
-      // Log result
-      context.logs.push({
-        timestamp: Date.now(),
-        level: result.success ? 'info' : 'error',
-        message: result.success
-          ? `Step ${i + 1} completed in ${result.metadata?.duration}ms`
-          : `Step ${i + 1} failed: ${result.error?.message}`,
-        toolId: tool.tool_id,
-        data: result,
-      });
-
-      // Notify progress
-      onProgress?.(context, result);
-
-      // Stop on error
-      if (!result.success) {
-        context.logs.push({
-          timestamp: Date.now(),
-          level: 'error',
-          message: 'Mission aborted due to error',
-        });
-        break;
-      }
-
-      // Small delay between steps for stability
-      await new Promise((r) => setTimeout(r, 500));
+      return await executeToolOnTab(tabId, tool, params, false);
     } catch (error) {
-      context.logs.push({
-        timestamp: Date.now(),
-        level: 'error',
-        message: `Step ${i + 1} threw exception: ${error}`,
-        toolId: tool.tool_id,
-      });
-      break;
+      const isLastAttempt = i === maxRetries - 1;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      // 检查是否是 content script 未就绪的错误
+      if (
+        errorMessage.includes('Receiving end does not exist') ||
+        errorMessage.includes('message port closed') ||
+        errorMessage.includes('Could not establish connection')
+      ) {
+        if (!isLastAttempt) {
+          console.log(
+            `[Orchestrator] Content script not ready, retry ${i + 1}/${maxRetries} after ${delays[i]}ms`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delays[i]));
+          continue;
+        }
+      }
+
+      // 其他错误或最后一次重试失败
+      if (isLastAttempt) {
+        return {
+          success: false,
+          error: {
+            code: 'TIMEOUT',
+            message: `Failed after ${maxRetries} retries: ${errorMessage}`,
+          },
+        };
+      }
     }
   }
 
-  return context;
+  return {
+    success: false,
+    error: {
+      code: 'UNKNOWN',
+      message: 'Unknown execution error',
+    },
+  };
 }
+
+/**
+ * 加载执行状态
+ */
+async function loadExecutionState(): Promise<ExecutionState | null> {
+  const result = await chrome.storage.local.get(STORAGE_KEY);
+  return result[STORAGE_KEY] || null;
+}
+
+/**
+ * 保存执行状态
+ */
+async function saveExecutionState(state: ExecutionState): Promise<void> {
+  await chrome.storage.local.set({ [STORAGE_KEY]: state });
+}
+
+/**
+ * 清除执行状态
+ */
+async function clearExecutionState(): Promise<void> {
+  await chrome.storage.local.remove(STORAGE_KEY);
+}
+
+// ============================================================================
+// Exports
+// ============================================================================
+
+// initOrchestrator 已经在文件顶部导出
+export {
+  startExecution,
+  resumeExecution,
+  loadExecutionState,
+  clearExecutionState,
+};
