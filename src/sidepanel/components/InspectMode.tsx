@@ -58,7 +58,13 @@ export function InspectMode() {
     setUserModeOverride,
     setPathSelectorResult,
     setContainerType,
+    // Tool Editing State
+    editingTool,
+    finishEditing,
   } = useRecordingStore();
+
+  // 是否处于编辑模式（来自测试模式）
+  const isEditMode = editingTool !== null;
 
   // Determine active mode: user override > AI decision > default based on analysis
   const activeMode: ViewMode = React.useMemo(() => {
@@ -333,11 +339,17 @@ export function InspectMode() {
       });
       return;
     }
-    addLog({
-      timestamp: Date.now(),
-      level: 'info',
-      message: '保存到工具库功能即将推出...',
-    });
+    // 如果在编辑模式（从测试模式进入），同步回测试模式
+    if (isEditMode) {
+      await finishEditing();
+    } else {
+      // 正常模式，保存到工具库（待实现）
+      addLog({
+        timestamp: Date.now(),
+        level: 'info',
+        message: '保存到工具库功能即将推出...',
+      });
+    }
   };
 
   const handleModeChange = (mode: ViewMode) => {
@@ -420,12 +432,13 @@ export function InspectMode() {
       </div>
 
       {/* Bottom Action Bar */}
-      {analysis && (
+      {(analysis || isEditMode) && (
         <ActionBar
           selectorDraft={selectorDraft}
           isProcessing={isProcessing}
           onAIGenerate={handleAIGenerate}
           onSave={handleSaveTool}
+          isEditMode={isEditMode}
         />
       )}
     </div>
@@ -609,6 +622,7 @@ interface ActionBarProps {
   isProcessing: boolean;
   onAIGenerate: () => void;
   onSave: () => void;
+  isEditMode: boolean;
 }
 
 function ActionBar({
@@ -616,6 +630,7 @@ function ActionBar({
   isProcessing,
   onAIGenerate,
   onSave,
+  isEditMode,
 }: ActionBarProps) {
   const handleCopySelector = () => {
     if (selectorDraft?.target?.selector) {
@@ -663,13 +678,13 @@ function ActionBar({
         </button>
       </div>
 
-      {/* Save Button */}
+      {/* Save Button - text changes based on mode */}
       <button
         onClick={onSave}
         disabled={!selectorDraft}
         className="
           w-full h-9 flex items-center justify-center gap-2
-          bg-gradient-to-r from-violet-600/90 to-fuchsia-600/90 
+          bg-gradient-to-r from-violet-600/90 to-fuchsia-600/90
           rounded-lg text-xs font-medium text-white
           hover:from-violet-500 hover:to-fuchsia-500 hover:shadow-neon
           disabled:opacity-50 disabled:cursor-not-allowed
@@ -677,7 +692,7 @@ function ActionBar({
         "
       >
         <SaveIcon className="w-3.5 h-3.5" />
-        保存到工具库
+        {isEditMode ? '更新并返回测试' : '保存到工具库'}
       </button>
     </div>
   );

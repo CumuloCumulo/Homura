@@ -37,6 +37,12 @@ interface ToolStore {
   removeTool: (toolId: string) => void;
   /** Save a recorded tool to manual (long-term) library */
   saveTool: (toolId: string) => void;
+  /**
+   * Replace all recorded tools with new ones.
+   * Removes all tools with source='recorded' and adds the new tools.
+   * Preserves tools with source='manual' or source='imported'.
+   */
+  replaceRecordedTools: (tools: AtomicTool[]) => void;
   selectTool: (tool: AtomicTool | null) => void;
   setRuleBook: (content: string) => void;
   setMission: (mission: Mission | null) => void;
@@ -98,11 +104,33 @@ export const useToolStore = create<ToolStore>()(
         })),
 
       saveTool: (toolId) =>
-        set((state) => ({
-          tools: state.tools.map((t) =>
-            t.tool_id === toolId ? { ...t, source: 'manual' as const } : t,
-          ),
-        })),
+        set((state) => {
+          // First, remove the tool from the recorded" list
+          const toolToSave = state.tools.find((t) => t.tool_id === toolId);
+          const updatedTools = state.tools.filter((t) => t.tool_id !== toolId);
+
+          // Add it back with source='manual' if it was recorded
+          if (toolToSave) {
+            updatedTools.push({
+              ...toolToSave,
+              source: 'manual' as const,
+            });
+          }
+
+          return { tools: updatedTools };
+        }),
+
+      replaceRecordedTools: (newRecordedTools) =>
+        set((state) => {
+          // Keep only non-recorded tools (manual, imported)
+          const nonRecordedTools = state.tools.filter(
+            (t) => t.source !== 'recorded',
+          );
+          // Add new recorded tools
+          return {
+            tools: [...nonRecordedTools, ...newRecordedTools],
+          };
+        }),
 
       selectTool: (tool) => set({ selectedTool: tool }),
 

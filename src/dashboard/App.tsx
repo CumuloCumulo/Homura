@@ -22,7 +22,16 @@ import type { AtomicTool } from '@homura/sdk/types';
 // Storage keys for listening to recorded tools
 const STORAGE_KEYS = {
   RECORDED_TOOLS: 'homura_recorded_tools',
+  TOOL_UPDATE_PREFIX: 'homura_tool_update_',
 } as const;
+
+// Type for tool update data
+interface ToolUpdateData {
+  toolkitId: string;
+  toolIndex: number;
+  updatedTool: AtomicTool;
+  timestamp: number;
+}
 
 interface RecordedToolsData {
   tools: AtomicTool[];
@@ -33,7 +42,7 @@ interface RecordedToolsData {
 type DashboardTab = 'toolkit' | 'blueprint';
 
 export default function App() {
-  const { tools, addTool, updateTool } = useToolStore();
+  const { replaceRecordedTools } = useToolStore();
   const { loadToolkits } = useToolkitStore();
   const [currentTab, setCurrentTab] = React.useState<DashboardTab>('toolkit');
   const [recordingImportOpen, setRecordingImportOpen] = React.useState(false);
@@ -72,7 +81,11 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Check for existing recorded tools on mount (in case Dashboard opened after recording)
+  // Note: On mount, we check for existing recorded tools to handle the case
+  // where Dashboard opens AFTER recording is complete.
+  // We use replaceRecordedTools to ensure "最近录制" only shows the latest batch.
+
+  // Check for existing recorded tools on mount
   useEffect(() => {
     const checkRecordedTools = async () => {
       const result = await chrome.storage.local.get(
@@ -84,19 +97,15 @@ export default function App() {
 
       if (data?.tools && data.tools.length > 0) {
         console.log('[Dashboard] Found existing tools in storage:', data.tools);
-        for (const tool of data.tools) {
-          const existingTool = tools.find((t) => t.tool_id === tool.tool_id);
-          if (!existingTool) {
-            addTool(tool);
-          }
-        }
+        replaceRecordedTools(data.tools);
         console.log(`[Dashboard] Loaded ${data.tools.length} existing tools`);
       }
     };
     checkRecordedTools();
-  }, []);
+  }, []); // Empty deps - only run on mount
 
-  // Listen for recorded tools from SidePanel (方案b)
+  // Listen for recorded tools from SidePanel
+  // Uses replaceRecordedTools to ensure "最近录制" only shows the latest batch
   useEffect(() => {
     const handleStorageChange = (
       changes: { [key: string]: chrome.storage.StorageChange },
@@ -111,27 +120,11 @@ export default function App() {
         console.log('[Dashboard] Received tools data:', newData);
 
         if (newData?.tools) {
-          let addedCount = 0;
-          let updatedCount = 0;
-
-          for (const tool of newData.tools) {
-            const existingTool = tools.find((t) => t.tool_id === tool.tool_id);
-
-            if (existingTool) {
-              // Update existing tool, preserve source
-              updateTool(tool.tool_id, {
-                ...tool,
-                source: existingTool.source || tool.source,
-              });
-              updatedCount++;
-            } else {
-              // Add new tool
-              addTool(tool);
-              addedCount++;
-            }
-          }
+          // Replace all recorded tools with new ones
+          // This ensures "最近录制" only shows the latest recording
+          replaceRecordedTools(newData.tools);
           console.log(
-            `[Dashboard] Added ${addedCount} new tools, updated ${updatedCount} existing tools`,
+            `[Dashboard] Replaced recorded tools with ${newData.tools.length} new tools`,
           );
         }
       }
@@ -140,7 +133,57 @@ export default function App() {
     chrome.storage.onChanged.addListener(handleStorageChange);
     console.log('[Dashboard] Storage listener registered');
     return () => chrome.storage.onChanged.removeListener(handleStorageChange);
-  }, [tools, addTool, updateTool]);
+  }, [replaceRecordedTools]);
+
+  // Listen for tool updates from SidePanel
+  // When a tool is edited in SidePanel test mode, it syncs back to Dashboard
+  const updateToolByIndex = useToolkitStore((state) => state.updateToolByIndex);
+  const updateTool = useToolStore((state) => state.updateTool);
+
+  useEffect(() => {
+    const handleStorageChange = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      areaName: string,
+    ) => {
+      if (areaName !== 'local') return;
+
+      // Check for tool update keys
+      for (const key of Object.keys(changes)) {
+        if (key.startsWith(STORAGE_KEYS.TOOL_UPDATE_PREFIX)) {
+          const updateData = changes[key].newValue as
+            | ToolUpdateData
+            | undefined;
+
+          if (updateData?.updatedTool) {
+            console.log('[Dashboard] Tool update received:', {
+              toolkitId: updateData.toolkitId,
+              toolIndex: updateData.toolIndex,
+              toolName: updateData.updatedTool.name,
+            });
+
+            // 1. Update tool in toolkit (by index)
+            updateToolByIndex(
+              updateData.toolkitId,
+              updateData.toolIndex,
+              updateData.updatedTool,
+            );
+
+            // 2. Also update tool in tool library (by tool_id)
+            updateTool(updateData.updatedTool.tool_id, updateData.updatedTool);
+
+            // 3. Clean up the storage key to avoid duplicate processing
+            chrome.storage.local.remove(key);
+
+            console.log('[Dashboard] Tool synced successfully');
+          }
+        }
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    console.log('[Dashboard] Tool update listener registered');
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+  }, [updateToolByIndex, updateTool]);
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-300 antialiased selection:bg-violet-500/30">

@@ -254,7 +254,32 @@ export interface ToolTestResult {
   timestamp: string;
 }
 
+/**
+ * SidePanel → Dashboard: Tool has been updated
+ */
+export interface ToolUpdatedMessage {
+  type: 'TOOL_UPDATED';
+  payload: {
+    toolkitId: string;
+    toolIndex: number;
+    updatedTool: import('@homura/sdk/types').AtomicTool;
+  };
+}
+
+/**
+ * Dashboard → SidePanel: Sync completed
+ */
+export interface ToolSyncedMessage {
+  type: 'TOOL_SYNCED';
+  payload: {
+    toolkitId: string;
+    toolIndex: number;
+  };
+}
+
 // Add new message types to the union
 export type ExtendedHomuraMessage =
   | HomuraMessage
-  | SendToolkitToSidepanelMessage;
+  | SendToolkitToSidepanelMessage
+  | ToolUpdatedMessage
+  | ToolSyncedMessage;

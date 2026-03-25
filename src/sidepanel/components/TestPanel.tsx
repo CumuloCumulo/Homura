@@ -11,6 +11,7 @@ import type { SidePanelTestState, ToolTestResult } from '@shared/types';
 import type { AtomicTool, ExecutionState } from '@homura/sdk/types';
 import { sendToContentScript } from '../utils/ensureContentScript';
 import { ActionIcon } from '@shared/components/ActionIcon';
+import { useRecordingStore } from '../stores/recordingStore';
 
 const EXECUTION_STATE_CHECK_INTERVAL = 500; // ms
 
@@ -30,15 +31,30 @@ export function TestPanel({ testState }: TestPanelProps) {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasTools = testState.tools.length > 0;
 
+  // 获取 recordingStore 中的 startEditingTool 方法
+  const { startEditingTool } = useRecordingStore();
+
   // 轮询执行状态
   useEffect(() => {
-    if (!executionId || testStatus !== 'running') {
+    // 只有当有 executionId 且状态为 running 时才启动轮询
+    if (!executionId) {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
       return;
     }
+
+    // 如果状态不是 running，停止轮询
+    if (testStatus !== 'running') {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      return;
+    }
+
+    console.log('[TestPanel] Starting polling for executionId:', executionId);
 
     pollIntervalRef.current = setInterval(async () => {
       try {
@@ -71,15 +87,37 @@ export function TestPanel({ testState }: TestPanelProps) {
         setCurrentToolIndex(state.currentIndex);
 
         // 转换历史记录为测试结果
-        const newResults: ToolTestResult[] = state.history.map((h) => ({
-          toolId: h.toolId,
-          toolName: h.toolName,
-          success: h.result.success,
-          duration: h.result.metadata?.duration || 0,
-          data: h.result.data,
-          error: h.result.error?.message,
-          timestamp: h.timestamp,
-        }));
+        const newResults: ToolTestResult[] = state.history.map((h) => {
+          // 安全地提取错误信息
+          let errorMessage: string | undefined = undefined;
+          if (h.result.error) {
+            if (typeof h.result.error === 'string') {
+              errorMessage = h.result.error;
+            } else if (
+              typeof h.result.error === 'object' &&
+              h.result.error !== null
+            ) {
+              // 类型断言：error 对象可能有 message 属性
+              const errorObj = h.result.error as unknown as {
+                message?: string;
+                [key: string]: unknown;
+              };
+              errorMessage = errorObj.message || JSON.stringify(errorObj);
+            } else {
+              errorMessage = String(h.result.error);
+            }
+          }
+
+          return {
+            toolId: h.toolId,
+            toolName: h.toolName,
+            success: h.result.success,
+            duration: h.result.metadata?.duration || 0,
+            data: h.result.data,
+            error: errorMessage,
+            timestamp: h.timestamp,
+          };
+        });
         setResults(newResults);
 
         // 检查执行状态
@@ -105,7 +143,12 @@ export function TestPanel({ testState }: TestPanelProps) {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
       }
+      console.log(
+        '[TestPanel] Polling cleaned up for executionId:',
+        executionId,
+      );
     };
   }, [executionId, testStatus]);
 
@@ -127,13 +170,33 @@ export function TestPanel({ testState }: TestPanelProps) {
 
       const duration = Date.now() - startTime;
 
+      // 安全地提取错误信息
+      let errorMessage: string | undefined = undefined;
+      if (response?.error) {
+        if (typeof response.error === 'string') {
+          errorMessage = response.error;
+        } else if (
+          typeof response.error === 'object' &&
+          response.error !== null
+        ) {
+          // 类型断言：error 对象可能有 message 属性
+          const errorObj = response.error as {
+            message?: string;
+            [key: string]: unknown;
+          };
+          errorMessage = errorObj.message || JSON.stringify(errorObj);
+        } else {
+          errorMessage = String(response.error);
+        }
+      }
+
       const result: ToolTestResult = {
         toolId: tool.tool_id,
         toolName: tool.name,
         success: response?.success || false,
         duration,
         data: response?.data,
-        error: response?.error,
+        error: errorMessage,
         timestamp: new Date().toISOString(),
       };
 
@@ -171,7 +234,7 @@ export function TestPanel({ testState }: TestPanelProps) {
   const testSequence = async () => {
     if (testState.tools.length === 0) return;
 
-    setTestStatus('running');
+    // 清空状态和结果
     setResults([]);
     setCurrentToolIndex(-1);
 
@@ -202,8 +265,10 @@ export function TestPanel({ testState }: TestPanelProps) {
       console.log('[TestPanel] Start execution response:', response);
 
       if (response && response.id) {
-        // 设置执行 ID，触发轮询
+        // 先设置 executionId，再设置 testStatus
+        // 这样确保 useEffect 在 executionId 存在时才启动轮询
         setExecutionId(response.id);
+        setTestStatus('running');
       } else {
         console.error('[TestPanel] No execution ID in response:', response);
         setTestStatus('failed');
@@ -220,6 +285,39 @@ export function TestPanel({ testState }: TestPanelProps) {
   const clearResults = () => {
     setResults([]);
     setTestStatus('idle');
+  };
+
+  // 停止测试
+  const stopTest = async () => {
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'HOMURA_CANCEL_EXECUTION',
+      });
+      console.log('[TestPanel] Execution cancelled');
+    } catch (error) {
+      console.error('[TestPanel] Failed to cancel execution:', error);
+    }
+    // 立即更新本地状态
+    setTestStatus('idle');
+    setExecutionId(null);
+    setCurrentToolIndex(-1);
+  };
+
+  // 在检查模式中修复失败的工具
+  const handleFixInInspect = (tool: AtomicTool, index: number) => {
+    if (!testState.toolkitId) {
+      console.error('[TestPanel] No toolkitId, cannot start editing');
+      return;
+    }
+
+    console.log(
+      '[TestPanel] Starting edit for tool:',
+      tool.name,
+      'at index:',
+      index,
+    );
+    startEditingTool(testState.toolkitId, index, tool);
+    // App 会监听 editingTool 变化并自动切换到检查模式
   };
 
   return (
@@ -250,22 +348,31 @@ export function TestPanel({ testState }: TestPanelProps) {
 
         {hasTools && (
           <button
-            onClick={testSequence}
-            disabled={testStatus === 'running'}
+            onClick={testStatus === 'running' ? stopTest : testSequence}
             className={`
               w-full h-8 flex items-center justify-center gap-2 rounded text-xs font-medium
               transition-all duration-200
               ${
                 testStatus === 'running'
-                  ? 'bg-violet-500/20 text-violet-400 cursor-wait'
-                  : 'bg-violet-600/90 text-white hover:bg-violet-500 hover:shadow-neon'
+                  ? 'bg-rose-600/90 text-white hover:bg-rose-500 hover:shadow-neon'
+                  : testStatus === 'completed'
+                    ? 'bg-emerald-600/90 text-white'
+                    : testStatus === 'failed'
+                      ? 'bg-rose-600/90 text-white'
+                      : 'bg-violet-600/90 text-white hover:bg-violet-500 hover:shadow-neon'
               }
             `}
           >
             {testStatus === 'running' ? (
               <>
-                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                <span>测试中...</span>
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
+                </svg>
+                <span>停止测试</span>
               </>
             ) : testStatus === 'completed' ? (
               <>
@@ -460,9 +567,18 @@ export function TestPanel({ testState }: TestPanelProps) {
 
                   {/* Error message */}
                   {toolResult?.error && (
-                    <p className="text-[9px] text-rose-400 mt-2">
-                      {toolResult.error}
-                    </p>
+                    <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between gap-2">
+                      <p className="text-[9px] text-rose-400 flex-1">
+                        {toolResult.error}
+                      </p>
+                      <button
+                        onClick={() => handleFixInInspect(tool, index)}
+                        className="px-2 py-1 rounded text-[9px] font-medium bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 transition-colors"
+                        disabled={testStatus === 'running'}
+                      >
+                        在检查模式中修复
+                      </button>
+                    </div>
                   )}
                 </div>
               );

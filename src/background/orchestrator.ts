@@ -203,6 +203,7 @@ async function executeNextTool(tabId: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, toolDelay));
 
     // 检测是否有新 tab 打开（点击可能触发 target="_blank" 等）
+    // 使用当前 tabId 作为基准，检测比当前 tab 更新的 tab
     const allTabs = await chrome.tabs.query({});
 
     // 找出比当前 tabId 更新的 tab（说明是工具执行过程中打开的）
@@ -219,6 +220,19 @@ async function executeNextTool(tabId: number): Promise<void> {
         state.currentUrl = newestTab.url;
         await saveExecutionState(state);
         tabId = newestTab.id; // 更新本地变量
+
+        // 等待新 tab 的 content script 准备好
+        console.log(
+          `[Orchestrator] Waiting for content script in tab ${tabId}...`,
+        );
+        const contentScriptReady = await waitForContentScript(tabId, 5000);
+        if (!contentScriptReady) {
+          console.warn(
+            `[Orchestrator] Content script not ready in tab ${tabId} after 5s, continuing anyway`,
+          );
+        } else {
+          console.log(`[Orchestrator] Content script ready in tab ${tabId}`);
+        }
       }
     }
 
@@ -231,6 +245,86 @@ async function executeNextTool(tabId: number): Promise<void> {
     state.status = 'failed';
     await saveExecutionState(state);
   }
+}
+
+/**
+ * 等待 content script 准备好
+ *
+ * @param tabId - Tab ID
+ * @param timeout - 超时时间（毫秒）
+ * @returns 是否准备好
+ */
+async function waitForContentScript(
+  tabId: number,
+  timeout = 5000,
+): Promise<boolean> {
+  const startTime = Date.now();
+  const pollInterval = 200;
+
+  // 首先检查 tab 是否可访问（排除内部页面）
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (
+      !tab.url ||
+      tab.url.startsWith('chrome://') ||
+      tab.url.startsWith('about:')
+    ) {
+      console.warn(
+        `[Orchestrator] Tab ${tabId} is internal page (${tab.url}), content script cannot be injected`,
+      );
+      return false;
+    }
+  } catch (error) {
+    console.warn(`[Orchestrator] Cannot access tab ${tabId}:`, error);
+    return false;
+  }
+
+  // 如果 tab 还在加载中，先等待加载完成
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.status !== 'complete') {
+      console.log(
+        `[Orchestrator] Tab ${tabId} is loading (${tab.status}), waiting...`,
+      );
+      await new Promise<void>((resolve) => {
+        const listener = (
+          updatedTabId: number,
+          changeInfo: chrome.tabs.TabChangeInfo,
+        ) => {
+          if (updatedTabId === tabId && changeInfo.status === 'complete') {
+            chrome.tabs.onUpdated.removeListener(listener);
+            resolve();
+          }
+        };
+        chrome.tabs.onUpdated.addListener(listener);
+
+        // 设置超时，避免永久等待
+        setTimeout(() => {
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }, timeout);
+      });
+    }
+  } catch (error) {
+    console.warn(
+      `[Orchestrator] Error waiting for tab ${tabId} to load:`,
+      error,
+    );
+  }
+
+  // 等待 content script 响应
+  while (Date.now() - startTime < timeout) {
+    try {
+      // 尝试发送 ping 消息
+      await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+      return true;
+    } catch {
+      // Content script 还没准备好，等待后重试
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    }
+  }
+
+  return false;
 }
 
 /**

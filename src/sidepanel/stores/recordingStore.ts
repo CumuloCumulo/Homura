@@ -14,7 +14,12 @@ import type {
   PathSelector,
 } from '@shared/selectorBuilder/types';
 import type { LogEntry } from '@shared/types';
-import type { UnifiedSelector } from '@homura/sdk/types';
+import type {
+  UnifiedSelector,
+  AtomicTool,
+  SelectorLogic,
+} from '@homura/sdk/types';
+import { convertSelectorLogicToUnified } from '@shared/selectorBuilder/generator';
 
 export type RecordingMode = 'inspect' | 'record';
 
@@ -67,6 +72,23 @@ interface RecordingStore {
   /** Container type detected by AI */
   containerType?: string;
 
+  // ==========================================================================
+  // Tool Editing State (for Test → Inspect workflow)
+  // ==========================================================================
+
+  /** Toolkit ID being edited (from test mode) */
+  editingToolkitId: string | null;
+  /** Index of tool being edited within the toolkit */
+  editingToolIndex: number | null;
+  /** The tool being edited (loaded from test mode) */
+  editingTool: AtomicTool | null;
+  /** Original unified selector before editing (for cancel) */
+  originalSelector: UnifiedSelector | null;
+  /** Sync status: idle, syncing, success, error */
+  syncStatus: 'idle' | 'syncing' | 'success' | 'error';
+  /** Sync error message */
+  syncError?: string;
+
   // Actions
   setMode: (mode: RecordingMode) => void;
   setInspecting: (active: boolean) => void;
@@ -98,6 +120,23 @@ interface RecordingStore {
   setPathSelectorResult: (result: PathSelector | undefined) => void;
   setContainerType: (type: string | undefined) => void;
   resetAIState: () => void;
+
+  // Tool Editing Actions
+  /** Start editing a tool from test mode */
+  startEditingTool: (
+    toolkitId: string,
+    toolIndex: number,
+    tool: AtomicTool,
+  ) => void;
+  /** Finish editing and sync to dashboard */
+  finishEditing: () => Promise<void>;
+  /** Cancel editing and return to test mode */
+  cancelEditing: () => void;
+  /** Set sync status */
+  setSyncStatus: (
+    status: 'idle' | 'syncing' | 'success' | 'error',
+    error?: string,
+  ) => void;
 }
 
 export const useRecordingStore = create<RecordingStore>((set) => ({
@@ -120,6 +159,14 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
   userModeOverride: undefined,
   pathSelectorResult: undefined,
   containerType: undefined,
+
+  // Tool Editing State - Initial values
+  editingToolkitId: null,
+  editingToolIndex: null,
+  editingTool: null,
+  originalSelector: null,
+  syncStatus: 'idle',
+  syncError: undefined,
 
   setMode: (mode) => set({ mode }),
   setInspecting: (active) => set({ isInspecting: active }),
@@ -219,5 +266,162 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
       userModeOverride: undefined,
       pathSelectorResult: undefined,
       unifiedSelector: null,
+    }),
+
+  // Tool Editing Actions
+  startEditingTool: (
+    toolkitId: string,
+    toolIndex: number,
+    tool: AtomicTool,
+  ) => {
+    // Convert AtomicTool.selector_logic to UnifiedSelector for editing
+    const unifiedSelector = convertSelectorLogicToUnified(
+      tool.selector_logic,
+      tool.description ? 0.8 : 0.7,
+    );
+
+    // Store original selector for cancel functionality
+    set({
+      editingToolkitId: toolkitId,
+      editingToolIndex: toolIndex,
+      editingTool: tool,
+      originalSelector: unifiedSelector,
+      unifiedSelector,
+      // Also sync selectorDraft for backward compatibility
+      selectorDraft: {
+        target: {
+          selector: tool.selector_logic.target.selector,
+          action: tool.selector_logic.target.action,
+        },
+        scope: tool.selector_logic.scope
+          ? {
+              selector: tool.selector_logic.scope.selector,
+              type: tool.selector_logic.scope.type,
+              matchCount: 0,
+            }
+          : undefined,
+        anchor: tool.selector_logic.anchor
+          ? {
+              selector: tool.selector_logic.anchor.selector,
+              type: tool.selector_logic.anchor.type,
+              value: tool.selector_logic.anchor.value,
+              matchMode: tool.selector_logic.anchor.matchMode || 'contains',
+            }
+          : undefined,
+        confidence: 0.7,
+        validated: false,
+      },
+      syncStatus: 'idle',
+      syncError: undefined,
+    });
+  },
+
+  finishEditing: async () => {
+    const state = useRecordingStore.getState();
+    if (
+      !state.editingToolkitId ||
+      !state.editingToolIndex === null ||
+      !state.unifiedSelector
+    ) {
+      console.error('[RecordingStore] Cannot finish editing: missing state');
+      return;
+    }
+
+    // Convert UnifiedSelector back to SelectorLogic
+    const selectorLogic: SelectorLogic = {
+      target: {
+        selector:
+          state.unifiedSelector.structureData?.target.selector ||
+          state.unifiedSelector.fullSelector,
+        action: state.unifiedSelector.action.type,
+        actionParams: state.unifiedSelector.action.params,
+      },
+    };
+
+    if (
+      state.unifiedSelector.strategy === 'scope_anchor_target' &&
+      state.unifiedSelector.structureData
+    ) {
+      selectorLogic.scope = {
+        type: state.unifiedSelector.structureData.scope.type,
+        selector: state.unifiedSelector.structureData.scope.selector,
+      };
+
+      if (state.unifiedSelector.structureData.anchor) {
+        selectorLogic.anchor = {
+          type: state.unifiedSelector.structureData.anchor.type,
+          selector: state.unifiedSelector.structureData.anchor.selector,
+          value: state.unifiedSelector.structureData.anchor.value,
+          matchMode: state.unifiedSelector.structureData.anchor.matchMode,
+        };
+      }
+    }
+
+    // Create updated tool
+    const updatedTool: AtomicTool = {
+      ...state.editingTool!,
+      selector_logic: selectorLogic,
+    };
+
+    set({ syncStatus: 'syncing' });
+
+    try {
+      // Send to Dashboard for sync
+      const response = await chrome.runtime.sendMessage({
+        type: 'TOOL_UPDATED',
+        payload: {
+          toolkitId: state.editingToolkitId,
+          toolIndex: state.editingToolIndex,
+          updatedTool,
+        },
+      });
+
+      if (response?.success) {
+        set({ syncStatus: 'success' });
+        // Clear editing state after successful sync
+        setTimeout(() => {
+          set({
+            editingToolkitId: null,
+            editingToolIndex: null,
+            editingTool: null,
+            originalSelector: null,
+            syncStatus: 'idle',
+          });
+        }, 1000);
+      } else {
+        set({
+          syncStatus: 'error',
+          syncError: response?.error || '同步失败',
+        });
+      }
+    } catch (error) {
+      console.error('[RecordingStore] Sync error:', error);
+      set({
+        syncStatus: 'error',
+        syncError: error instanceof Error ? error.message : '同步失败',
+      });
+    }
+  },
+
+  cancelEditing: () => {
+    set({
+      editingToolkitId: null,
+      editingToolIndex: null,
+      editingTool: null,
+      originalSelector: null,
+      syncStatus: 'idle',
+      syncError: undefined,
+      unifiedSelector: null,
+      selectorDraft: null,
+    });
+  },
+
+  setSyncStatus: (
+    status: 'idle' | 'syncing' | 'success' | 'error',
+    error?: string,
+  ) =>
+    set({
+      syncStatus: status,
+      syncError: error,
     }),
 }));

@@ -405,6 +405,15 @@ interface ExecuteNavigateMessage {
   };
 }
 
+interface HomuraNavigateMessage {
+  type: 'HOMURA_NAVIGATE';
+  payload: {
+    tabId: number;
+    url: string;
+    waitForLoad: boolean;
+  };
+}
+
 interface HomuraStartExecutionMessage {
   type: 'HOMURA_START_EXECUTION';
   payload: {
@@ -426,6 +435,15 @@ interface HomuraCancelExecutionMessage {
   type: 'HOMURA_CANCEL_EXECUTION';
 }
 
+interface ToolUpdatedMessage {
+  type: 'TOOL_UPDATED';
+  payload: {
+    toolkitId: string;
+    toolIndex: number;
+    updatedTool: AtomicTool;
+  };
+}
+
 type BackgroundMessage =
   | RunMissionMessage
   | OpenSidePanelMessage
@@ -437,10 +455,12 @@ type BackgroundMessage =
   | AIGeneratePathSelectorMessage
   | AIGenerateSmartSelectorMessage
   | ExecuteNavigateMessage
+  | HomuraNavigateMessage
   | HomuraStartExecutionMessage
   | HomuraResumeExecutionMessage
   | HomuraGetStateMessage
-  | HomuraCancelExecutionMessage;
+  | HomuraCancelExecutionMessage
+  | ToolUpdatedMessage;
 
 chrome.runtime.onMessage.addListener(
   (
@@ -500,6 +520,20 @@ async function handleMessage(
       );
       break;
 
+    case 'HOMURA_NAVIGATE': {
+      const msg = message as HomuraNavigateMessage;
+      const { tabId, url } = msg.payload;
+      // waitForLoad is handled by the tab status listener in orchestrator
+      const result = await executeNavigation({
+        url,
+        tabId,
+        newTab: false,
+        setActive: false,
+      });
+      sendResponse(result);
+      break;
+    }
+
     // Recording state management (for cross-page recording)
     case 'SET_RECORDING_STATE': {
       const msg = message as SetRecordingStateMessage;
@@ -551,6 +585,28 @@ async function handleMessage(
     case 'HOMURA_CANCEL_EXECUTION': {
       const { clearExecutionState } = await import('./orchestrator');
       await clearExecutionState();
+      sendResponse({ success: true });
+      break;
+    }
+
+    case 'TOOL_UPDATED': {
+      const msg = message as ToolUpdatedMessage;
+      const { toolkitId, toolIndex, updatedTool } = msg.payload;
+
+      // Store the update in chrome.storage.local for Dashboard to pick up
+      const updateKey = `homura_tool_update_${toolkitId}_${toolIndex}`;
+      await chrome.storage.local.set({
+        [updateKey]: {
+          toolkitId,
+          toolIndex,
+          updatedTool,
+          timestamp: Date.now(),
+        },
+      });
+
+      console.log(
+        `[Background] Tool updated: ${toolkitId}[${toolIndex}] - ${updatedTool.name}`,
+      );
       sendResponse({ success: true });
       break;
     }

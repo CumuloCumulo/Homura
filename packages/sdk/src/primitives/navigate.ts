@@ -47,6 +47,21 @@ export async function executeNavigate(
 
   const { url, waitForLoad = true } = params;
 
+  // 检查当前 URL 是否已经是目标 URL
+  const currentUrl = window.location.href;
+  const targetUrl = new URL(url, currentUrl).href;
+
+  if (currentUrl === targetUrl) {
+    console.log(
+      `[Homura SDK] Already on target page: ${currentUrl}, skipping navigation`,
+    );
+    return {
+      url,
+      navigated: false,
+      newUrl: currentUrl,
+    };
+  }
+
   // 检查是否在 content script 中（有 chrome.runtime）
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     try {

@@ -20,6 +20,7 @@ import {
   removeToolFromToolkit,
   moveToolInToolkit,
   updateToolInToolkit,
+  updateToolInToolkitByIndex,
 } from '../utils/toolkitOperations';
 
 interface ToolkitStore {
@@ -95,6 +96,16 @@ interface ToolkitStore {
     toolkitId: string,
     toolId: string,
     updates: Partial<import('@homura/sdk/types').AtomicTool>,
+  ) => Promise<void>;
+
+  /**
+   * 按索引更新工具集中的工具
+   * 用于从 SidePanel 同步工具更新
+   */
+  updateToolByIndex: (
+    toolkitId: string,
+    toolIndex: number,
+    updatedTool: import('@homura/sdk/types').AtomicTool,
   ) => Promise<void>;
 
   /** Set export dialog open state */
@@ -255,6 +266,34 @@ export const useToolkitStore = create<ToolkitStore>()(
         if (!toolkit) return;
 
         const updated = updateToolInToolkit(toolkit, toolId, updates);
+        await saveToolkitToStorage(updated);
+        set((state) => ({
+          toolkits: state.toolkits.map((t) =>
+            t.id === toolkitId ? updated : t,
+          ),
+          selectedToolkit:
+            state.selectedToolkit?.id === toolkitId
+              ? updated
+              : state.selectedToolkit,
+        }));
+      },
+
+      /**
+       * 按索引更新工具集中的工具
+       * 用于从 SidePanel 同步工具更新
+       * @param toolkitId - 工具集 ID
+       * @param toolIndex - 工具在工具集中的索引
+       * @param updatedTool - 更新后的完整工具对象
+       */
+      updateToolByIndex: async (toolkitId, toolIndex, updatedTool) => {
+        const toolkit = get().toolkits.find((t) => t.id === toolkitId);
+        if (!toolkit) return;
+
+        const updated = updateToolInToolkitByIndex(
+          toolkit,
+          toolIndex,
+          updatedTool,
+        );
         await saveToolkitToStorage(updated);
         set((state) => ({
           toolkits: state.toolkits.map((t) =>

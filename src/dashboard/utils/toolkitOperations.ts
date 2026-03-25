@@ -122,6 +122,29 @@ export function updateToolsInToolkit(
 }
 
 /**
+ * 按索引更新工具集中的工具
+ * 用于从 SidePanel 同步工具更新（使用索引而非 toolId）
+ * @param toolkit - 工具集对象
+ * @param toolIndex - 工具在工具集中的索引
+ * @param updatedTool - 更新后的完整工具对象
+ * @returns 更新后的工具集
+ */
+export function updateToolInToolkitByIndex(
+  toolkit: Toolkit,
+  toolIndex: number,
+  updatedTool: AtomicTool,
+): Toolkit {
+  if (toolIndex < 0 || toolIndex >= toolkit.tools.length) {
+    return toolkit;
+  }
+
+  const newTools = [...toolkit.tools];
+  newTools[toolIndex] = updatedTool;
+
+  return updateToolkitMetadata(toolkit, newTools);
+}
+
+/**
  * 克隆工具集
  * @param toolkit - 工具集对象
  * @param newName - 新名称

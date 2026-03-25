@@ -90,8 +90,16 @@ const LogsIcon = () => (
 );
 
 export default function App() {
-  const { setMode, logs, clearLogs, isInspecting, isRecording, addLog } =
-    useRecordingStore();
+  const {
+    setMode,
+    logs,
+    clearLogs,
+    isInspecting,
+    isRecording,
+    addLog,
+    editingTool,
+    syncStatus,
+  } = useRecordingStore();
   const [showLogs, setShowLogs] = React.useState(false);
   const [currentMode, setCurrentMode] =
     React.useState<SidePanelMode>('inspect');
@@ -205,6 +213,31 @@ export default function App() {
     chrome.runtime.onMessage.addListener(handleMessage);
     return () => chrome.runtime.onMessage.removeListener(handleMessage);
   }, []);
+
+  // 监听编辑状态变化，自动切换到检查模式
+  React.useEffect(() => {
+    if (editingTool !== null) {
+      // 有工具正在编辑，切换到检查模式
+      setCurrentMode('inspect');
+      addLog({
+        timestamp: Date.now(),
+        level: 'info',
+        message: `正在编辑工具: ${editingTool.name}`,
+      });
+    } else if (
+      currentMode === 'inspect' &&
+      editingTool === null &&
+      syncStatus === 'success'
+    ) {
+      // 同步成功后，返回测试模式
+      setCurrentMode('test');
+      addLog({
+        timestamp: Date.now(),
+        level: 'info',
+        message: '工具已同步，返回测试模式',
+      });
+    }
+  }, [editingTool, syncStatus]);
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-300 antialiased selection:bg-violet-500/30">
