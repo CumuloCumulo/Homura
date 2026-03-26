@@ -248,7 +248,12 @@ async function handleToolResult(
     },
   ];
 
-  await stateManager.update({ tools: updatedTools, history });
+  // 推进 currentIndex，让前端能看到正确的执行进度
+  await stateManager.update({
+    tools: updatedTools,
+    history,
+    currentIndex: toolIndex + 1,
+  });
 
   // 检查页面跳转
   if (result.metadata?.pageNavigated) {
