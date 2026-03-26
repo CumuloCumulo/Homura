@@ -180,6 +180,9 @@ async function executeNextTool(tabId: number): Promise<void> {
     ),
   });
 
+  // 记录执行前的 URL（用于检测页面跳转）
+  const beforeUrl = await getCurrentTabUrl(tabId);
+
   try {
     const result = await retryManager.executeWithRetry(
       tabId,
@@ -187,11 +190,23 @@ async function executeNextTool(tabId: number): Promise<void> {
       toolExec.params as Record<string, string | number | boolean>,
     );
 
-    // 处理执行结果
-    await handleToolResult(tabId, nextIndex, result);
+    // 处理执行结果，传入执行前的 URL
+    await handleToolResult(tabId, nextIndex, result, beforeUrl);
   } catch (error) {
     console.error('[Orchestrator] Tool execution error:', error);
     await handleToolFailure(nextIndex, error);
+  }
+}
+
+/**
+ * 获取当前 tab 的 URL
+ */
+async function getCurrentTabUrl(tabId: number): Promise<string> {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    return tab.url || '';
+  } catch {
+    return '';
   }
 }
 
@@ -202,6 +217,7 @@ async function handleToolResult(
   tabId: number,
   toolIndex: number,
   result: ExecuteToolResult,
+  beforeUrl: string,
 ): Promise<void> {
   const state = stateManager.getState();
   if (!state) return;
@@ -251,13 +267,26 @@ async function handleToolResult(
     return;
   }
 
-  // 检测新 tab
-  const newTab = await tabTracker.detectNewTab(tabId);
-  if (newTab?.id) {
-    await handleTabSwitch(newTab.id);
-    tabId = newTab.id;
+  // URL 变化检测：只有 URL 变化时才检测新 tab
+  const afterUrl = await getCurrentTabUrl(tabId);
+  const urlChanged = beforeUrl !== afterUrl && afterUrl !== '';
+
+  if (urlChanged) {
+    console.log(
+      `[Orchestrator] URL changed from "${beforeUrl}" to "${afterUrl}"`,
+    );
+    // URL 变化了，检测是否有新 tab 打开
+    const newTab = await tabTracker.detectNewTab(tabId);
+    if (newTab?.id) {
+      await handleTabSwitch(newTab.id);
+      tabId = newTab.id;
+    } else {
+      // 同一 tab 但 URL 变化了（可能是页面内跳转）
+      console.log('[Orchestrator] Same tab, URL changed (in-page navigation)');
+      await sleep(CONFIG.DELAY.SAME_TAB_TOOL);
+    }
   } else {
-    // 同一页面延迟
+    // URL 没有变化，保持在同一页面
     await sleep(CONFIG.DELAY.SAME_TAB_TOOL);
   }
 
