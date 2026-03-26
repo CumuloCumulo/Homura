@@ -380,6 +380,17 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
   const ancestorPath = collectAncestorPath(element);
   const pathSelector = buildPathSelector(ancestorPath, targetSelector);
 
+  // 11. Get target text content (for anchor matching, serializable)
+  const targetText = getDirectTextContent(element);
+
+  // 12. Get child text content (fallback when targetText is empty)
+  const childText = getMeaningfulChildText(element);
+
+  // 13. Get position in container (for fallback anchor inference)
+  const positionInContainer = container
+    ? Array.from(container.children).indexOf(element)
+    : -1;
+
   return {
     target: element,
     container,
@@ -394,6 +405,9 @@ export function analyzeElement(element: HTMLElement): ElementAnalysis {
     semanticContainer,
     ancestorPath,
     pathSelector,
+    targetText,
+    childText, // ← 新增：子元素文本
+    positionInContainer, // ← 新增：在容器中的位置
   };
 }
 
@@ -927,6 +941,67 @@ function getDirectTextContent(element: HTMLElement): string {
 }
 
 /**
+ * Get meaningful child element text
+ * Used when the element itself has no direct text (e.g., container divs)
+ *
+ * This function recursively searches for text in children, prioritizing:
+ * 1. Non-low-entropy text (not "edit", "delete", etc.)
+ * 2. Text in meaningful elements (span, label, a, button)
+ * 3. Reasonable length (2-100 chars)
+ * 4. First meaningful text found (for intermediate wrapper scenarios)
+ * 5. Searches up to MAX_DEPTH levels deep
+ *
+ * @param element - The element to search within
+ * @param depth - Current recursion depth (internal use)
+ * @returns The first meaningful text found, or empty string
+ */
+function getMeaningfulChildText(element: HTMLElement, depth = 0): string {
+  const MAX_DEPTH = 3;
+
+  if (depth > MAX_DEPTH) {
+    return '';
+  }
+
+  // First, try direct children
+  for (const child of Array.from(element.children)) {
+    const childEl = child as HTMLElement;
+    const text = getDirectTextContent(childEl);
+
+    // Skip empty or too short/long text
+    if (!text || text.length < 2 || text.length > 100) {
+      continue;
+    }
+
+    // Skip low-entropy text (common actions/status)
+    if (isLowEntropyText(text)) {
+      continue;
+    }
+
+    // Prioritize text in semantic elements
+    if (['SPAN', 'LABEL', 'A', 'BUTTON', 'OPTION'].includes(childEl.tagName)) {
+      return text;
+    }
+  }
+
+  // Recursively search deeper levels
+  // This handles intermediate wrapper scenarios like:
+  // <div> (target - wrapper)
+  //   <div role="option"> (child - list item container)
+  //     <span>文本</span> (grandchild - actual text)
+  //   </div>
+  // </div>
+  for (const child of Array.from(element.children)) {
+    const childEl = child as HTMLElement;
+    const result = getMeaningfulChildText(childEl, depth + 1);
+    if (result) {
+      return result;
+    }
+  }
+
+  return '';
+}
+
+/**
  * Calculate confidence score for a text anchor
  */
 function calculateTextConfidence(element: HTMLElement, text: string): number {
@@ -964,6 +1039,8 @@ function isLikelyUnique(text: string): boolean {
 
 /**
  * Build a minimal CSS selector for an element
+ *
+ * Enhanced with better dynamic ID detection and generic tag handling
  */
 export function buildMinimalSelector(
   element: HTMLElement,
@@ -972,51 +1049,80 @@ export function buildMinimalSelector(
   const tag = element.tagName.toLowerCase();
   const parent = context || element.parentElement;
 
-  if (element.id && !element.id.match(/\d{5,}|uid|uuid|random|react|vue/i)) {
-    return `#${CSS.escape(element.id)}`;
+  // 1. Enhanced ID detection - catch more dynamic ID patterns
+  if (element.id) {
+    // Enhanced dynamic patterns: jqxWidget, widget, long hash, etc.
+    const dynamicPatterns = [
+      /\d{5,}/, // 5+ consecutive digits
+      /jqxWidget\w{8,}/i, // jqxWidget + 8+ chars (e.g., jqxWidget2da45ee2)
+      /widget\d+/i, // widget + digits
+      /uuid|random/i, // explicit random markers
+      /\w{32}/, // 32 chars (MD5/hash)
+      /_\w{8,}$/, // underscore + 8+ chars at end
+      /[a-f0-9]{8,}/i, // hex strings (8+ chars)
+    ];
+
+    const isDynamic = dynamicPatterns.some((pattern) =>
+      pattern.test(element.id),
+    );
+
+    if (
+      !isDynamic &&
+      !GLOBAL_CONTAINER_IDS.includes(element.id.toLowerCase())
+    ) {
+      return `#${CSS.escape(element.id)}`;
+    }
   }
 
+  // 2. Use test attributes (data-testid, etc)
   const testId = element.getAttribute('data-testid');
   if (testId) {
     return `[data-testid="${testId}"]`;
   }
 
+  // 3. Use name attribute (stable for form elements)
   const name = element.getAttribute('name');
   if (name && !name.match(/\d{5,}/)) {
     return `${tag}[name="${name}"]`;
   }
 
+  // 4. For generic tags (div, span, a, li), require additional specificity
+  const GENERIC_TAGS = ['div', 'span', 'a', 'li', 'td', 'th'];
+  const isGeneric = GENERIC_TAGS.includes(tag);
+
+  let baseSelector = tag;
   const stableClasses = Array.from(element.classList)
     .filter(isSafeCssClass)
     .slice(0, 2);
 
-  let baseSelector = tag;
-
   if (stableClasses.length > 0) {
     baseSelector = `${tag}.${stableClasses.join('.')}`;
-  } else {
-    const role = element.getAttribute('role');
-    if (role) {
-      baseSelector = `${tag}[role="${role}"]`;
-    } else {
-      const type = element.getAttribute('type');
-      if (
-        type &&
-        [
-          'button',
-          'submit',
-          'text',
-          'checkbox',
-          'radio',
-          'email',
-          'password',
-        ].includes(type)
-      ) {
-        baseSelector = `${tag}[type="${type}"]`;
-      }
+  }
+
+  // Add role attribute for accessibility
+  const role = element.getAttribute('role');
+  if (role) {
+    baseSelector = `${baseSelector}[role="${role}"]`;
+  } else if (isGeneric && stableClasses.length === 0) {
+    // Generic tag with no classes - check type attribute
+    const type = element.getAttribute('type');
+    if (
+      type &&
+      [
+        'button',
+        'submit',
+        'text',
+        'checkbox',
+        'radio',
+        'email',
+        'password',
+      ].includes(type)
+    ) {
+      baseSelector = `${tag}[type="${type}"]`;
     }
   }
 
+  // 5. Add nth-of-type when there are multiple same-tag siblings
   if (parent) {
     try {
       const matches = parent.querySelectorAll(`:scope > ${baseSelector}`);
@@ -1036,25 +1142,100 @@ export function buildMinimalSelector(
 
 /**
  * Build a selector relative to a container
+ *
+ * Enhanced to:
+ * 1. Preserve full path with semantic attributes (role, etc.)
+ * 2. Add nth-of-type for disambiguation
+ * 3. Generate more specific selectors for each path segment
  */
 export function buildRelativeSelector(
   target: HTMLElement,
   container: HTMLElement,
 ): string {
+  // Check if target is a direct child of container
+  if (target.parentElement === container) {
+    const tag = target.tagName.toLowerCase();
+    const siblings = Array.from(container.children);
+
+    // If there are multiple siblings with the same tag, use nth-of-type
+    const sameTagCount = siblings.filter(
+      (s) => s.tagName === target.tagName,
+    ).length;
+    if (sameTagCount > 1) {
+      const nthIndex =
+        siblings.filter((s) => s.tagName === target.tagName).indexOf(target) +
+        1;
+      return `${tag}:nth-of-type(${nthIndex})`;
+    }
+
+    return tag;
+  }
+
+  // Build path for nested elements
   const path: string[] = [];
   let current: HTMLElement | null = target;
 
   while (current && current !== container) {
-    const selector = buildMinimalSelector(current, container);
+    const selector = buildRelativePathSegment(current, container);
     path.unshift(selector);
     current = current.parentElement;
   }
 
-  if (path.length > 3) {
-    return path.slice(-2).join(' > ');
+  // Preserve full path - don't truncate
+  // Only truncate if it's excessively long (>5 levels)
+  if (path.length > 5) {
+    return path.slice(-3).join(' > ');
   }
 
-  return path.join(' ');
+  return path.join(' > ');
+}
+
+/**
+ * Build a single path segment for relative selector
+ * Enhanced to include role attribute and other semantic markers
+ */
+function buildRelativePathSegment(
+  element: HTMLElement,
+  container: HTMLElement,
+): string {
+  const tag = element.tagName.toLowerCase();
+  const parent = element.parentElement;
+
+  // Check for semantic attributes first
+  const role = element.getAttribute('role');
+  if (role) {
+    return `${tag}[role="${role}"]`;
+  }
+
+  // Check for stable classes
+  const stableClasses = Array.from(element.classList)
+    .filter(isSafeCssClass)
+    .filter((cls) => !SKIP_CLASS_PATTERNS.some((pattern) => pattern.test(cls)))
+    .slice(0, 1);
+
+  if (stableClasses.length > 0) {
+    const baseSelector = `${tag}.${stableClasses[0]}`;
+
+    // Add nth-of-type if needed
+    if (parent && parent !== container) {
+      try {
+        const matches = parent.querySelectorAll(`:scope > ${baseSelector}`);
+        if (matches.length > 1) {
+          const index = Array.from(matches).indexOf(element) + 1;
+          if (index > 0) {
+            return `${baseSelector}:nth-of-type(${index})`;
+          }
+        }
+      } catch {
+        // Invalid selector syntax
+      }
+    }
+
+    return baseSelector;
+  }
+
+  // Fallback to minimal selector with nth-of-type
+  return buildMinimalSelector(element, container);
 }
 
 /**

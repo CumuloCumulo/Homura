@@ -40,35 +40,30 @@ export async function waitForTarget(
     return false;
   }
 
-  const {
-    pollInterval = config.pollInterval ?? 500,
-    verbose = config.verbose ?? false,
-  } = config;
+  const { pollInterval = config.pollInterval ?? 500 } = config;
 
   const startTime = Date.now();
 
-  if (verbose) {
-    console.log('[Readiness] Waiting for target:', selector);
-  }
+  console.log(`[Readiness] waitForTarget: ${selector}, timeout: ${timeout}ms`);
 
   while (Date.now() - startTime < timeout) {
     const element = document.querySelector(selector);
     if (element) {
-      if (verbose) {
-        console.log(
-          '[Readiness] Target found after',
-          Date.now() - startTime,
-          'ms',
-        );
-      }
+      const elapsed = Date.now() - startTime;
+      console.log(`[Readiness] ✓ Target found after ${elapsed}ms: ${selector}`);
       return true;
+    }
+    // 每 2 秒输出一次进度
+    const elapsed = Date.now() - startTime;
+    if (elapsed > 0 && elapsed % 2000 < pollInterval) {
+      console.log(
+        `[Readiness] Still waiting for target... (${elapsed}/${timeout}ms): ${selector}`,
+      );
     }
     await sleep(pollInterval);
   }
 
-  if (verbose) {
-    console.log('[Readiness] Target not found after', timeout, 'ms');
-  }
+  console.log(`[Readiness] ✗ Target NOT found after ${timeout}ms: ${selector}`);
 
   return false;
 }

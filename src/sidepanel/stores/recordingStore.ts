@@ -377,6 +377,44 @@ export const useRecordingStore = create<RecordingStore>((set) => ({
       });
 
       if (response?.success) {
+        // 更新 homura_current_toolkit storage，让测试面板获取最新工具
+        try {
+          const STORAGE_KEY = 'homura_current_toolkit';
+          const result = await chrome.storage.local.get(STORAGE_KEY);
+          const currentToolkit = result[STORAGE_KEY] as {
+            toolkitId: string;
+            toolkitName: string;
+            tools: unknown[];
+            timestamp: string;
+            version: string;
+          } | undefined;
+
+          if (currentToolkit && currentToolkit.tools) {
+            // 更新对应索引的工具
+            const newTools = [...currentToolkit.tools];
+            if (
+              state.editingToolIndex !== null &&
+              state.editingToolIndex >= 0 &&
+              state.editingToolIndex < newTools.length
+            ) {
+              newTools[state.editingToolIndex] = updatedTool;
+              await chrome.storage.local.set({
+                [STORAGE_KEY]: {
+                  ...currentToolkit,
+                  tools: newTools,
+                },
+              });
+              console.log(
+                '[RecordingStore] Updated homura_current_toolkit:',
+                state.editingToolIndex,
+                updatedTool.name,
+              );
+            }
+          }
+        } catch (storageError) {
+          console.error('[RecordingStore] Failed to update storage:', storageError);
+        }
+
         set({ syncStatus: 'success' });
         // Clear editing state after successful sync
         setTimeout(() => {

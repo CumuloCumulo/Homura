@@ -26,13 +26,29 @@ const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
   </svg>
 );
 
-export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
+export const ToolCard = React.memo(function ToolCard({
+  tool,
+  onRun,
+  disabled,
+}: ToolCardProps) {
   const [params, setParams] = React.useState<Record<string, string>>({});
   const [isExpanded, setIsExpanded] = React.useState(false);
 
-  const action = tool.selector_logic.target.action;
-  const paramEntries = Object.entries(tool.parameters);
-  const hasParams = paramEntries.length > 0;
+  // 使用 useMemo 缓存计算结果
+  const action = React.useMemo(
+    () => tool.selector_logic.target.action,
+    [tool.selector_logic.target.action],
+  );
+
+  const paramEntries = React.useMemo(
+    () => Object.entries(tool.parameters),
+    [tool.parameters],
+  );
+
+  const hasParams = React.useMemo(
+    () => paramEntries.length > 0,
+    [paramEntries],
+  );
 
   const handleParamChange = (key: string, value: string) => {
     setParams((prev: Record<string, string>) => ({ ...prev, [key]: value }));
@@ -207,7 +223,7 @@ export function ToolCard({ tool, onRun, disabled }: ToolCardProps) {
       </div>
     </div>
   );
-}
+});
 
 function ActionBadge({ action }: { action: string }) {
   const colors: Record<string, string> = {

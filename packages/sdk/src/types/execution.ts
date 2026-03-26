@@ -97,6 +97,8 @@ export interface ExecutionError {
     | 'ACTION_FAILED' // Action execution failed
     | 'TIMEOUT' // Wait timeout exceeded
     | 'INVALID_SELECTOR' // CSS selector syntax error
+    | 'PAGE_NOT_READY' // Page not ready for execution
+    | 'NAVIGATION_FAILED' // Navigation failed
     | 'UNKNOWN'; // Unexpected error
   /** Human-readable message */
   message: string;

@@ -130,39 +130,3 @@ export async function executeNavigate(
     };
   }
 }
-
-/**
- * 判断是否为跨域导航
- */
-export function isCrossOriginNavigation(url: string): boolean {
-  if (!isBrowser) {
-    return false;
-  }
-
-  try {
-    const target = new URL(url, window.location.href);
-    return target.origin !== window.location.origin;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 判断是否为同页面导航
- */
-export function isSamePageNavigation(url: string): boolean {
-  if (!isBrowser) {
-    return false;
-  }
-
-  try {
-    const target = new URL(url, window.location.href);
-    return (
-      target.origin === window.location.origin &&
-      target.pathname === window.location.pathname &&
-      target.search === window.location.search
-    );
-  } catch {
-    return false;
-  }
-}

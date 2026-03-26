@@ -25,3 +25,6 @@ export * from './pageState.js';
 export * from './spaDetection.js';
 export * from './domStability.js';
 export * from './readiness.js';
+
+// Type guards and error handling
+export * from './typeGuards.js';

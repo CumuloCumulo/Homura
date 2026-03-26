@@ -46,6 +46,21 @@ export interface ElementAnalysis {
   containerSelector?: string;
   /** Container tag name (serializable) */
   containerTagName?: string;
+  /**
+   * Target element's text content (serializable)
+   * Used for matching the correct anchor candidate
+   */
+  targetText?: string;
+  /**
+   * Child element's text content (serializable)
+   * Used as fallback when targetText is empty (e.g., container divs with text in span)
+   */
+  childText?: string;
+  /**
+   * Position of target element within its container (0-indexed)
+   * Used for position-based anchor inference when text matching fails
+   */
+  positionInContainer?: number;
 
   // =========================================================================
   // PATH-BASED SELECTOR (New)

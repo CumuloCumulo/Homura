@@ -336,4 +336,282 @@ if (isGridOrFlexContainer(parent) && VALID_GRID_ITEMS.includes(current.tagName))
 
 ---
 
+## 🐛 问题案例：容器元素文本获取缺陷 (Container Text Extraction Issue)
+
+### 问题描述
+
+**案例 HTML 结构** (jqxWidget 下拉列表)：
+```html
+<div id="listBoxContentinnerListBoxjqxWidget...">
+  <!-- 用户点击这个 div -->
+  <div role="option" id="listitem2...">
+    <!-- 文本在这个 span 里 -->
+    <span class="jqx-listitem-state-normal jqx-item">团学活动</span>
+  </div>
+</div>
+```
+
+**问题现象**：
+- 用户点击"团学活动"列表项
+- `analyzeElement` 返回 `targetText: ""`
+- `buildSelectorWithAnchor` 无法匹配锚点
+- Fallback 只取 `anchorCandidates[0]` = "请选择"
+- 生成错误的选择器
+
+### 根本原因
+
+**设计假设与现实不匹配：**
+
+| 假设 | 现实 |
+|------|------|
+| 用户点击的元素包含文本 | 用户点击的是**容器**，文本在**子元素**里 |
+| `target.textContent` 可用 | 容器元素（div）的 `textContent` 为空 |
+| `getDirectTextContent` 足够 | 只获取元素**自己的**文本，删除所有子元素 |
+
+**`getDirectTextContent` 的限制：**
+```typescript
+function getDirectTextContent(element: HTMLElement): string {
+  const clone = element.cloneNode(true);
+  Array.from(clone.children).forEach((child) => child.remove()); // ← 删除所有子元素
+  return clone.textContent?.trim() || "";
+}
+```
+
+对于 `<div><span>文本</span></div>`：
+- 克隆 div
+- 删除 span 子元素
+- div 本身没有文本 → 返回 `""`
+
+---
+
+## 🔧 解决方案：多策略文本获取
+
+### 1. 增强的 ElementAnalysis
+
+**新增字段**：
+```typescript
+export interface ElementAnalysis {
+  // ... 现有字段
+
+  /** 子元素文本内容（当 targetText 为空时使用） */
+  childText?: string;
+
+  /** 元素在容器中的位置（用于位置推断） */
+  positionInContainer?: number;
+}
+```
+
+### 2. 新增 `getMeaningfulChildText` 函数
+
+```typescript
+/**
+ * 获取元素的有意义子元素文本
+ * 用于当元素本身没有文本时，从子元素中提取
+ *
+ * 优先级：
+ * 1. 非 low-entropy 文本（不是 "edit", "delete" 等）
+ * 2. 语义元素中的文本（span, label, a, button, option）
+ * 3. 合理长度（2-100 chars）
+ */
+function getMeaningfulChildText(element: HTMLElement): string {
+  for (const child of Array.from(element.children)) {
+    const childEl = child as HTMLElement;
+    const text = getDirectTextContent(childEl);
+
+    if (!text || text.length < 2 || text.length > 100) continue;
+    if (isLowEntropyText(text)) continue;
+
+    // 优先语义元素
+    if (["SPAN", "LABEL", "A", "BUTTON", "OPTION"].includes(childEl.tagName)) {
+      return text;
+    }
+  }
+  return "";
+}
+```
+
+### 3. 在 `analyzeElement` 中收集完整信息
+
+```typescript
+export function analyzeElement(element: HTMLElement): ElementAnalysis {
+  // ... 现有逻辑
+
+  // 11. Get target text content
+  const targetText = getDirectTextContent(element);
+
+  // 12. Get child text content (fallback)
+  const childText = getMeaningfulChildText(element);
+
+  // 13. Get position in container (for fallback)
+  const positionInContainer = container
+    ? Array.from(container.children).indexOf(element)
+    : -1;
+
+  return {
+    // ... 现有字段
+    targetText,
+    childText,           // ← 新增
+    positionInContainer, // ← 新增
+  };
+}
+```
+
+---
+
+## 🧠 智能锚点匹配逻辑
+
+### 多策略文本获取流程
+
+```
+获取目标元素文本
+    ↓
+策略 1: targetText (元素自己的文本)
+    ↓ 为空？
+策略 2: childText (子元素文本) ← NEW!
+    ↓ 仍然为空？
+策略 3: 语义属性 (aria-label, title) ← 未来扩展
+    ↓
+匹配 anchorCandidates
+```
+
+### 智能锚点选择（buildStructureData 增强）
+
+```typescript
+export function buildStructureData(analysis: ElementAnalysis) {
+  // ... 现有逻辑
+
+  // 智能锚点选择（优先级顺序）：
+  let topAnchor = analysis.anchorCandidates?.[0];
+
+  // 优先级 1: 通过文本内容匹配
+  const targetText = analysis.targetText || analysis.childText;
+  if (targetText) {
+    const matched = analysis.anchorCandidates.find(a => a.text === targetText);
+    if (matched) topAnchor = matched;
+  }
+
+  // 优先级 2: 通过位置推断匹配
+  else if (analysis.positionInContainer >= 0) {
+    topAnchor = analysis.anchorCandidates[analysis.positionInContainer];
+  }
+
+  // Fallback: 使用第一个锚点
+  // (这是最后的保底方案)
+}
+```
+
+---
+
+## 📊 改进后的完整流程
+
+### 对于"团学活动"案例
+
+```
+用户点击 div[role="option"] #3 ("团学活动")
+  ↓
+analyzeElement(div)
+  ├─ targetText = ""                    (div 直接文本为空)
+  ├─ childText = "团学活动"            ← NEW! 从子元素 span 获取
+  ├─ positionInContainer = 2           ← NEW! 第3个列表项
+  └─ anchorCandidates = [
+      { selector: 'span', text: "请选择" },
+      { selector: 'span', text: "教师教学、补课" },
+      { selector: 'span', text: "团学活动" },  ← 应该匹配这个
+      { selector: 'span', text: "考试" },
+      { selector: 'span', text: "讲座" }
+    ]
+  ↓
+createUnifiedSelector()
+  ├─ buildSelectorWithAnchor()
+  │   ├─ targetText = "" → 跳过
+  │   ├─ childText = "团学活动" ✓
+  │   └─ 匹配 anchorCandidates[2] ✓
+  │
+  └─ 生成的 UnifiedSelector:
+    {
+      strategy: 'scope_anchor_target',
+      structureData: {
+        scope: { selector: 'div:nth-of-type(2)' },
+        anchor: {
+          selector: 'span.jqx-listitem-state-normal.jqx-item',
+          value: '团学活动'  ← 正确的锚点！
+        },
+        target: { selector: 'div[role="option"]' }
+      },
+      confidence: 0.95
+    }
+```
+
+---
+
+## 📝 设计决策记录
+
+| 日期 | 决策 | 原因 |
+|------|------|------|
+| 2026-03-26 | **多策略文本获取** | 容器元素的文本可能在子元素中，需要逐级降级获取 |
+| 2026-03-26 | **childText 字段** | 当 targetText 为空时，使用子元素文本进行锚点匹配 |
+| 2026-03-26 | **positionInContainer 字段** | 当文本无法匹配时，使用位置推断正确的锚点 |
+| 2026-03-26 | **智能锚点选择优先级** | 文本匹配 → 位置推断 → 第一个锚点（保底） |
+| 2026-03-26 | **getMeaningfulChildText 语义优先** | 优先获取 SPAN/LABEL/A/BUTTON 等语义元素的文本 |
+
+---
+
+## 🎯 关键要点
+
+### Scope 设计理念（不变）
+
+**Scope = 列表的容器**（不是单个列表项）
+- 方便 Agent 遍历整个列表
+- 支持列表级操作（统计、批量处理）
+- 统一的处理逻辑
+
+### 文本获取策略（增强）
+
+```
+目标元素文本获取优先级：
+1. 元素自己的文本 (targetText)
+2. 子元素的文本 (childText) ← NEW!
+3. 语义属性 (aria-label, title) ← 未来
+4. 位置推断 (positionInContainer) ← NEW!
+```
+
+### 锚点匹配策略（增强）
+
+```
+锚点选择优先级：
+1. 文本匹配 (targetText || childText)
+2. 位置推断 (positionInContainer)
+3. 第一个锚点 (anchorCandidates[0]) ← 保底
+```
+
+---
+
+## ✅ 验证效果
+
+**改进前**：
+```javascript
+{
+  targetText: "",
+  anchorCandidates: ["请选择", "教师教学", "团学活动", ...],
+  structureData: {
+    anchor: { value: "请选择" }  // ❌ 错误
+  }
+}
+```
+
+**改进后**：
+```javascript
+{
+  targetText: "",
+  childText: "团学活动",        // ← 新增
+  positionInContainer: 2,       // ← 新增
+  anchorCandidates: ["请选择", "教师教学", "团学活动", ...],
+  structureData: {
+    anchor: { value: "团学活动" }  // ✅ 正确
+  }
+}
+```
+
+---
+
 *📌 本文档记录 Homura 选择器系统的设计，供开发参考*

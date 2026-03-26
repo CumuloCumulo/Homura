@@ -86,17 +86,20 @@ export async function executeTool(
       // 获取目标选择器用于预检
       const targetSelector = resolvedLogic.target.selector || '';
 
-      // 构建等待配置
+      // 构建等待配置 - 使用更长的超时时间，特别是连贯执行场景
       const readinessConfig: ReadinessConfig = {
         skipWait: false,
-        domStabilityTimeout: 5000,
-        targetTimeout: 5000,
-        spaExtraWait: 2000,
-        pollInterval: 500,
+        domStabilityTimeout: 10000,
+        targetTimeout: 15000, // 增加到 15 秒，适配动态加载的下拉框等元素
+        spaExtraWait: 3000,
+        pollInterval: 300, // 更频繁的轮询
         verbose: debug,
       };
 
-      console.log('[Homura SDK] Waiting for page readiness...');
+      console.log('[Homura SDK] Waiting for page readiness...', {
+        targetSelector,
+        timeout: readinessConfig.targetTimeout,
+      });
       const readinessResult = await waitForReady(
         targetSelector,
         readinessConfig,

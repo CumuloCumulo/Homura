@@ -14,17 +14,21 @@ import type {
 } from '@shared/types';
 import { generateMessageId } from '@homura/sdk/utils';
 
+// ============================================================================
+// Internal Helpers
+// ============================================================================
+
 /**
- * Send a message to the active tab's content script
+ * Get active tab ID
  */
-async function sendToActiveTab<T>(message: unknown): Promise<T> {
+async function getActiveTabId(): Promise<number> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   if (!tab?.id) {
     throw new Error('No active tab found');
   }
 
-  return chrome.tabs.sendMessage(tab.id, message);
+  return tab.id;
 }
 
 /**
@@ -35,24 +39,69 @@ async function sendToTab<T>(tabId: number, message: unknown): Promise<T> {
 }
 
 /**
+ * Create an ExecuteTool message
+ */
+function createExecuteToolMessage(
+  tool: AtomicTool,
+  params: Record<string, string | number | boolean>,
+  debug: boolean = false,
+): ExecuteToolMessage {
+  return {
+    type: 'EXECUTE_TOOL',
+    payload: { tool, params, debug },
+    messageId: generateMessageId(),
+  };
+}
+
+// ============================================================================
+// Tool Execution API
+// ============================================================================
+
+/**
+ * Execute an Atomic Tool
+ *
+ * Unified interface for tool execution on either a specific tab or active tab.
+ *
+ * @param target - Either { tabId: number } for specific tab, or { activeTab: true } for current active tab
+ * @param tool - The AtomicTool to execute
+ * @param params - Tool parameters
+ * @param debug - Enable debug mode
+ *
+ * @example
+ * // Execute on specific tab
+ * await executeTool({ tabId: 123 }, tool, params);
+ *
+ * // Execute on active tab
+ * await executeTool({ activeTab: true }, tool, params);
+ */
+export async function executeTool(
+  target: { tabId: number } | { activeTab: true },
+  tool: AtomicTool,
+  params: Record<string, string | number | boolean>,
+  debug: boolean = false,
+): Promise<ExecuteToolResult> {
+  const tabId = 'tabId' in target ? target.tabId : await getActiveTabId();
+  const message = createExecuteToolMessage(tool, params, debug);
+  return sendToTab<ExecuteToolResult>(tabId, message);
+}
+
+/**
  * Execute an Atomic Tool on the active tab
+ *
+ * @deprecated Use executeTool({ activeTab: true }, ...) instead
  */
 export async function executeToolOnActiveTab(
   tool: AtomicTool,
   params: Record<string, string | number | boolean>,
   debug: boolean = false,
 ): Promise<ExecuteToolResult> {
-  const message: ExecuteToolMessage = {
-    type: 'EXECUTE_TOOL',
-    payload: { tool, params, debug },
-    messageId: generateMessageId(),
-  };
-
-  return sendToActiveTab<ExecuteToolResult>(message);
+  return executeTool({ activeTab: true }, tool, params, debug);
 }
 
 /**
  * Execute an Atomic Tool on a specific tab
+ *
+ * @deprecated Use executeTool({ tabId }, ...) instead
  */
 export async function executeToolOnTab(
   tabId: number,
@@ -60,14 +109,12 @@ export async function executeToolOnTab(
   params: Record<string, string | number | boolean>,
   debug: boolean = false,
 ): Promise<ExecuteToolResult> {
-  const message: ExecuteToolMessage = {
-    type: 'EXECUTE_TOOL',
-    payload: { tool, params, debug },
-    messageId: generateMessageId(),
-  };
-
-  return sendToTab<ExecuteToolResult>(tabId, message);
+  return executeTool({ tabId }, tool, params, debug);
 }
+
+// ============================================================================
+// Highlight API
+// ============================================================================
 
 /**
  * Highlight an element on the active tab
@@ -76,12 +123,13 @@ export async function highlightElementOnActiveTab(
   selector: string,
   color?: string,
 ): Promise<{ success: boolean }> {
+  const tabId = await getActiveTabId();
   const message: HighlightElementMessage = {
     type: 'HIGHLIGHT_ELEMENT',
     payload: { selector, color },
   };
 
-  return sendToActiveTab(message);
+  return sendToTab(tabId, message);
 }
 
 /**
@@ -90,10 +138,11 @@ export async function highlightElementOnActiveTab(
 export async function clearHighlightsOnActiveTab(): Promise<{
   success: boolean;
 }> {
+  const tabId = await getActiveTabId();
   const message: ClearHighlightsMessage = {
     type: 'CLEAR_HIGHLIGHTS',
     payload: undefined,
   };
 
-  return sendToActiveTab(message);
+  return sendToTab(tabId, message);
 }
