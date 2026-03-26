@@ -6,9 +6,16 @@
  * The orchestration layer that coordinates tool execution and AI operations.
  */
 
-import type { AtomicTool } from '@homura/sdk/types';
-import { initAIClient, isAIClientInitialized } from '@services/ai';
-import { initOrchestrator } from './orchestrator';
+import type { AtomicTool } from "@homura/sdk/types";
+import { getAIClient, initAIClient, isAIClientInitialized } from "@services/ai";
+import {
+  initOrchestrator,
+  startExecution,
+  clearExecutionState,
+  resumeExecution,
+  loadExecutionState,
+} from "./orchestrator";
+import { simpleExecutor } from "./orchestration/simple-executor";
 
 // =============================================================================
 // INITIALIZATION
@@ -16,14 +23,14 @@ import { initOrchestrator } from './orchestrator';
 
 // Initialize AI client with stored API key
 async function initializeAI(): Promise<void> {
-  const result = await chrome.storage.local.get('ai_api_key');
+  const result = await chrome.storage.local.get("ai_api_key");
   if (result.ai_api_key) {
     initAIClient({ apiKey: result.ai_api_key });
-    console.log('[Homura] AI client initialized');
+    console.log("[Homura] AI client initialized");
   } else {
     // Use default key for development (will be removed in production)
-    initAIClient({ apiKey: 'sk-d2514b410e02403eae3f3b5efe0ef172' });
-    console.log('[Homura] AI client initialized with default key');
+    initAIClient({ apiKey: "sk-d2514b410e02403eae3f3b5efe0ef172" });
+    console.log("[Homura] AI client initialized with default key");
   }
 }
 
@@ -68,16 +75,16 @@ let recordingState: RecordingState = {
 // Restore state from storage on Service Worker startup
 async function restoreRecordingState(): Promise<void> {
   try {
-    const result = await chrome.storage.session.get('recordingState');
+    const result = await chrome.storage.session.get("recordingState");
     if (result.recordingState) {
       recordingState = result.recordingState;
       console.log(
-        '[Homura] Recording state restored from storage:',
+        "[Homura] Recording state restored from storage:",
         recordingState,
       );
     }
   } catch (error) {
-    console.error('[Homura] Failed to restore recording state:', error);
+    console.error("[Homura] Failed to restore recording state:", error);
   }
 }
 
@@ -88,14 +95,14 @@ async function startRecording(tabId: number): Promise<void> {
   recordingState = { isRecording: true, tabId, startTime: Date.now() };
   // Persist to storage to survive Service Worker restarts
   await chrome.storage.session.set({ recordingState });
-  console.log('[Homura] Recording started on tab:', tabId);
+  console.log("[Homura] Recording started on tab:", tabId);
 }
 
 async function stopRecording(): Promise<void> {
   recordingState = { isRecording: false, tabId: null, startTime: null };
   // Clear from storage
-  await chrome.storage.session.remove('recordingState');
-  console.log('[Homura] Recording stopped');
+  await chrome.storage.session.remove("recordingState");
+  console.log("[Homura] Recording stopped");
 }
 
 function isTabRecording(tabId: number): boolean {
@@ -113,13 +120,13 @@ const lastRecordedUrl = new Map<number, string>();
 function detectNavigationType(details: {
   transitionType?: string;
   transitionQualifiers?: string[];
-}): 'link' | 'form' | 'direct' | 'reload' | 'typed' {
+}): "link" | "form" | "direct" | "reload" | "typed" {
   const transitionType = details.transitionType;
-  if (transitionType === 'link') return 'link';
-  if (transitionType === 'form_submit') return 'form';
-  if (transitionType === 'reload') return 'reload';
-  if (transitionType === 'typed') return 'typed';
-  return 'direct'; // JavaScript redirect, bookmark, etc.
+  if (transitionType === "link") return "link";
+  if (transitionType === "form_submit") return "form";
+  if (transitionType === "reload") return "reload";
+  if (transitionType === "typed") return "typed";
+  return "direct"; // JavaScript redirect, bookmark, etc.
 }
 
 // Record navigation when tab navigates to a new URL
@@ -129,9 +136,9 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
 
   // Skip chrome:// and other internal pages
   if (
-    details.url.startsWith('chrome://') ||
-    details.url.startsWith('chrome-extension://') ||
-    details.url.startsWith('about:')
+    details.url.startsWith("chrome://") ||
+    details.url.startsWith("chrome-extension://") ||
+    details.url.startsWith("about:")
   ) {
     return;
   }
@@ -144,7 +151,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   // Skip duplicate recordings (same URL)
   const lastUrl = lastRecordedUrl.get(details.tabId);
   if (lastUrl === details.url) {
-    console.log('[Homura] Skipping duplicate navigation:', details.url);
+    console.log("[Homura] Skipping duplicate navigation:", details.url);
     return;
   }
 
@@ -155,7 +162,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   };
   const navigationType = detectNavigationType(navDetails);
 
-  console.log('[Homura] Navigation recorded:', {
+  console.log("[Homura] Navigation recorded:", {
     url: details.url,
     type: navigationType,
     transitionType: navDetails.transitionType,
@@ -165,11 +172,11 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   try {
     // Send to runtime which will be picked up by SidePanel
     chrome.runtime.sendMessage({
-      type: 'ACTION_RECORDED',
+      type: "ACTION_RECORDED",
       payload: {
         id: `nav_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        type: 'navigate',
-        name: '导航',
+        type: "navigate",
+        name: "导航",
         url: details.url,
         navigationType,
         timestamp: Date.now(),
@@ -177,7 +184,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
     });
   } catch (error) {
     console.log(
-      '[Homura] Could not send navigation recording (SidePanel may not be open):',
+      "[Homura] Could not send navigation recording (SidePanel may not be open):",
       error,
     );
   }
@@ -186,7 +193,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   lastRecordedUrl.set(details.tabId, details.url);
 
   // Then restore recording state on the new page
-  console.log('[Homura] Navigation completed while recording:', details.url);
+  console.log("[Homura] Navigation completed while recording:", details.url);
 
   // Retry logic with increasing delays to ensure content script is ready
   const delays = [300, 800, 1500];
@@ -195,15 +202,15 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
     await new Promise((r) => setTimeout(r, delay));
 
     try {
-      await chrome.tabs.sendMessage(details.tabId, { type: 'START_RECORDING' });
-      console.log('[Homura] Recording restored after', delay, 'ms');
+      await chrome.tabs.sendMessage(details.tabId, { type: "START_RECORDING" });
+      console.log("[Homura] Recording restored after", delay, "ms");
       return; // Success, exit retry loop
     } catch (error) {
-      console.log('[Homura] Retry attempt at', delay, 'ms failed');
+      console.log("[Homura] Retry attempt at", delay, "ms failed");
     }
   }
 
-  console.error('[Homura] Failed to restore recording after all retries');
+  console.error("[Homura] Failed to restore recording after all retries");
 });
 
 // =============================================================================
@@ -219,9 +226,9 @@ chrome.webNavigation.onCreatedNavigationTarget.addListener(async (details) => {
   if (recordingState.tabId !== details.sourceTabId) return;
 
   console.log(
-    '[Homura] New tab opened from recording tab:',
+    "[Homura] New tab opened from recording tab:",
     details.sourceTabId,
-    '->',
+    "->",
     details.tabId,
   );
 
@@ -229,7 +236,7 @@ chrome.webNavigation.onCreatedNavigationTarget.addListener(async (details) => {
   recordingState.tabId = details.tabId;
   await chrome.storage.session.set({ recordingState });
 
-  console.log('[Homura] Recording switched to new tab:', details.tabId);
+  console.log("[Homura] Recording switched to new tab:", details.tabId);
 });
 
 // Handle tab activation - when user switches tabs during recording (e.g., JS redirect to new tab)
@@ -241,9 +248,9 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 
   // Auto-switch recording to newly activated tab
   console.log(
-    '[Homura] User switched to different tab while recording:',
+    "[Homura] User switched to different tab while recording:",
     recordingState.tabId,
-    '->',
+    "->",
     activeInfo.tabId,
   );
 
@@ -254,12 +261,12 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   setTimeout(async () => {
     try {
       await chrome.tabs.sendMessage(activeInfo.tabId, {
-        type: 'START_RECORDING',
+        type: "START_RECORDING",
       });
-      console.log('[Homura] Recording started on newly activated tab');
+      console.log("[Homura] Recording started on newly activated tab");
     } catch (error) {
       console.log(
-        '[Homura] Could not start recording on new tab (content script may not be ready)',
+        "[Homura] Could not start recording on new tab (content script may not be ready)",
       );
     }
   }, 300);
@@ -267,7 +274,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 
 // Fallback: also listen to tabs.onUpdated for hash changes (SPA navigation)
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
-  if (changeInfo.status !== 'complete') return;
+  if (changeInfo.status !== "complete") return;
 
   // Re-check state from storage in case Service Worker just restarted
   await restoreRecordingState();
@@ -278,8 +285,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
   await new Promise((r) => setTimeout(r, 200));
 
   try {
-    await chrome.tabs.sendMessage(tabId, { type: 'START_RECORDING' });
-    console.log('[Homura] Recording restored via tabs.onUpdated');
+    await chrome.tabs.sendMessage(tabId, { type: "START_RECORDING" });
+    console.log("[Homura] Recording restored via tabs.onUpdated");
   } catch {
     // Ignore - webNavigation handler will handle it
   }
@@ -290,7 +297,7 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   await restoreRecordingState();
   if (recordingState.tabId === tabId) {
     await stopRecording();
-    console.log('[Homura] Recording stopped - tab closed');
+    console.log("[Homura] Recording stopped - tab closed");
   }
 });
 
@@ -299,7 +306,7 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 // =============================================================================
 
 interface RunMissionMessage {
-  type: 'RUN_MISSION';
+  type: "RUN_MISSION";
   payload: {
     tools: Array<{
       tool: unknown;
@@ -309,16 +316,16 @@ interface RunMissionMessage {
 }
 
 interface OpenSidePanelMessage {
-  type: 'OPEN_SIDEPANEL';
+  type: "OPEN_SIDEPANEL";
 }
 
 interface SetAPIKeyMessage {
-  type: 'SET_API_KEY';
+  type: "SET_API_KEY";
   payload: { apiKey: string };
 }
 
 interface AIGenerateSelectorMessage {
-  type: 'AI_GENERATE_SELECTOR';
+  type: "AI_GENERATE_SELECTOR";
   payload: {
     intent: string;
     targetHtml: string;
@@ -328,7 +335,7 @@ interface AIGenerateSelectorMessage {
 }
 
 interface AIGenerateToolMessage {
-  type: 'AI_GENERATE_TOOL';
+  type: "AI_GENERATE_TOOL";
   payload: {
     actions: unknown[];
     pageUrl: string;
@@ -337,7 +344,7 @@ interface AIGenerateToolMessage {
 }
 
 interface AIGeneratePathSelectorMessage {
-  type: 'AI_GENERATE_PATH_SELECTOR';
+  type: "AI_GENERATE_PATH_SELECTOR";
   payload: {
     intent: string;
     targetSelector: string;
@@ -356,7 +363,7 @@ interface AIGeneratePathSelectorMessage {
 }
 
 interface AIGenerateSmartSelectorMessage {
-  type: 'AI_GENERATE_SMART_SELECTOR';
+  type: "AI_GENERATE_SMART_SELECTOR";
   payload: {
     intent: string;
     targetSelector: string;
@@ -372,12 +379,12 @@ interface AIGenerateSmartSelectorMessage {
       isSemanticRoot: boolean;
     }>;
     structureInfo: {
-      containerType: 'table' | 'list' | 'grid' | 'card' | 'single';
+      containerType: "table" | "list" | "grid" | "card" | "single";
       hasRepeatingStructure: boolean;
       containerSelector?: string;
       anchorCandidates: Array<{
         selector: string;
-        type: 'text_match' | 'attribute_match';
+        type: "text_match" | "attribute_match";
         text?: string;
         attribute?: { name: string; value: string };
         confidence: number;
@@ -388,16 +395,16 @@ interface AIGenerateSmartSelectorMessage {
 }
 
 interface SetRecordingStateMessage {
-  type: 'SET_RECORDING_STATE';
+  type: "SET_RECORDING_STATE";
   payload: { isRecording: boolean; tabId?: number };
 }
 
 interface GetRecordingStateMessage {
-  type: 'GET_RECORDING_STATE';
+  type: "GET_RECORDING_STATE";
 }
 
 interface ExecuteNavigateMessage {
-  type: 'EXECUTE_NAVIGATE';
+  type: "EXECUTE_NAVIGATE";
   payload: {
     url: string;
     newTab?: boolean;
@@ -406,7 +413,7 @@ interface ExecuteNavigateMessage {
 }
 
 interface HomuraNavigateMessage {
-  type: 'HOMURA_NAVIGATE';
+  type: "HOMURA_NAVIGATE";
   payload: {
     tabId: number;
     url: string;
@@ -415,28 +422,30 @@ interface HomuraNavigateMessage {
 }
 
 interface HomuraStartExecutionMessage {
-  type: 'HOMURA_START_EXECUTION';
+  type: "HOMURA_START_EXECUTION";
   payload: {
     tools: Array<{ tool: unknown; params: Record<string, unknown> }>;
     tabId: number;
+    executionMode?: "simple" | "advanced";
+    executionConfig?: { mode: "simple"; toolDelay?: number };
   };
 }
 
 interface HomuraResumeExecutionMessage {
-  type: 'HOMURA_RESUME_EXECUTION';
+  type: "HOMURA_RESUME_EXECUTION";
   payload: { tabId: number };
 }
 
 interface HomuraGetStateMessage {
-  type: 'HOMURA_GET_STATE';
+  type: "HOMURA_GET_STATE";
 }
 
 interface HomuraCancelExecutionMessage {
-  type: 'HOMURA_CANCEL_EXECUTION';
+  type: "HOMURA_CANCEL_EXECUTION";
 }
 
 interface ToolUpdatedMessage {
-  type: 'TOOL_UPDATED';
+  type: "TOOL_UPDATED";
   payload: {
     toolkitId: string;
     toolIndex: number;
@@ -478,49 +487,49 @@ async function handleMessage(
   sender: chrome.runtime.MessageSender,
   sendResponse: (response: unknown) => void,
 ): Promise<void> {
-  console.log('[Homura] Background received:', message.type);
+  console.log("[Homura] Background received:", message.type);
 
   switch (message.type) {
-    case 'RUN_MISSION':
+    case "RUN_MISSION":
       await handleRunMission(message, sendResponse);
       break;
 
-    case 'OPEN_SIDEPANEL':
+    case "OPEN_SIDEPANEL":
       await handleOpenSidePanel(sender);
       sendResponse({ success: true });
       break;
 
-    case 'SET_API_KEY':
+    case "SET_API_KEY":
       await handleSetAPIKey(message, sendResponse);
       break;
 
-    case 'AI_GENERATE_SELECTOR':
+    case "AI_GENERATE_SELECTOR":
       await handleAIGenerateSelector(message, sendResponse);
       break;
 
-    case 'AI_GENERATE_TOOL':
+    case "AI_GENERATE_TOOL":
       await handleAIGenerateTool(message, sendResponse);
       break;
 
-    case 'AI_GENERATE_PATH_SELECTOR':
+    case "AI_GENERATE_PATH_SELECTOR":
       await handleAIGeneratePathSelector(message, sendResponse);
       break;
 
-    case 'AI_GENERATE_SMART_SELECTOR':
+    case "AI_GENERATE_SMART_SELECTOR":
       await handleAIGenerateSmartSelector(
         message as AIGenerateSmartSelectorMessage,
         sendResponse,
       );
       break;
 
-    case 'EXECUTE_NAVIGATE':
+    case "EXECUTE_NAVIGATE":
       await handleExecuteNavigate(
         message as ExecuteNavigateMessage,
         sendResponse,
       );
       break;
 
-    case 'HOMURA_NAVIGATE': {
+    case "HOMURA_NAVIGATE": {
       const msg = message as HomuraNavigateMessage;
       const { tabId, url } = msg.payload;
       // waitForLoad is handled by the tab status listener in orchestrator
@@ -535,7 +544,7 @@ async function handleMessage(
     }
 
     // Recording state management (for cross-page recording)
-    case 'SET_RECORDING_STATE': {
+    case "SET_RECORDING_STATE": {
       const msg = message as SetRecordingStateMessage;
       if (msg.payload.isRecording && msg.payload.tabId) {
         await startRecording(msg.payload.tabId);
@@ -546,50 +555,85 @@ async function handleMessage(
       break;
     }
 
-    case 'GET_RECORDING_STATE': {
+    case "GET_RECORDING_STATE": {
       await restoreRecordingState(); // Ensure we have latest state
       sendResponse({ success: true, state: recordingState });
       break;
     }
 
     // Orchestrator messages
-    case 'HOMURA_START_EXECUTION': {
-      const { startExecution, clearExecutionState } =
-        await import('./orchestrator');
-      await clearExecutionState();
-      const result = await startExecution(
-        message.payload.tools as Array<{
-          tool: AtomicTool;
-          params: Record<string, unknown>;
-        }>,
-        message.payload.tabId,
+    case "HOMURA_START_EXECUTION": {
+      const msg = message as HomuraStartExecutionMessage;
+      const { executionMode = "advanced", executionConfig } = msg.payload;
+
+      console.log(
+        "[Background] Starting execution with mode:",
+        executionMode,
+        "config:",
+        executionConfig,
       );
-      sendResponse(result);
+
+      if (executionMode === "simple") {
+        // 简单模式：使用简单执行器
+        const state = await simpleExecutor.start(
+          msg.payload.tools as Array<{
+            tool: AtomicTool;
+            params: Record<string, unknown>;
+          }>,
+          msg.payload.tabId,
+          executionConfig || { mode: "simple", toolDelay: 2000 },
+        );
+        // 返回兼容的 ExecutionState 格式
+        sendResponse(state);
+      } else {
+        // 高级模式：使用原有编排器
+        await clearExecutionState();
+        const result = await startExecution(
+          msg.payload.tools as Array<{
+            tool: AtomicTool;
+            params: Record<string, unknown>;
+          }>,
+          msg.payload.tabId,
+        );
+        sendResponse(result);
+      }
       break;
     }
 
-    case 'HOMURA_RESUME_EXECUTION': {
-      const { resumeExecution } = await import('./orchestrator');
+    case "HOMURA_RESUME_EXECUTION": {
       const result = await resumeExecution(message.payload.tabId);
       sendResponse(result);
       break;
     }
 
-    case 'HOMURA_GET_STATE': {
-      const { loadExecutionState } = await import('./orchestrator');
-      const state = await loadExecutionState();
-      sendResponse(state);
+    case "HOMURA_GET_STATE": {
+      // 首先检查简单执行器
+      const simpleState = simpleExecutor.getState();
+      if (simpleState) {
+        // 简单执行器正在运行
+        sendResponse(simpleExecutor.toExecutionState());
+      } else {
+        // 检查高级编排器
+        const state = await loadExecutionState();
+        sendResponse(state);
+      }
       break;
     }
 
-    case 'HOMURA_CANCEL_EXECUTION': {
-      const { clearExecutionState } = await import('./orchestrator');
-      await clearExecutionState();
+    case "HOMURA_CANCEL_EXECUTION": {
+      // 取消简单执行器
+      const simpleState = simpleExecutor.getState();
+      if (simpleState && simpleState.status === "running") {
+        await simpleExecutor.cancel();
+      } else {
+        // 取消高级编排器
+        await clearExecutionState();
+      }
       sendResponse({ success: true });
       break;
     }
 
-    case 'TOOL_UPDATED': {
+    case "TOOL_UPDATED": {
       const msg = message as ToolUpdatedMessage;
       const { toolkitId, toolIndex, updatedTool } = msg.payload;
 
@@ -612,7 +656,7 @@ async function handleMessage(
     }
 
     default:
-      sendResponse({ success: false, error: 'Unknown message type' });
+      sendResponse({ success: false, error: "Unknown message type" });
   }
 }
 
@@ -624,12 +668,10 @@ async function handleRunMission(
   message: RunMissionMessage,
   sendResponse: (response: unknown) => void,
 ): Promise<void> {
-  const { startExecution } = await import('./orchestrator');
-
   // 获取当前活动 tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
-    sendResponse({ error: 'No active tab found' });
+    sendResponse({ error: "No active tab found" });
     return;
   }
 
@@ -671,12 +713,11 @@ async function handleAIGenerateSelector(
   sendResponse: (response: unknown) => void,
 ): Promise<void> {
   if (!isAIClientInitialized()) {
-    sendResponse({ success: false, error: 'AI client not initialized' });
+    sendResponse({ success: false, error: "AI client not initialized" });
     return;
   }
 
   try {
-    const { getAIClient } = await import('@services/ai');
     const client = getAIClient();
 
     const result = await client.generateSelector({
@@ -688,7 +729,7 @@ async function handleAIGenerateSelector(
 
     sendResponse({ success: true, selectorLogic: result.selectorLogic });
   } catch (error) {
-    console.error('[Homura] AI selector generation error:', error);
+    console.error("[Homura] AI selector generation error:", error);
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -698,24 +739,23 @@ async function handleAIGenerateTool(
   sendResponse: (response: unknown) => void,
 ): Promise<void> {
   if (!isAIClientInitialized()) {
-    sendResponse({ success: false, error: 'AI client not initialized' });
+    sendResponse({ success: false, error: "AI client not initialized" });
     return;
   }
 
   try {
-    const { getAIClient } = await import('@services/ai');
     const client = getAIClient();
 
     const result = await client.generateTool({
       actions: message.payload.actions as never[],
       pageUrl: message.payload.pageUrl,
       pageTitle: message.payload.pageTitle,
-      domSnapshot: '', // TODO: Get from content script
+      domSnapshot: "", // TODO: Get from content script
     });
 
     sendResponse({ success: true, tool: result.tool });
   } catch (error) {
-    console.error('[Homura] AI tool generation error:', error);
+    console.error("[Homura] AI tool generation error:", error);
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -725,12 +765,11 @@ async function handleAIGeneratePathSelector(
   sendResponse: (response: unknown) => void,
 ): Promise<void> {
   if (!isAIClientInitialized()) {
-    sendResponse({ success: false, error: 'AI client not initialized' });
+    sendResponse({ success: false, error: "AI client not initialized" });
     return;
   }
 
   try {
-    const { getAIClient } = await import('@services/ai');
     const client = getAIClient();
 
     // Use the new path-based selector generation
@@ -741,14 +780,14 @@ async function handleAIGeneratePathSelector(
       ancestorPath: message.payload.ancestorPath,
     });
 
-    console.log('[Homura] AI path selector result:', result);
+    console.log("[Homura] AI path selector result:", result);
 
     sendResponse({
       success: true,
       pathSelector: result,
     });
   } catch (error) {
-    console.error('[Homura] AI path selector generation error:', error);
+    console.error("[Homura] AI path selector generation error:", error);
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -757,19 +796,18 @@ async function handleAIGenerateSmartSelector(
   message: AIGenerateSmartSelectorMessage,
   sendResponse: (response: unknown) => void,
 ): Promise<void> {
-  console.log('[Background] Routing SmartSelector to AI service:', {
+  console.log("[Background] Routing SmartSelector to AI service:", {
     containerType: message.payload.structureInfo.containerType,
     hasRepeating: message.payload.structureInfo.hasRepeatingStructure,
     anchorCount: message.payload.structureInfo.anchorCandidates.length,
   });
 
   if (!isAIClientInitialized()) {
-    sendResponse({ success: false, error: 'AI client not initialized' });
+    sendResponse({ success: false, error: "AI client not initialized" });
     return;
   }
 
   try {
-    const { getAIClient } = await import('@services/ai');
     const client = getAIClient();
 
     // Use the smart selector generation method
@@ -781,7 +819,7 @@ async function handleAIGenerateSmartSelector(
       structureInfo: message.payload.structureInfo,
     });
 
-    console.log('[Background] SmartSelector result:', {
+    console.log("[Background] SmartSelector result:", {
       strategy: result.strategy,
       confidence: result.confidence,
     });
@@ -795,7 +833,7 @@ async function handleAIGenerateSmartSelector(
       reasoning: result.reasoning,
     });
   } catch (error) {
-    console.error('[Background] SmartSelector generation error:', error);
+    console.error("[Background] SmartSelector generation error:", error);
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -824,17 +862,17 @@ async function executeNavigation(
 
   try {
     // Validate URL
-    if (!url || typeof url !== 'string') {
-      return { success: false, error: 'Invalid URL' };
+    if (!url || typeof url !== "string") {
+      return { success: false, error: "Invalid URL" };
     }
 
     // Skip internal pages
     if (
-      url.startsWith('chrome://') ||
-      url.startsWith('chrome-extension://') ||
-      url.startsWith('about:')
+      url.startsWith("chrome://") ||
+      url.startsWith("chrome-extension://") ||
+      url.startsWith("about:")
     ) {
-      return { success: false, error: 'Cannot navigate to internal pages' };
+      return { success: false, error: "Cannot navigate to internal pages" };
     }
 
     if (newTab || tabId === undefined) {
@@ -844,16 +882,16 @@ async function executeNavigation(
         active: setActive,
       });
 
-      console.log('[Homura] Navigated in new tab:', tab.id, 'to:', url);
+      console.log("[Homura] Navigated in new tab:", tab.id, "to:", url);
       return { success: true, tabId: tab.id };
     } else {
       // Navigate in existing tab
       await chrome.tabs.update(tabId, { url });
-      console.log('[Homura] Navigated tab:', tabId, 'to:', url);
+      console.log("[Homura] Navigated tab:", tabId, "to:", url);
       return { success: true, tabId };
     }
   } catch (error) {
-    console.error('[Homura] Navigation error:', error);
+    console.error("[Homura] Navigation error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -871,4 +909,4 @@ async function handleExecuteNavigate(
   sendResponse(result);
 }
 
-console.log('[Homura] Background service worker initialized');
+console.log("[Homura] Background service worker initialized");

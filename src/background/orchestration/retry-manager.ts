@@ -6,10 +6,35 @@
  * 管理工具执行的重试逻辑
  */
 
-import type { AtomicTool, ExecuteToolResult } from '@homura/sdk/types';
-import { sleep, extractErrorMessage } from '@homura/sdk/utils';
-import { CONFIG } from '../config';
-import { executeToolOnTab } from '../messaging';
+import type { AtomicTool, ExecuteToolResult } from "@homura/sdk/types";
+import { CONFIG } from "../config";
+import { executeToolOnTab } from "../messaging";
+
+/**
+ * Sleep for a specified duration
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Extract error message safely from any error type
+ */
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return String(error.message);
+  }
+
+  return String(error);
+}
 
 /**
  * 重试管理器
@@ -55,14 +80,14 @@ export class RetryManager {
         // 其他错误或最后一次重试失败
         if (isLastAttempt) {
           return this.createErrorResult(
-            'TIMEOUT',
+            "TIMEOUT",
             `Failed after ${maxRetries} retries: ${errorMessage}`,
           );
         }
       }
     }
 
-    return this.createErrorResult('UNKNOWN', 'Unknown execution error');
+    return this.createErrorResult("UNKNOWN", "Unknown execution error");
   }
 
   /**
@@ -70,9 +95,9 @@ export class RetryManager {
    */
   isContentScriptNotReadyError(message: string): boolean {
     return (
-      message.includes('Receiving end does not exist') ||
-      message.includes('message port closed') ||
-      message.includes('Could not establish connection')
+      message.includes("Receiving end does not exist") ||
+      message.includes("message port closed") ||
+      message.includes("Could not establish connection")
     );
   }
 
@@ -81,7 +106,7 @@ export class RetryManager {
   // ============================================================================
 
   private createErrorResult(
-    code: 'TIMEOUT' | 'UNKNOWN',
+    code: "TIMEOUT" | "UNKNOWN",
     message: string,
   ): ExecuteToolResult {
     return {

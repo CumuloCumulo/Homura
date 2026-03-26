@@ -6,17 +6,23 @@
  * Type-safe messaging between Background and Content Scripts.
  */
 
-import type { AtomicTool, ExecuteToolResult } from '@homura/sdk/types';
+import type { AtomicTool, ExecuteToolResult } from "@homura/sdk/types";
 import type {
   ExecuteToolMessage,
   HighlightElementMessage,
   ClearHighlightsMessage,
-} from '@shared/types';
-import { generateMessageId } from '@homura/sdk/utils';
+} from "@shared/types";
 
 // ============================================================================
 // Internal Helpers
 // ============================================================================
+
+/**
+ * Generate a unique message ID
+ */
+function generateMessageId(): string {
+  return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
 
 /**
  * Get active tab ID
@@ -25,7 +31,7 @@ async function getActiveTabId(): Promise<number> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   if (!tab?.id) {
-    throw new Error('No active tab found');
+    throw new Error("No active tab found");
   }
 
   return tab.id;
@@ -47,7 +53,7 @@ function createExecuteToolMessage(
   debug: boolean = false,
 ): ExecuteToolMessage {
   return {
-    type: 'EXECUTE_TOOL',
+    type: "EXECUTE_TOOL",
     payload: { tool, params, debug },
     messageId: generateMessageId(),
   };
@@ -80,7 +86,7 @@ export async function executeTool(
   params: Record<string, string | number | boolean>,
   debug: boolean = false,
 ): Promise<ExecuteToolResult> {
-  const tabId = 'tabId' in target ? target.tabId : await getActiveTabId();
+  const tabId = "tabId" in target ? target.tabId : await getActiveTabId();
   const message = createExecuteToolMessage(tool, params, debug);
   return sendToTab<ExecuteToolResult>(tabId, message);
 }
@@ -125,7 +131,7 @@ export async function highlightElementOnActiveTab(
 ): Promise<{ success: boolean }> {
   const tabId = await getActiveTabId();
   const message: HighlightElementMessage = {
-    type: 'HIGHLIGHT_ELEMENT',
+    type: "HIGHLIGHT_ELEMENT",
     payload: { selector, color },
   };
 
@@ -140,7 +146,7 @@ export async function clearHighlightsOnActiveTab(): Promise<{
 }> {
   const tabId = await getActiveTabId();
   const message: ClearHighlightsMessage = {
-    type: 'CLEAR_HIGHLIGHTS',
+    type: "CLEAR_HIGHLIGHTS",
     payload: undefined,
   };
 

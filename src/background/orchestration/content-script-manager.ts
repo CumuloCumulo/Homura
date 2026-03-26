@@ -6,9 +6,15 @@
  * 管理 content script 的注入和就绪检查
  */
 
-import { sleep } from '@homura/sdk/utils';
-import { CONFIG } from '../config';
-import { TabTracker } from './tab-tracker';
+import { CONFIG } from "../config";
+import { TabTracker } from "./tab-tracker";
+
+/**
+ * Sleep for a specified duration
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Content Script 管理器
@@ -54,7 +60,7 @@ export class ContentScriptManager {
     while (Date.now() - startTime < timeout) {
       try {
         // 尝试发送 ping 消息
-        await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+        await chrome.tabs.sendMessage(tabId, { type: "PING" });
         return true;
       } catch {
         // Content script 还没准备好
