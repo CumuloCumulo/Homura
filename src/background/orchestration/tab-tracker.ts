@@ -95,13 +95,22 @@ export class TabTracker {
 
   /**
    * 检查是否是内部页面（无法注入 content script）
+   *
+   * 注意：URL 为空时不一定是内部页面，可能是权限限制或加载中
+   * 只有当 URL 确实以内部协议开头时才返回 true
    */
   isInternalPage(tab: chrome.tabs.Tab): boolean {
+    // 如果没有 URL，不认为是内部页面（可能是新 tab 或权限限制）
+    if (!tab.url) {
+      return false;
+    }
+    // 检查是否以内部协议开头
     return (
-      !tab.url ||
       tab.url.startsWith('chrome://') ||
       tab.url.startsWith('about:') ||
-      tab.url.startsWith('chrome-extension://')
+      tab.url.startsWith('chrome-extension://') ||
+      tab.url.startsWith('edge://') ||
+      tab.url.startsWith('opera://')
     );
   }
 
