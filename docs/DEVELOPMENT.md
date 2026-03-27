@@ -315,30 +315,39 @@ packages/sdk/
 
 ### 可用脚本
 
-```bash
-# 从项目根目录运行
+<!-- AUTO-GENERATED: Scripts from package.json -->
+<!-- DO NOT EDIT MANUALLY - Run /update-docs to regenerate -->
 
-# 构建 SDK
-npm run build:sdk
-# → cd packages/sdk && tsc
-
-# 构建扩展（包含 SDK）
-npm run build:extension
-# → npm run build:sdk && tsc && vite build
-
-# 完整构建
-npm run build
-# → npm run build:sdk && tsc && vite build
-
-# 开发模式（Vite dev server）
-npm run dev
-
-# 预览构建产物
-npm run preview
-
-# 代码检查
-npm run lint
-```
+| 命令 | 说明 |
+|------|------|
+| **开发构建** | |
+| `npm run dev` | 启动 Vite 开发服务器（带热重载） |
+| `npm run build` | 完整构建（SDK + 扩展） |
+| `npm run build:extension` | 仅构建扩展（包含 SDK） |
+| `npm run build:sdk` | 仅构建 SDK |
+| `npm run preview` | 预览构建产物 |
+| **类型检查** | |
+| `npm run typecheck` | TypeScript 类型检查（项目根） |
+| `npm run typecheck:sdk` | TypeScript 类型检查（SDK） |
+| **代码质量检查** | |
+| `npm run check:duplicates` | 检查类型冲突 |
+| `npm run check:imports` | 检查导入路径 |
+| `npm run check:all` | 运行所有检查（类型 + 冲突 + 导入） |
+| `npm run quick-check` | 快速检查（简化版） |
+| **代码规范** | |
+| `npm run lint` | ESLint 检查 |
+| `npm run lint:fix` | ESLint 自动修复 |
+| **测试** | |
+| `npm test` | 运行测试套件 |
+| `npm run test:ui` | 运行测试（UI 模式） |
+| `npm run test:coverage` | 运行测试并生成覆盖率报告 |
+| **Git Hooks** | |
+| `npm run prepare` | Husky 安装（自动运行） |
+| **代码生成** | |
+| `npm run new:function` | 创建新函数文件 |
+| `npm run new:test` | 创建新测试文件 |
+| `npm run new:component` | 创建新组件文件 |
+<!-- END AUTO-GENERATED -->
 
 ### TypeScript 配置
 

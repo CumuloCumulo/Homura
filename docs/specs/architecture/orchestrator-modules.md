@@ -28,6 +28,7 @@ src/background/
 ├── config.ts                    # 集中配置管理
 └── orchestration/
     ├── index.ts                 # 主入口，协调各模块
+    ├── simple-executor.ts      # 简单模式执行器（固定延迟）
     ├── state-manager.ts         # 执行状态管理
     ├── tab-tracker.ts           # Tab 追踪和切换
     ├── retry-manager.ts         # 重试逻辑
@@ -129,6 +130,30 @@ class ContentScriptManager {
 }
 ```
 
+### 6. SimpleExecutor (`simple-executor.ts`)
+
+轻量级顺序执行器，用于简单模式的快速测试。
+
+```typescript
+class SimpleExecutor {
+  start(
+    tools: Array<{ tool: AtomicTool; params: Record<string, unknown> }>,
+    tabId: number,
+    config: SimpleExecutionConfig
+  ): Promise<SimpleExecutorState>;
+
+  cancel(): Promise<void>;
+  getState(): SimpleExecutorState | null;
+  toExecutionState(): ExecutionState | null;
+}
+```
+
+**特点**：
+- 固定延迟顺序执行（默认 2000ms）
+- 快速失败（无重试）
+- 无页面导航支持
+- 无状态持久化
+
 ---
 
 ## 🔄 工作流
@@ -200,3 +225,4 @@ class ContentScriptManager {
 | 日期 | 版本 | 变更说明 |
 |------|------|----------|
 | 2026-03-25 | 1.0.0 | 初始版本，完成模块化重构 |
+| 2026-03-27 | 1.1.0 | 添加 SimpleExecutor 模块（双模式执行器） |
