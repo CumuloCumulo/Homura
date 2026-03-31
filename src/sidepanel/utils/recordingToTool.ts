@@ -6,9 +6,9 @@
  * Utility functions for converting recorded actions to atomic tools
  */
 
-import type { RecordedAction } from "@shared/selectorBuilder/types";
-import type { AtomicTool } from "@homura/sdk/types";
-import { convertUnifiedToSelectorLogic } from "@homura/sdk/selector";
+import type { RecordedAction } from '@shared/selectorBuilder/types';
+import type { AtomicTool } from '@homura/sdk/types';
+import { convertUnifiedToSelectorLogic } from '@homura/sdk/selector';
 
 // =============================================================================
 // STORAGE KEYS
@@ -18,7 +18,7 @@ import { convertUnifiedToSelectorLogic } from "@homura/sdk/selector";
  * 存储键名常量
  */
 const STORAGE_KEYS = {
-  RECORDED_TOOLS: "homura_recorded_tools",
+  RECORDED_TOOLS: 'homura_recorded_tools',
 } as const;
 
 /**
@@ -49,26 +49,26 @@ export function recordedActionToTool(action: RecordedAction): AtomicTool {
   const name = generateToolName(action);
 
   // navigate 操作特殊处理：不需要 selector，只需要 URL
-  if (action.type === "navigate") {
+  if (action.type === 'navigate') {
     return {
       tool_id: toolId,
       name,
-      description: `录制于 ${new Date(action.timestamp).toLocaleString("zh-CN")}`,
+      description: `录制于 ${new Date(action.timestamp).toLocaleString('zh-CN')}`,
       parameters: {},
       selector_logic: {
         target: {
-          selector: "",
-          action: "NAVIGATE",
-          actionParams: { url: action.url || "", waitForLoad: false },
+          selector: '',
+          action: 'NAVIGATE',
+          actionParams: { url: action.url || '', waitForLoad: false },
         },
       },
-      source: "recorded",
+      source: 'recorded',
       createdAt: new Date().toISOString(),
     };
   }
 
   // 构建 selector_logic (非 navigate 操作)
-  let selectorLogic: AtomicTool["selector_logic"];
+  let selectorLogic: AtomicTool['selector_logic'];
 
   if (action.unifiedSelector) {
     // 使用 SDK 的转换函数，正确处理 UnifiedSelector
@@ -88,7 +88,7 @@ export function recordedActionToTool(action: RecordedAction): AtomicTool {
     // 回退到旧格式（兼容性）
     selectorLogic = {
       target: {
-        selector: action.elementAnalysis?.minimalSelector || "",
+        selector: action.elementAnalysis?.minimalSelector || '',
         action: convertActionType(action.type),
         actionParams: action.value ? { value: action.value } : undefined,
       },
@@ -98,10 +98,10 @@ export function recordedActionToTool(action: RecordedAction): AtomicTool {
   return {
     tool_id: toolId,
     name,
-    description: `录制于 ${new Date(action.timestamp).toLocaleString("zh-CN")}`,
+    description: `录制于 ${new Date(action.timestamp).toLocaleString('zh-CN')}`,
     parameters: {}, // Empty parameters for recorded tools
     selector_logic: selectorLogic,
-    source: "recorded", // 标记为录制工具
+    source: 'recorded', // 标记为录制工具
     createdAt: new Date().toISOString(),
   };
 }
@@ -117,15 +117,15 @@ export async function sendRecordedToolsToDashboard(
   const data: RecordedToolsData = {
     tools,
     timestamp: new Date().toISOString(),
-    version: "2.0",
+    version: '2.0',
   };
 
-  console.log("[recordingToTool] Sending tools to Dashboard:", tools);
+  console.log('[recordingToTool] Sending tools to Dashboard:', tools);
   await chrome.storage.local.set({
     [STORAGE_KEYS.RECORDED_TOOLS]: data,
   });
   console.log(
-    "[recordingToTool] Tools saved to storage:",
+    '[recordingToTool] Tools saved to storage:',
     STORAGE_KEYS.RECORDED_TOOLS,
   );
 }
@@ -147,21 +147,21 @@ function generateToolName(action: RecordedAction): string {
 
   // 格式: [动作] [元素描述]
   const actionNames: Record<string, string> = {
-    click: "点击",
-    input: "输入",
-    select: "选择",
-    scroll: "滚动",
-    navigate: "导航",
+    click: '点击',
+    input: '输入',
+    select: '选择',
+    scroll: '滚动',
+    navigate: '导航',
   };
 
   const actionName = actionNames[action.type] || action.type;
 
   // 元素描述
-  let elementDesc = "";
+  let elementDesc = '';
 
-  if (action.type === "navigate") {
+  if (action.type === 'navigate') {
     // 导航动作：使用 URL
-    elementDesc = truncateUrl(action.url || "", 20);
+    elementDesc = truncateUrl(action.url || '', 20);
   } else if (analysis) {
     // 从锚点候选中获取文本描述
     const firstAnchor = analysis.anchorCandidates?.[0];
@@ -173,7 +173,7 @@ function generateToolName(action: RecordedAction): string {
       elementDesc = analysis.containerType;
     } else {
       elementDesc =
-        analysis.targetSelector || analysis.minimalSelector || "元素";
+        analysis.targetSelector || analysis.minimalSelector || '元素';
     }
   }
 
@@ -188,7 +188,7 @@ function generateToolId(action: RecordedAction): string {
     selector:
       action.unifiedSelector?.fullSelector ||
       action.elementAnalysis?.minimalSelector ||
-      "",
+      '',
     action: action.type,
     value: action.value,
     url: action.url,
@@ -208,20 +208,20 @@ function generateToolId(action: RecordedAction): string {
  * 转换动作类型到 SDK action 类型
  */
 function convertActionType(
-  type: RecordedAction["type"],
-): AtomicTool["selector_logic"]["target"]["action"] {
+  type: RecordedAction['type'],
+): AtomicTool['selector_logic']['target']['action'] {
   const actionMap: Record<
-    RecordedAction["type"],
-    AtomicTool["selector_logic"]["target"]["action"]
+    RecordedAction['type'],
+    AtomicTool['selector_logic']['target']['action']
   > = {
-    click: "CLICK",
-    input: "INPUT",
-    select: "INPUT", // SELECT 映射到 INPUT（选择框输入）
-    scroll: "CLICK", // SCROLL 映射到 CLICK（滚动可以点击触发）
-    navigate: "NAVIGATE",
+    click: 'CLICK',
+    input: 'INPUT',
+    select: 'INPUT', // SELECT 映射到 INPUT（选择框输入）
+    scroll: 'CLICK', // SCROLL 映射到 CLICK（滚动可以点击触发）
+    navigate: 'NAVIGATE',
   };
 
-  return actionMap[type] || "CLICK";
+  return actionMap[type] || 'CLICK';
 }
 
 /**
@@ -229,7 +229,7 @@ function convertActionType(
  */
 function truncateUrl(url: string, maxLength: number = 40): string {
   if (!url || url.length <= maxLength) return url;
-  return url.slice(0, maxLength) + "...";
+  return url.slice(0, maxLength) + '...';
 }
 
 // =============================================================================

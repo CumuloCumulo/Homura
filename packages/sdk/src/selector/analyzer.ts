@@ -1123,15 +1123,31 @@ export function buildMinimalSelector(
   }
 
   // 5. Add nth-of-type when there are multiple same-tag siblings
+  // IMPORTANT: Only add nth-of-type if there are multiple matches AND index > 1
+  // nth-of-type(1) is redundant and can cause issues when:
+  // - The first element of that type doesn't match the full selector
+  // - Example: div.bh-col-md-8:nth-of-type(1) fails when the first div is div.other
+  //
+  // The trap: :nth-of-type(n) selects the nth element of that type among ALL siblings,
+  // not just those matching the selector. So div.class:nth-of-type(1) means:
+  // "Find the first div, then check if it has .class" - which fails if the first div
+  // doesn't have that class!
   if (parent) {
     try {
       const matches = parent.querySelectorAll(`:scope > ${baseSelector}`);
       if (matches.length > 1) {
         const index = Array.from(matches).indexOf(element) + 1;
-        if (index > 0) {
+        // Only use nth-of-type for index > 1
+        // For index === 1, rely on baseSelector + anchor filtering instead
+        if (index > 1) {
           return `${baseSelector}:nth-of-type(${index})`;
         }
+        // When index === 1, skip nth-of-type to avoid the trap
+        // The selector will work with anchor-based filtering in scope+anchor strategy
       }
+      // If matches.length === 1, nth-of-type(1) is redundant - skip it
+      // This prevents the "nth-of-type trap" where div.class:nth-of-type(1)
+      // fails because the first div doesn't have the required class
     } catch {
       // Invalid selector syntax
     }

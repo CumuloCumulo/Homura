@@ -42,6 +42,8 @@ let validationHighlight: HTMLElement | null = null;
 let inspectOverlay: HTMLElement | null = null;
 /** Currently hovered element (tracked via elementFromPoint) */
 let currentHoveredElement: HTMLElement | null = null;
+/** Z-index monitoring interval for dynamic elements like jqxWidget dropdowns */
+let zIndexMonitorInterval: number | null = null;
 
 /**
  * Initialize message listener
@@ -279,7 +281,15 @@ function handleStartInspect(): { success: boolean } {
   inspectOverlay.addEventListener('mousedown', onOverlayMouseDown, true);
   inspectOverlay.addEventListener('mouseup', onOverlayMouseUp, true);
 
-  console.log('[Homura] Inspect mode started with overlay');
+  // Start z-index monitoring to handle dynamic elements like jqxWidget dropdowns
+  zIndexMonitorInterval = window.setInterval(
+    maintainOverlayZIndex,
+    100, // Check every 100ms
+  );
+
+  console.log(
+    '[Homura] Inspect mode started with overlay and z-index monitoring',
+  );
   return { success: true };
 }
 
@@ -290,6 +300,12 @@ function handleStopInspect(): { success: boolean } {
   if (!isInspectMode) return { success: true };
 
   isInspectMode = false;
+
+  // Stop z-index monitoring
+  if (zIndexMonitorInterval !== null) {
+    clearInterval(zIndexMonitorInterval);
+    zIndexMonitorInterval = null;
+  }
 
   // Remove overlay and its listeners
   if (inspectOverlay) {
@@ -309,6 +325,77 @@ function handleStopInspect(): { success: boolean } {
 
   console.log('[Homura] Inspect mode stopped');
   return { success: true };
+}
+
+/**
+ * Maintain overlay z-index above all dynamic elements
+ *
+ * This function runs periodically to ensure the inspect overlay always stays
+ * on top, even when libraries like jqxWidget dynamically create dropdowns
+ * with high z-index values.
+ */
+function maintainOverlayZIndex(): void {
+  if (!inspectOverlay || !isInspectMode) return;
+
+  const currentZIndex = parseInt(
+    inspectOverlay.style.zIndex || '2147483648',
+    10,
+  );
+  let needsUpdate = false;
+
+  // Check all elements with high z-index values
+  // Focus on common problematic elements like dropdowns, modals, popups
+  const selectors = [
+    "[style*='z-index']",
+    '.jqx-listbox',
+    '.jqx-dropdownlist',
+    '.jqx-popup',
+    '.jqx-window',
+    "[role='option']",
+    "[role='listbox']",
+  ];
+
+  for (const selector of selectors) {
+    const elements = document.querySelectorAll(selector);
+    for (const element of elements) {
+      if (element === inspectOverlay) continue;
+
+      const computedZIndex = parseInt(
+        window.getComputedStyle(element).zIndex || '0',
+        10,
+      );
+
+      // If element has a z-index >= our overlay, we need to increase ours
+      if (computedZIndex > 0 && computedZIndex >= currentZIndex) {
+        needsUpdate = true;
+        break;
+      }
+    }
+    if (needsUpdate) break;
+  }
+
+  if (needsUpdate) {
+    // Increment z-index to stay on top
+    const newZIndex = currentZIndex + 1;
+    inspectOverlay.style.zIndex = String(newZIndex);
+
+    // Also update highlight z-indexes to maintain proper layering
+    const highlights = [
+      'homura-inspect-highlight',
+      'homura-selected-highlight',
+      'homura-validation-highlight',
+    ];
+    highlights.forEach((id, index) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.style.zIndex = String(newZIndex - 1 - index);
+      }
+    });
+
+    console.log(
+      `[Homura] Updated overlay z-index to ${newZIndex} to stay above dynamic elements`,
+    );
+  }
 }
 
 /**

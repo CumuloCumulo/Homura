@@ -9,18 +9,18 @@
  * - 自动同步到 chrome.storage
  */
 
-import { create } from "zustand";
+import { create } from 'zustand';
 import type {
   AtomicTool,
   ExecutionState,
   ExecutionMode,
-} from "@homura/sdk/types";
+} from '@homura/sdk/types';
 
 // =============================================================================
 // 类型定义
 // =============================================================================
 
-export type TestStatus = "idle" | "running" | "completed" | "failed";
+export type TestStatus = 'idle' | 'running' | 'completed' | 'failed';
 
 /**
  * 单个工具测试结果
@@ -146,17 +146,17 @@ interface TestStore {
 export const useTestStore = create<TestStore>((set) => ({
   // 工具集状态 - 初始值
   toolkitId: null,
-  toolkitName: "",
+  toolkitName: '',
   tools: [],
 
   // 执行状态 - 初始值
-  testStatus: "idle",
+  testStatus: 'idle',
   currentToolIndex: -1,
   executionId: null,
   results: [],
 
   // 执行模式 - 初始值
-  executionMode: "simple",
+  executionMode: 'simple',
   simpleToolDelay: 2000,
 
   // 执行锁 - 初始值
@@ -170,7 +170,7 @@ export const useTestStore = create<TestStore>((set) => ({
       toolkitName,
       tools,
       // 重置执行状态
-      testStatus: "idle",
+      testStatus: 'idle',
       currentToolIndex: -1,
       executionId: null,
       results: [],
@@ -182,9 +182,9 @@ export const useTestStore = create<TestStore>((set) => ({
   clearToolkit: () => {
     set({
       toolkitId: null,
-      toolkitName: "",
+      toolkitName: '',
       tools: [],
-      testStatus: "idle",
+      testStatus: 'idle',
       currentToolIndex: -1,
       executionId: null,
       results: [],
@@ -214,7 +214,7 @@ export const useTestStore = create<TestStore>((set) => ({
   clearResults: () => {
     set({
       results: [],
-      testStatus: "idle",
+      testStatus: 'idle',
     });
   },
 
@@ -224,7 +224,7 @@ export const useTestStore = create<TestStore>((set) => ({
 
   resetExecution: () => {
     set({
-      testStatus: "idle",
+      testStatus: 'idle',
       currentToolIndex: -1,
       executionId: null,
       isExecuting: false,
@@ -238,10 +238,10 @@ export const useTestStore = create<TestStore>((set) => ({
       // 安全地提取错误信息
       let errorMessage: string | undefined = undefined;
       if (h.result.error) {
-        if (typeof h.result.error === "string") {
+        if (typeof h.result.error === 'string') {
           errorMessage = h.result.error;
         } else if (
-          typeof h.result.error === "object" &&
+          typeof h.result.error === 'object' &&
           h.result.error !== null
         ) {
           const errorObj = h.result.error as {
@@ -273,25 +273,25 @@ export const useTestStore = create<TestStore>((set) => ({
     });
 
     // 根据执行状态更新测试状态
-    if (state.status === "completed") {
+    if (state.status === 'completed') {
       set({
-        testStatus: "completed",
+        testStatus: 'completed',
         executionId: null,
         isExecuting: false,
       });
       // 2 秒后重置
       setTimeout(() => {
-        set({ testStatus: "idle", currentToolIndex: -1 });
+        set({ testStatus: 'idle', currentToolIndex: -1 });
       }, 2000);
-    } else if (state.status === "failed") {
+    } else if (state.status === 'failed') {
       set({
-        testStatus: "failed",
+        testStatus: 'failed',
         executionId: null,
         isExecuting: false,
       });
       // 2 秒后重置
       setTimeout(() => {
-        set({ testStatus: "idle", currentToolIndex: -1 });
+        set({ testStatus: 'idle', currentToolIndex: -1 });
       }, 2000);
     }
   },

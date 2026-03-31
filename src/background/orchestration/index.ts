@@ -10,12 +10,12 @@ import type {
   ExecutionState,
   AtomicTool,
   ExecuteToolResult,
-} from "@homura/sdk/types";
-import { CONFIG } from "../config";
-import { stateManager } from "./state-manager";
-import { tabTracker } from "./tab-tracker";
-import { retryManager } from "./retry-manager";
-import { contentScriptManager } from "./content-script-manager";
+} from '@homura/sdk/types';
+import { CONFIG } from '../config';
+import { stateManager } from './state-manager';
+import { tabTracker } from './tab-tracker';
+import { retryManager } from './retry-manager';
+import { contentScriptManager } from './content-script-manager';
 
 /**
  * Sleep for a specified duration
@@ -45,12 +45,12 @@ export interface ToolExecution {
 export function initOrchestrator(): void {
   // 监听 tab 更新（页面加载完成）
   chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if (changeInfo.status === "complete" && tab.url) {
+    if (changeInfo.status === 'complete' && tab.url) {
       await handleTabUpdate(tabId, tab);
     }
   });
 
-  console.log("[Orchestrator] Initialized");
+  console.log('[Orchestrator] Initialized');
 }
 
 // ============================================================================
@@ -68,17 +68,17 @@ export async function startExecution(
 
   const state: ExecutionState = {
     id,
-    mode: "sequential",
+    mode: 'sequential',
     currentIndex: 0,
     tools: tools.map((t) => ({
       tool: t.tool,
       params: t.params,
-      status: "pending" as const,
+      status: 'pending' as const,
       retryCount: 0,
     })),
     variables: {},
     history: [],
-    status: "running",
+    status: 'running',
     startTime: new Date().toISOString(),
     lastUpdate: new Date().toISOString(),
     tabId,
@@ -96,8 +96,8 @@ export async function startExecution(
 export async function cancelExecution(): Promise<void> {
   const state = stateManager.getState();
   if (state) {
-    await stateManager.update({ status: "failed" });
-    console.log("[Orchestrator] Execution cancelled");
+    await stateManager.update({ status: 'failed' });
+    console.log('[Orchestrator] Execution cancelled');
   }
 }
 
@@ -130,10 +130,10 @@ async function handleTabUpdate(
 
   console.log(
     `[Orchestrator] Tab ${tabId} loaded, state:`,
-    state ? `${state.status} (tabId: ${state.tabId})` : "null",
+    state ? `${state.status} (tabId: ${state.tabId})` : 'null',
   );
 
-  if (state?.status === "paused") {
+  if (state?.status === 'paused') {
     console.log(
       `[Orchestrator] Resuming execution on tab ${tabId}, was tracking tab ${state.tabId}`,
     );
@@ -147,11 +147,11 @@ async function handleTabUpdate(
  */
 async function resumeExecution(tabId: number): Promise<void> {
   const state = stateManager.getState();
-  if (!state || state.status !== "paused") {
+  if (!state || state.status !== 'paused') {
     return;
   }
 
-  await stateManager.update({ status: "running", tabId });
+  await stateManager.update({ status: 'running', tabId });
   await executeNextTool(tabId);
 }
 
@@ -160,17 +160,17 @@ async function resumeExecution(tabId: number): Promise<void> {
  */
 async function executeNextTool(tabId: number): Promise<void> {
   const state = stateManager.getState();
-  if (!state || state.status !== "running") {
+  if (!state || state.status !== 'running') {
     return;
   }
 
   // 找到下一个待执行的工具
-  const nextIndex = state.tools.findIndex((t) => t.status === "pending");
+  const nextIndex = state.tools.findIndex((t) => t.status === 'pending');
 
   if (nextIndex === -1) {
     // 全部完成
-    await stateManager.update({ status: "completed" });
-    console.log("[Orchestrator] Execution completed");
+    await stateManager.update({ status: 'completed' });
+    console.log('[Orchestrator] Execution completed');
     return;
   }
 
@@ -182,7 +182,7 @@ async function executeNextTool(tabId: number): Promise<void> {
   await stateManager.update({
     currentIndex: nextIndex,
     tools: state.tools.map((t, i) =>
-      i === nextIndex ? { ...t, status: "running" as const } : t,
+      i === nextIndex ? { ...t, status: 'running' as const } : t,
     ),
   });
 
@@ -199,7 +199,7 @@ async function executeNextTool(tabId: number): Promise<void> {
     // 处理执行结果，传入执行前的 URL
     await handleToolResult(tabId, nextIndex, result, beforeUrl);
   } catch (error) {
-    console.error("[Orchestrator] Tool execution error:", error);
+    console.error('[Orchestrator] Tool execution error:', error);
     await handleToolFailure(nextIndex, error);
   }
 }
@@ -210,9 +210,9 @@ async function executeNextTool(tabId: number): Promise<void> {
 async function getCurrentTabUrl(tabId: number): Promise<string> {
   try {
     const tab = await chrome.tabs.get(tabId);
-    return tab.url || "";
+    return tab.url || '';
   } catch {
-    return "";
+    return '';
   }
 }
 
@@ -235,7 +235,7 @@ async function handleToolResult(
     i === toolIndex
       ? {
           ...t,
-          status: result.success ? ("completed" as const) : ("failed" as const),
+          status: result.success ? ('completed' as const) : ('failed' as const),
           result,
           timestamp: new Date().toISOString(),
         }
@@ -265,22 +265,22 @@ async function handleToolResult(
   if (result.metadata?.pageNavigated) {
     await stateManager.update({
       currentUrl: result.metadata.newUrl,
-      status: "paused",
+      status: 'paused',
     });
-    console.log("[Orchestrator] Page navigation detected, execution paused");
+    console.log('[Orchestrator] Page navigation detected, execution paused');
     return;
   }
 
   // 处理失败
   if (!result.success) {
-    await stateManager.update({ status: "failed" });
-    console.error("[Orchestrator] Execution failed:", result.error);
+    await stateManager.update({ status: 'failed' });
+    console.error('[Orchestrator] Execution failed:', result.error);
     return;
   }
 
   // URL 变化检测：只有 URL 变化时才检测新 tab
   const afterUrl = await getCurrentTabUrl(tabId);
-  const urlChanged = beforeUrl !== afterUrl && afterUrl !== "";
+  const urlChanged = beforeUrl !== afterUrl && afterUrl !== '';
 
   if (urlChanged) {
     console.log(
@@ -293,7 +293,7 @@ async function handleToolResult(
       tabId = newTab.id;
     } else {
       // 同一 tab 但 URL 变化了（可能是页面内跳转）
-      console.log("[Orchestrator] Same tab, URL changed (in-page navigation)");
+      console.log('[Orchestrator] Same tab, URL changed (in-page navigation)');
       await sleep(CONFIG.DELAY.SAME_TAB_TOOL);
     }
   } else {
@@ -321,7 +321,7 @@ async function handleToolFailure(
     i === toolIndex
       ? {
           ...t,
-          status: "failed" as const,
+          status: 'failed' as const,
           timestamp: new Date().toISOString(),
         }
       : t,
@@ -329,10 +329,10 @@ async function handleToolFailure(
 
   await stateManager.update({
     tools: updatedTools,
-    status: "failed",
+    status: 'failed',
   });
 
-  console.error("[Orchestrator] Tool execution failed:", errorMessage);
+  console.error('[Orchestrator] Tool execution failed:', errorMessage);
 }
 
 /**

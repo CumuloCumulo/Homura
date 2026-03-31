@@ -6,7 +6,7 @@
  * Types for tool execution requests, responses, and errors.
  */
 
-import type { SelectorLogic } from "./selector.js";
+import type { SelectorLogic } from './selector.js';
 
 // ============================================================================
 // Execution Mode
@@ -17,13 +17,13 @@ import type { SelectorLogic } from "./selector.js";
  * - simple: 简单模式，固定时间间隔顺序执行
  * - advanced: 高级模式，智能等待页面就绪，支持跨页面执行
  */
-export type ExecutionMode = "simple" | "advanced";
+export type ExecutionMode = 'simple' | 'advanced';
 
 /**
  * 简单模式执行配置
  */
 export interface SimpleExecutionConfig {
-  mode: "simple";
+  mode: 'simple';
   /** 工具之间的延迟（毫秒），默认 2000 */
   toolDelay?: number;
 }
@@ -32,7 +32,7 @@ export interface SimpleExecutionConfig {
  * 高级模式执行配置
  */
 export interface AdvancedExecutionConfig {
-  mode: "advanced";
+  mode: 'advanced';
   /** 页面导航超时（毫秒），默认 30000 */
   pageNavigationTimeout?: number;
   /** Content script 超时（毫秒），默认 10000 */
@@ -52,7 +52,7 @@ export type ExecutionModeConfig =
  * Parameter definition for an atomic tool
  */
 export interface ToolParameter {
-  type: "string" | "number" | "boolean" | "array";
+  type: 'string' | 'number' | 'boolean' | 'array';
   description: string;
   required?: boolean;
   default?: string | number | boolean;
@@ -61,7 +61,7 @@ export interface ToolParameter {
 /**
  * Tool source type - indicates how the tool was created
  */
-export type ToolSource = "recorded" | "manual" | "imported";
+export type ToolSource = 'recorded' | 'manual' | 'imported';
 
 /**
  * Atomic Tool: A complete, reusable automation action
@@ -131,15 +131,15 @@ export interface ExecuteToolResult {
 export interface ExecutionError {
   /** Error code for programmatic handling */
   code:
-    | "SCOPE_NOT_FOUND" // Scope selector matched 0 elements
-    | "ANCHOR_NOT_FOUND" // No element in scope matched anchor
-    | "TARGET_NOT_FOUND" // Target selector not found in context
-    | "ACTION_FAILED" // Action execution failed
-    | "TIMEOUT" // Wait timeout exceeded
-    | "INVALID_SELECTOR" // CSS selector syntax error
-    | "PAGE_NOT_READY" // Page not ready for execution
-    | "NAVIGATION_FAILED" // Navigation failed
-    | "UNKNOWN"; // Unexpected error
+    | 'SCOPE_NOT_FOUND' // Scope selector matched 0 elements
+    | 'ANCHOR_NOT_FOUND' // No element in scope matched anchor
+    | 'TARGET_NOT_FOUND' // Target selector not found in context
+    | 'ACTION_FAILED' // Action execution failed
+    | 'TIMEOUT' // Wait timeout exceeded
+    | 'INVALID_SELECTOR' // CSS selector syntax error
+    | 'PAGE_NOT_READY' // Page not ready for execution
+    | 'NAVIGATION_FAILED' // Navigation failed
+    | 'UNKNOWN'; // Unexpected error
   /** Human-readable message */
   message: string;
   /** The selector that failed (for self-healing) */
@@ -164,7 +164,7 @@ export interface ExecutorOptions {
  * Debug step information for callback
  */
 export interface DebugStep {
-  type: "scope" | "anchor" | "target" | "action";
+  type: 'scope' | 'anchor' | 'target' | 'action';
   selector?: string;
   matchCount?: number;
   element?: Element;
@@ -182,7 +182,7 @@ export interface ExecutionState {
   id: string;
 
   /** 执行模式 */
-  mode: "sequential" | "agent" | "interactive";
+  mode: 'sequential' | 'agent' | 'interactive';
 
   /** 执行模式（simple/advanced） */
   executionMode?: ExecutionMode;
@@ -202,7 +202,7 @@ export interface ExecutionState {
   history: ExecutionStep[];
 
   /** 状态 */
-  status: "idle" | "running" | "paused" | "completed" | "failed";
+  status: 'idle' | 'running' | 'paused' | 'completed' | 'failed';
 
   /** 开始时间 */
   startTime: string;
@@ -228,7 +228,7 @@ export interface ToolExecution {
   params: Record<string, unknown>;
 
   /** 执行状态 */
-  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
 
   /** 执行结果 */
   result?: ExecuteToolResult;
@@ -281,7 +281,7 @@ export interface ExecutionConfig {
   timeout?: number;
 
   /** 失败策略 */
-  failureStrategy?: "stop" | "continue" | "retry";
+  failureStrategy?: 'stop' | 'continue' | 'retry';
 
   /** 调试模式 */
   debug?: boolean;
@@ -308,7 +308,7 @@ export interface ExecutionConfig {
  */
 export interface AIDecision {
   /** 决策类型 */
-  action: "call_skill" | "complete" | "ask_user" | "skip" | "retry";
+  action: 'call_skill' | 'complete' | 'ask_user' | 'skip' | 'retry';
 
   /** 工具 ID（call_skill 时） */
   skillId?: string;
@@ -390,7 +390,7 @@ export interface ReadinessResult {
   duration: number;
 
   /** 检测到的页面类型 */
-  pageType: "spa" | "traditional" | "unknown";
+  pageType: 'spa' | 'traditional' | 'unknown';
 
   /** 错误信息（如果失败） */
   error?: string;
@@ -418,7 +418,7 @@ export interface SPADetectionResult {
   isSPA: boolean;
 
   /** 检测到的框架类型 */
-  framework?: "vue" | "react" | "angular" | "unknown";
+  framework?: 'vue' | 'react' | 'angular' | 'unknown';
 
   /** 根节点选择器 */
   rootSelector?: string;

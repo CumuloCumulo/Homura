@@ -18,8 +18,8 @@ import type {
   ExecutionState,
   ExecuteToolResult,
   SimpleExecutionConfig,
-} from "@homura/sdk/types";
-import { executeToolOnTab } from "../messaging";
+} from '@homura/sdk/types';
+import { executeToolOnTab } from '../messaging';
 
 // ============================================================================
 // Types
@@ -44,12 +44,12 @@ export interface SimpleExecutorState {
   tools: Array<{
     tool: AtomicTool;
     params: Record<string, unknown>;
-    status: "pending" | "running" | "completed" | "failed";
+    status: 'pending' | 'running' | 'completed' | 'failed';
     result?: ExecuteToolResult;
     timestamp?: string;
   }>;
   /** 执行状态 */
-  status: "idle" | "running" | "completed" | "failed";
+  status: 'idle' | 'running' | 'completed' | 'failed';
   /** 开始时间 */
   startTime: string;
   /** 最后更新时间 */
@@ -84,7 +84,7 @@ class SimpleExecutor {
   async start(
     tools: Array<{ tool: AtomicTool; params: Record<string, unknown> }>,
     tabId: number,
-    config: SimpleExecutionConfig = { mode: "simple", toolDelay: 2000 },
+    config: SimpleExecutionConfig = { mode: 'simple', toolDelay: 2000 },
   ): Promise<SimpleExecutorState> {
     const id = this.generateExecutionId();
 
@@ -94,9 +94,9 @@ class SimpleExecutor {
       tools: tools.map((t) => ({
         tool: t.tool,
         params: t.params,
-        status: "pending" as const,
+        status: 'pending' as const,
       })),
-      status: "running",
+      status: 'running',
       startTime: new Date().toISOString(),
       lastUpdate: new Date().toISOString(),
       tabId,
@@ -105,7 +105,7 @@ class SimpleExecutor {
     };
 
     this.isCancelled = false;
-    console.log("[SimpleExecutor] Starting execution:", {
+    console.log('[SimpleExecutor] Starting execution:', {
       id,
       toolCount: tools.length,
       config,
@@ -113,9 +113,9 @@ class SimpleExecutor {
 
     // 异步执行（不阻塞响应）
     this.execute(tabId, config).catch((error) => {
-      console.error("[SimpleExecutor] Execution error:", error);
+      console.error('[SimpleExecutor] Execution error:', error);
       if (this.state) {
-        this.state.status = "failed";
+        this.state.status = 'failed';
         this.state.error =
           error instanceof Error ? error.message : String(error);
         this.state.lastUpdate = new Date().toISOString();
@@ -139,10 +139,10 @@ class SimpleExecutor {
     for (let i = 0; i < this.state.tools.length; i++) {
       // 检查是否被取消
       if (this.isCancelled) {
-        console.log("[SimpleExecutor] Execution cancelled at index", i);
+        console.log('[SimpleExecutor] Execution cancelled at index', i);
         if (this.state) {
-          this.state.status = "failed";
-          this.state.error = "执行被取消";
+          this.state.status = 'failed';
+          this.state.error = '执行被取消';
         }
         return;
       }
@@ -159,7 +159,7 @@ class SimpleExecutor {
       );
 
       // 更新状态为运行中
-      toolExec.status = "running";
+      toolExec.status = 'running';
       this.state.currentIndex = i;
       this.state.lastUpdate = new Date().toISOString();
 
@@ -177,7 +177,7 @@ class SimpleExecutor {
         const duration = Date.now() - startTime;
 
         // 更新工具状态
-        toolExec.status = result.success ? "completed" : "failed";
+        toolExec.status = result.success ? 'completed' : 'failed';
         toolExec.result = result;
         toolExec.timestamp = new Date().toISOString();
 
@@ -204,12 +204,12 @@ class SimpleExecutor {
           console.log(`[SimpleExecutor]   Error:`, result.error);
 
           // 简单模式：快速失败，停止执行
-          this.state.status = "failed";
+          this.state.status = 'failed';
           this.state.error = result.error
-            ? typeof result.error === "string"
+            ? typeof result.error === 'string'
               ? result.error
-              : result.error.message || "未知错误"
-            : "工具执行失败";
+              : result.error.message || '未知错误'
+            : '工具执行失败';
           return;
         }
 
@@ -231,11 +231,11 @@ class SimpleExecutor {
         console.log(`[SimpleExecutor]   Exception:`, error);
 
         // 更新工具状态
-        toolExec.status = "failed";
+        toolExec.status = 'failed';
         toolExec.result = {
           success: false,
           error: {
-            code: "UNKNOWN",
+            code: 'UNKNOWN',
             message: errorMessage,
           },
           metadata: { duration },
@@ -245,7 +245,7 @@ class SimpleExecutor {
         this.state.lastUpdate = new Date().toISOString();
 
         // 简单模式：快速失败
-        this.state.status = "failed";
+        this.state.status = 'failed';
         this.state.error = errorMessage;
         return;
       }
@@ -253,10 +253,10 @@ class SimpleExecutor {
 
     // 所有工具执行完成
     if (this.state) {
-      this.state.status = "completed";
+      this.state.status = 'completed';
       this.state.currentIndex = this.state.tools.length;
       this.state.lastUpdate = new Date().toISOString();
-      console.log("[SimpleExecutor] All tools completed successfully");
+      console.log('[SimpleExecutor] All tools completed successfully');
     }
   }
 
@@ -264,11 +264,11 @@ class SimpleExecutor {
    * 取消执行
    */
   async cancel(): Promise<void> {
-    console.log("[SimpleExecutor] Cancelling execution...");
+    console.log('[SimpleExecutor] Cancelling execution...');
     this.isCancelled = true;
     if (this.state) {
-      this.state.status = "failed";
-      this.state.error = "执行被取消";
+      this.state.status = 'failed';
+      this.state.error = '执行被取消';
       this.state.lastUpdate = new Date().toISOString();
     }
   }
@@ -303,8 +303,8 @@ class SimpleExecutor {
 
     return {
       id: this.state.id,
-      mode: "sequential",
-      executionMode: "simple",
+      mode: 'sequential',
+      executionMode: 'simple',
       executionConfig: this.state.config,
       currentIndex: this.state.currentIndex,
       tools: this.state.tools.map((t) => ({
@@ -318,11 +318,11 @@ class SimpleExecutor {
       variables: {},
       history: this.state.history,
       status: this.state.status as
-        | "idle"
-        | "running"
-        | "paused"
-        | "completed"
-        | "failed",
+        | 'idle'
+        | 'running'
+        | 'paused'
+        | 'completed'
+        | 'failed',
       startTime: this.state.startTime,
       lastUpdate: this.state.lastUpdate,
       tabId: this.state.tabId,
